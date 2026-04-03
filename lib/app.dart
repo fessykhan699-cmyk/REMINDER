@@ -1,0 +1,29 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'core/theme/app_theme.dart';
+import 'core/utils/app_router.dart';
+
+class InvoiceReminderApp extends ConsumerWidget {
+  const InvoiceReminderApp({
+    super.key,
+    this.scaffoldBackgroundColor = const Color(0xFF0F1115),
+  });
+
+  final Color scaffoldBackgroundColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
+
+    return MaterialApp.router(
+      title: 'Invoice Reminder',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.dark,
+      theme: AppTheme.darkTheme.copyWith(
+        scaffoldBackgroundColor: scaffoldBackgroundColor,
+      ),
+      routerConfig: router,
+    );
+  }
+}
