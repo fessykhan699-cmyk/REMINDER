@@ -7,8 +7,10 @@ import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/invoice_repository.dart';
 import '../../domain/usecases/create_invoice_usecase.dart';
+import '../../domain/usecases/delete_invoice_usecase.dart';
 import '../../domain/usecases/get_invoices_usecase.dart';
 import '../../domain/usecases/update_invoice_usecase.dart';
+import 'invoice_creation_learning_controller.dart';
 
 final invoicesLocalDatasourceProvider = Provider<InvoicesLocalDatasource>(
   (ref) => InvoicesLocalDatasource(),
@@ -28,6 +30,10 @@ final createInvoiceUseCaseProvider = Provider<CreateInvoiceUseCase>(
 
 final updateInvoiceUseCaseProvider = Provider<UpdateInvoiceUseCase>(
   (ref) => UpdateInvoiceUseCase(ref.watch(invoiceRepositoryProvider)),
+);
+
+final deleteInvoiceUseCaseProvider = Provider<DeleteInvoiceUseCase>(
+  (ref) => DeleteInvoiceUseCase(ref.watch(invoiceRepositoryProvider)),
 );
 
 final invoicesControllerProvider =
@@ -96,14 +102,33 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     }
   }
 
-  Future<void> createInvoice(Invoice invoice) async {
+  Future<Invoice> createInvoice(Invoice invoice) async {
     final created = await ref.read(createInvoiceUseCaseProvider).call(invoice);
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
     ref.invalidate(invoiceDetailProvider(invoice.id));
     await ref
+        .read(invoiceCreationLearningProvider.notifier)
+        .recordCreatedInvoice(created);
+    await ref
         .read(adaptiveSystemProvider.notifier)
         .recordAction(AdaptiveActionKey.newInvoice);
+    return created;
+  }
+
+  Future<void> deleteInvoice(String invoiceId) async {
+    final current = state.valueOrNull ?? const <Invoice>[];
+    final updatedList = current
+        .where((item) => item.id != invoiceId)
+        .toList(growable: false);
+
+    await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
+
+    state = AsyncValue.data(updatedList);
+    ref.invalidate(invoiceDetailProvider(invoiceId));
+    await ref
+        .read(invoiceCreationLearningProvider.notifier)
+        .rebuildFromInvoices(updatedList);
   }
 
   Future<void> updateInvoice(Invoice invoice) async {

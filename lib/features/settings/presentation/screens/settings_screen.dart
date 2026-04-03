@@ -5,6 +5,7 @@ import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../../../shared/widgets/app_failure_state.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../invoices/presentation/controllers/invoice_creation_learning_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../widgets/settings_tile.dart';
 
@@ -14,6 +15,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(settingsControllerProvider);
+    final quickCreateSettings = ref.watch(invoiceCreationLearningProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -52,6 +54,27 @@ class SettingsScreen extends ConsumerWidget {
                 title: 'Security',
                 subtitle: 'Session and account security',
                 trailing: Icon(Icons.chevron_right),
+              ),
+              SettingsTile(
+                title: 'Open Quick Invoice Details',
+                subtitle: quickCreateSettings.openDetailAfterQuickCreate
+                    ? 'One-tap invoices open the detail view after creation.'
+                    : 'One-tap invoices stay in place and show undo feedback only.',
+                trailing: Switch.adaptive(
+                  value: quickCreateSettings.openDetailAfterQuickCreate,
+                  onChanged: (value) {
+                    ref
+                        .read(invoiceCreationLearningProvider.notifier)
+                        .setOpenDetailAfterQuickCreate(value);
+                  },
+                ),
+                onTap: () {
+                  ref
+                      .read(invoiceCreationLearningProvider.notifier)
+                      .setOpenDetailAfterQuickCreate(
+                        !quickCreateSettings.openDetailAfterQuickCreate,
+                      );
+                },
               ),
               const SizedBox(height: 20),
               PrimaryButton(

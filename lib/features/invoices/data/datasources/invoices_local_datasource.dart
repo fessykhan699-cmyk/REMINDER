@@ -96,6 +96,19 @@ class InvoicesLocalDatasource {
     return invoice;
   }
 
+  Future<void> deleteInvoice(String id) async {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    final index = _invoices.indexWhere((item) => item.id == id);
+    if (index < 0) {
+      throw Exception('Invoice not found.');
+    }
+
+    _invoices.removeAt(index);
+    _invoiceCache.remove(id);
+    _pageCache.clear();
+  }
+
   Future<InvoiceModel?> getInvoiceById(String id) async {
     final cached = _invoiceCache[id];
     if (cached != null) {

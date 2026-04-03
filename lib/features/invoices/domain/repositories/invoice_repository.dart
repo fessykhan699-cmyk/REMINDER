@@ -11,5 +11,7 @@ abstract interface class InvoiceRepository {
 
   Future<Invoice> updateInvoice(Invoice invoice);
 
+  Future<void> deleteInvoice(String id);
+
   Future<Invoice?> getInvoiceById(String id);
 }

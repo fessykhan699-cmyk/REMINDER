@@ -85,7 +85,7 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
     }
   }
 
-  Future<void> addClient({
+  Future<Client> addClient({
     required String name,
     required String email,
     required String phone,
@@ -104,5 +104,6 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
     await ref
         .read(adaptiveSystemProvider.notifier)
         .recordAction(AdaptiveActionKey.addClient);
+    return created;
   }
 }
