@@ -11,6 +11,7 @@ import '../../../clients/domain/entities/client.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
+import '../controllers/invoice_prediction_engine.dart';
 import '../controllers/invoices_controller.dart';
 
 class CreateInvoiceScreen extends ConsumerStatefulWidget {
@@ -125,21 +126,16 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     });
   }
 
-  CreateInvoiceIntelligence _buildCurrentIntelligence() {
-    final invoices =
-        ref.read(invoicesControllerProvider).valueOrNull ?? const <Invoice>[];
-    final clients =
-        ref.read(clientsControllerProvider).valueOrNull ?? const <Client>[];
-    final learning = ref.read(invoiceCreationLearningProvider);
-
-    return CreateInvoiceIntelligence.fromData(
-      invoices: invoices,
-      clients: clients,
-      learning: learning,
-    );
+  SmartInvoicePrediction _buildCurrentIntelligence() {
+    return ref.read(smartInvoicePredictionProvider);
   }
 
   void _scheduleSmartSync() {
+    final launchMode = ref.read(invoiceCreateLaunchModeProvider);
+    if (launchMode == InvoiceCreateLaunchMode.manual) {
+      return;
+    }
+
     if (_smartSyncScheduled) {
       return;
     }
@@ -155,7 +151,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     });
   }
 
-  void _syncSmartDefaults(CreateInvoiceIntelligence intelligence) {
+  void _syncSmartDefaults(SmartInvoicePrediction intelligence) {
     final selectedClient = _selectedClient;
     if (selectedClient != null) {
       _applyClientSuggestion(
@@ -167,26 +163,36 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
 
     final preferredDueDays = intelligence.preferredDueDays;
-    if (preferredDueDays != null) {
-      _applySmartValues(dueDays: preferredDueDays, force: false);
+    final suggestedAmount = intelligence.quickAmountConfidence >= 0.50
+        ? intelligence.quickAmount
+        : null;
+    final suggestedDueDays = intelligence.preferredDueDaysConfidence >= 0.50
+        ? preferredDueDays
+        : null;
+
+    if (suggestedAmount != null || suggestedDueDays != null) {
+      _applySmartValues(
+        amount: suggestedAmount,
+        dueDays: suggestedDueDays,
+        force: false,
+      );
     }
   }
 
   void _applyClientSuggestion({
-    required CreateInvoiceIntelligence intelligence,
+    required SmartInvoicePrediction intelligence,
     required Client client,
     required bool force,
   }) {
-    final suggestion = intelligence.suggestionFor(client.id);
-    if (suggestion == null) {
-      _applySmartValues(dueDays: intelligence.preferredDueDays, force: force);
-      return;
-    }
+    final draft = intelligence.buildDraftForClient(
+      client,
+      minimumConfidence: 0.50,
+    );
 
     _applySmartValues(
-      service: suggestion.service,
-      amount: suggestion.amount,
-      dueDays: suggestion.suggestedDueDays ?? intelligence.preferredDueDays,
+      service: draft.usedFallbackService ? null : draft.service,
+      amount: draft.usedFallbackAmount ? null : draft.amount,
+      dueDays: draft.dueDays,
       force: force,
     );
   }
@@ -256,15 +262,17 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   }
 
   String _buildAmountHintText(
-    CreateInvoiceIntelligence intelligence,
-    CreateInvoiceClientSuggestion? clientSuggestion,
+    SmartInvoicePrediction intelligence,
+    SmartClientSuggestion? clientSuggestion,
   ) {
-    if (clientSuggestion?.amount != null) {
+    if (clientSuggestion?.amount != null &&
+        (clientSuggestion?.amountConfidence ?? 0) >= 0.50) {
       final amountReason = clientSuggestion?.amountReason ?? 'last used';
       return '${_compactCurrency(clientSuggestion!.amount!)} ($amountReason)';
     }
 
-    if (intelligence.quickAmount != null) {
+    if (intelligence.quickAmount != null &&
+        intelligence.quickAmountConfidence >= 0.50) {
       final amountReason = intelligence.quickAmountReason ?? 'common amount';
       return '${_compactCurrency(intelligence.quickAmount!)} ($amountReason)';
     }
@@ -273,8 +281,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   }
 
   List<_SmartActionChipData> _buildSmartActions(
-    CreateInvoiceIntelligence intelligence,
-    CreateInvoiceClientSuggestion? clientSuggestion,
+    SmartInvoicePrediction intelligence,
+    SmartClientSuggestion? clientSuggestion,
   ) {
     final actions = <_SmartActionChipData>[];
 
@@ -285,21 +293,26 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           : _dueDaysFromInvoice(latestInvoice);
 
       final hasSuggestedBundle =
-          clientSuggestion.service != null ||
-          clientSuggestion.amount != null ||
-          clientSuggestion.suggestedDueDays != null;
+          (clientSuggestion.service != null &&
+              clientSuggestion.serviceConfidence >= 0.50) ||
+          (clientSuggestion.amount != null &&
+              clientSuggestion.amountConfidence >= 0.50) ||
+          (clientSuggestion.suggestedDueDays != null &&
+              clientSuggestion.dueDaysConfidence >= 0.50);
 
       if (hasSuggestedBundle) {
         actions.add(
           _SmartActionChipData(
             label: 'Same as Previous',
             onTap: () {
+              final draft = intelligence.buildDraftForClient(
+                _selectedClient,
+                minimumConfidence: 0.50,
+              );
               _applySmartValues(
-                service: clientSuggestion.service,
-                amount: clientSuggestion.amount,
-                dueDays:
-                    clientSuggestion.suggestedDueDays ??
-                    intelligence.preferredDueDays,
+                service: draft.usedFallbackService ? null : draft.service,
+                amount: draft.usedFallbackAmount ? null : draft.amount,
+                dueDays: draft.dueDays,
                 force: true,
               );
             },
@@ -325,7 +338,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           ),
         );
       } else if (actions.length < 2 &&
-          clientSuggestion.suggestedDueDays != null) {
+          clientSuggestion.suggestedDueDays != null &&
+          clientSuggestion.dueDaysConfidence >= 0.50) {
         actions.add(
           _SmartActionChipData(
             label: 'Due in ${clientSuggestion.suggestedDueDays} days',
@@ -339,7 +353,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         );
       }
     } else {
-      if (intelligence.quickAmount != null) {
+      if (intelligence.quickAmount != null &&
+          intelligence.quickAmountConfidence >= 0.50) {
         actions.add(
           _SmartActionChipData(
             label: 'Quick ${_compactCurrency(intelligence.quickAmount!)}',
@@ -370,7 +385,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   bool _matchesSuggestedSnapshot(
     Invoice latestInvoice,
-    CreateInvoiceClientSuggestion suggestion,
+    SmartClientSuggestion suggestion,
   ) {
     return _sameServiceValue(latestInvoice.service, suggestion.service) &&
         _sameNumericValues(latestInvoice.amount, suggestion.amount) &&
@@ -470,6 +485,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final selectedDueDate = _selectedDueDate;
     final service = _serviceController.text.trim();
     final amount = double.tryParse(_amountController.text.trim());
+    final now = DateTime.now();
+    final intelligence = ref.read(smartInvoicePredictionProvider);
 
     if (!(form?.validate() ?? false) ||
         selectedClient == null ||
@@ -489,12 +506,32 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         amount: amount,
         dueDate: selectedDueDate,
         status: InvoiceStatus.pending,
-        createdAt: DateTime.now(),
+        createdAt: now,
       );
 
-      await ref
+      final createdInvoice = await ref
           .read(invoicesControllerProvider.notifier)
           .createInvoice(invoice);
+      final predictedDraft = intelligence.buildDraftForClient(
+        selectedClient,
+        now: now,
+        minimumConfidence: 0,
+      );
+      await ref
+          .read(invoiceCreationLearningProvider.notifier)
+          .recordPredictionOutcome(
+            predictedClientId: intelligence.suggestedClient?.id,
+            predictedService: predictedDraft.usedFallbackService
+                ? null
+                : predictedDraft.service,
+            predictedAmount: predictedDraft.usedFallbackAmount
+                ? null
+                : predictedDraft.amount,
+            predictedDueDate: predictedDraft.usedFallbackDueDays
+                ? null
+                : predictedDraft.dueDate,
+            actualInvoice: createdInvoice,
+          );
 
       if (!mounted) {
         return;
@@ -518,18 +555,10 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final invoices =
-        ref.watch(invoicesControllerProvider).valueOrNull ?? const <Invoice>[];
-    final clients =
-        ref.watch(clientsControllerProvider).valueOrNull ?? const <Client>[];
-    final learning = ref.watch(invoiceCreationLearningProvider);
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final intelligence = CreateInvoiceIntelligence.fromData(
-      invoices: invoices,
-      clients: clients,
-      learning: learning,
-    );
+    ref.watch(invoiceCreateLaunchModeProvider);
+    final intelligence = ref.watch(smartInvoicePredictionProvider);
     final clientSuggestion = _selectedClient == null
         ? null
         : intelligence.suggestionFor(_selectedClient!.id);

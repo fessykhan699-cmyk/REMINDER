@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +19,14 @@ class InvoiceCreationLearningState {
     required this.dueDaysUsageCounts,
     required this.amountUsageCounts,
     required this.clientMemories,
+    required this.clientPredictionFeedback,
+    required this.servicePredictionFeedback,
+    required this.amountPredictionFeedback,
+    required this.dueDaysPredictionFeedback,
+    required this.lastViewedClientId,
+    required this.lastViewedClientAt,
+    required this.predictionWeights,
+    required this.predictionHistory,
     required this.openDetailAfterQuickCreate,
   });
 
@@ -26,13 +35,85 @@ class InvoiceCreationLearningState {
       dueDaysUsageCounts = const {},
       amountUsageCounts = const {},
       clientMemories = const {},
+      clientPredictionFeedback = const {},
+      servicePredictionFeedback = const {},
+      amountPredictionFeedback = const {},
+      dueDaysPredictionFeedback = const {},
+      lastViewedClientId = null,
+      lastViewedClientAt = null,
+      predictionWeights = const PredictionModelWeights.initial(),
+      predictionHistory = const [],
       openDetailAfterQuickCreate = false;
 
   final String? lastClientId;
   final Map<String, int> dueDaysUsageCounts;
   final Map<String, int> amountUsageCounts;
   final Map<String, InvoiceCreationClientMemory> clientMemories;
+  final Map<String, PredictionFeedback> clientPredictionFeedback;
+  final Map<String, PredictionFeedback> servicePredictionFeedback;
+  final Map<String, PredictionFeedback> amountPredictionFeedback;
+  final Map<String, PredictionFeedback> dueDaysPredictionFeedback;
+  final String? lastViewedClientId;
+  final DateTime? lastViewedClientAt;
+  final PredictionModelWeights predictionWeights;
+  final List<PredictionResult> predictionHistory;
   final bool openDetailAfterQuickCreate;
+
+  List<PredictionResult> get recentPredictionHistory {
+    if (predictionHistory.isEmpty) {
+      return const <PredictionResult>[];
+    }
+
+    final startIndex = predictionHistory.length > 10
+        ? predictionHistory.length - 10
+        : 0;
+    return predictionHistory.sublist(startIndex);
+  }
+
+  double get recentAccuracyAverage {
+    final recentPredictiveHistory = recentPredictionHistory
+        .where((result) => result.hasAnyPrediction)
+        .toList(growable: false);
+    if (recentPredictiveHistory.isEmpty) {
+      return 0.0;
+    }
+
+    final total = recentPredictiveHistory.fold<double>(
+      0.0,
+      (sum, result) => sum + result.accuracyScore,
+    );
+    return total / recentPredictiveHistory.length;
+  }
+
+  int get consecutiveWrongPredictions {
+    var count = 0;
+    for (final result in predictionHistory.reversed) {
+      if (!result.hasAnyPrediction) {
+        continue;
+      }
+      if (result.accuracyScore >= 0.50) {
+        break;
+      }
+      count += 1;
+    }
+    return count;
+  }
+
+  bool get isOneTapTemporarilyDisabled => consecutiveWrongPredictions >= 3;
+
+  double get confidenceAdjustment {
+    if (!predictionHistory.any((result) => result.hasAnyPrediction)) {
+      return 0.0;
+    }
+
+    if (recentAccuracyAverage >= 0.80) {
+      return 0.04;
+    }
+    if (recentAccuracyAverage < 0.50) {
+      return -0.06;
+    }
+    return 0.0;
+  }
 
   InvoiceCreationLearningState copyWith({
     String? lastClientId,
@@ -40,6 +121,16 @@ class InvoiceCreationLearningState {
     Map<String, int>? dueDaysUsageCounts,
     Map<String, int>? amountUsageCounts,
     Map<String, InvoiceCreationClientMemory>? clientMemories,
+    Map<String, PredictionFeedback>? clientPredictionFeedback,
+    Map<String, PredictionFeedback>? servicePredictionFeedback,
+    Map<String, PredictionFeedback>? amountPredictionFeedback,
+    Map<String, PredictionFeedback>? dueDaysPredictionFeedback,
+    String? lastViewedClientId,
+    bool clearLastViewedClientId = false,
+    DateTime? lastViewedClientAt,
+    bool clearLastViewedClientAt = false,
+    PredictionModelWeights? predictionWeights,
+    List<PredictionResult>? predictionHistory,
     bool? openDetailAfterQuickCreate,
   }) {
     return InvoiceCreationLearningState(
@@ -49,6 +140,22 @@ class InvoiceCreationLearningState {
       dueDaysUsageCounts: dueDaysUsageCounts ?? this.dueDaysUsageCounts,
       amountUsageCounts: amountUsageCounts ?? this.amountUsageCounts,
       clientMemories: clientMemories ?? this.clientMemories,
+      clientPredictionFeedback:
+          clientPredictionFeedback ?? this.clientPredictionFeedback,
+      servicePredictionFeedback:
+          servicePredictionFeedback ?? this.servicePredictionFeedback,
+      amountPredictionFeedback:
+          amountPredictionFeedback ?? this.amountPredictionFeedback,
+      dueDaysPredictionFeedback:
+          dueDaysPredictionFeedback ?? this.dueDaysPredictionFeedback,
+      lastViewedClientId: clearLastViewedClientId
+          ? null
+          : (lastViewedClientId ?? this.lastViewedClientId),
+      lastViewedClientAt: clearLastViewedClientAt
+          ? null
+          : (lastViewedClientAt ?? this.lastViewedClientAt),
+      predictionWeights: predictionWeights ?? this.predictionWeights,
+      predictionHistory: predictionHistory ?? this.predictionHistory,
       openDetailAfterQuickCreate:
           openDetailAfterQuickCreate ?? this.openDetailAfterQuickCreate,
     );
@@ -60,6 +167,22 @@ class InvoiceCreationLearningState {
       dueDaysUsageCounts: _toIntMap(json['dueDaysUsageCounts']),
       amountUsageCounts: _toIntMap(json['amountUsageCounts']),
       clientMemories: _toClientMemoryMap(json['clientMemories']),
+      clientPredictionFeedback: _toFeedbackMap(
+        json['clientPredictionFeedback'],
+      ),
+      servicePredictionFeedback: _toFeedbackMap(
+        json['servicePredictionFeedback'],
+      ),
+      amountPredictionFeedback: _toFeedbackMap(
+        json['amountPredictionFeedback'],
+      ),
+      dueDaysPredictionFeedback: _toFeedbackMap(
+        json['dueDaysPredictionFeedback'],
+      ),
+      lastViewedClientId: json['lastViewedClientId'] as String?,
+      lastViewedClientAt: _parseDateTime(json['lastViewedClientAt'] as String?),
+      predictionWeights: _toPredictionWeights(json['predictionWeights']),
+      predictionHistory: _toPredictionHistory(json['predictionHistory']),
       openDetailAfterQuickCreate:
           json['openDetailAfterQuickCreate'] as bool? ?? false,
     );
@@ -73,6 +196,24 @@ class InvoiceCreationLearningState {
       'clientMemories': clientMemories.map(
         (key, value) => MapEntry(key, value.toJson()),
       ),
+      'clientPredictionFeedback': clientPredictionFeedback.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
+      'servicePredictionFeedback': servicePredictionFeedback.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
+      'amountPredictionFeedback': amountPredictionFeedback.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
+      'dueDaysPredictionFeedback': dueDaysPredictionFeedback.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
+      'lastViewedClientId': lastViewedClientId,
+      'lastViewedClientAt': lastViewedClientAt?.toIso8601String(),
+      'predictionWeights': predictionWeights.toJson(),
+      'predictionHistory': predictionHistory
+          .map((result) => result.toJson())
+          .toList(growable: false),
       'openDetailAfterQuickCreate': openDetailAfterQuickCreate,
     };
   }
@@ -111,6 +252,267 @@ class InvoiceCreationLearningState {
       }
     }
     return output;
+  }
+
+  static Map<String, PredictionFeedback> _toFeedbackMap(Object? raw) {
+    if (raw is! Map) {
+      return const {};
+    }
+
+    final output = <String, PredictionFeedback>{};
+    for (final entry in raw.entries) {
+      if (entry.key is String && entry.value is Map<String, dynamic>) {
+        output[entry.key as String] = PredictionFeedback.fromJson(
+          entry.value as Map<String, dynamic>,
+        );
+      } else if (entry.key is String && entry.value is Map) {
+        output[entry.key as String] = PredictionFeedback.fromJson(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+      }
+    }
+    return output;
+  }
+
+  static PredictionModelWeights _toPredictionWeights(Object? raw) {
+    if (raw is Map<String, dynamic>) {
+      return PredictionModelWeights.fromJson(raw);
+    }
+    if (raw is Map) {
+      return PredictionModelWeights.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return const PredictionModelWeights.initial();
+  }
+
+  static List<PredictionResult> _toPredictionHistory(Object? raw) {
+    if (raw is! List) {
+      return const <PredictionResult>[];
+    }
+
+    final output = <PredictionResult>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        output.add(PredictionResult.fromJson(item));
+      } else if (item is Map) {
+        output.add(PredictionResult.fromJson(Map<String, dynamic>.from(item)));
+      }
+    }
+    return output;
+  }
+}
+
+class PredictionFeedback {
+  const PredictionFeedback({
+    required this.acceptedCount,
+    required this.editedCount,
+    required this.lastUpdatedAt,
+  });
+
+  const PredictionFeedback.initial()
+    : acceptedCount = 0,
+      editedCount = 0,
+      lastUpdatedAt = null;
+
+  final int acceptedCount;
+  final int editedCount;
+  final DateTime? lastUpdatedAt;
+
+  double get smoothedAcceptanceRate {
+    final accepted = acceptedCount + 2.6;
+    final edited = editedCount + 1.4;
+    return accepted / (accepted + edited);
+  }
+
+  PredictionFeedback record({required bool accepted, required DateTime at}) {
+    return PredictionFeedback(
+      acceptedCount: acceptedCount + (accepted ? 1 : 0),
+      editedCount: editedCount + (accepted ? 0 : 1),
+      lastUpdatedAt: at,
+    );
+  }
+
+  factory PredictionFeedback.fromJson(Map<String, dynamic> json) {
+    return PredictionFeedback(
+      acceptedCount: (json['acceptedCount'] as num?)?.toInt() ?? 0,
+      editedCount: (json['editedCount'] as num?)?.toInt() ?? 0,
+      lastUpdatedAt: _parseDateTime(json['lastUpdatedAt'] as String?),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'acceptedCount': acceptedCount,
+      'editedCount': editedCount,
+      'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
+    };
+  }
+}
+
+class PredictionModelWeights {
+  const PredictionModelWeights({
+    required this.clientWeight,
+    required this.serviceWeight,
+    required this.amountWeight,
+    required this.dueDateWeight,
+    required this.recencyWeight,
+  });
+
+  const PredictionModelWeights.initial()
+    : clientWeight = 0.30,
+      serviceWeight = 0.20,
+      amountWeight = 0.25,
+      dueDateWeight = 0.15,
+      recencyWeight = 0.10;
+
+  final double clientWeight;
+  final double serviceWeight;
+  final double amountWeight;
+  final double dueDateWeight;
+  final double recencyWeight;
+
+  PredictionModelWeights copyWith({
+    double? clientWeight,
+    double? serviceWeight,
+    double? amountWeight,
+    double? dueDateWeight,
+    double? recencyWeight,
+  }) {
+    return PredictionModelWeights(
+      clientWeight: clientWeight ?? this.clientWeight,
+      serviceWeight: serviceWeight ?? this.serviceWeight,
+      amountWeight: amountWeight ?? this.amountWeight,
+      dueDateWeight: dueDateWeight ?? this.dueDateWeight,
+      recencyWeight: recencyWeight ?? this.recencyWeight,
+    );
+  }
+
+  PredictionModelWeights normalized() {
+    const fixedRecencyWeight = 0.10;
+    final nextClientWeight = clientWeight.clamp(0.06, 0.70).toDouble();
+    final nextServiceWeight = serviceWeight.clamp(0.06, 0.70).toDouble();
+    final nextAmountWeight = amountWeight.clamp(0.06, 0.70).toDouble();
+    final nextDueDateWeight = dueDateWeight.clamp(0.06, 0.70).toDouble();
+    final tunableWeightTotal =
+        nextClientWeight +
+        nextServiceWeight +
+        nextAmountWeight +
+        nextDueDateWeight;
+
+    if (tunableWeightTotal <= 0.0) {
+      return const PredictionModelWeights.initial();
+    }
+
+    final scale = (1.0 - fixedRecencyWeight) / tunableWeightTotal;
+    return PredictionModelWeights(
+      clientWeight: nextClientWeight * scale,
+      serviceWeight: nextServiceWeight * scale,
+      amountWeight: nextAmountWeight * scale,
+      dueDateWeight: nextDueDateWeight * scale,
+      recencyWeight: fixedRecencyWeight,
+    );
+  }
+
+  factory PredictionModelWeights.fromJson(Map<String, dynamic> json) {
+    return PredictionModelWeights(
+      clientWeight: (json['clientWeight'] as num?)?.toDouble() ?? 0.30,
+      serviceWeight: (json['serviceWeight'] as num?)?.toDouble() ?? 0.20,
+      amountWeight: (json['amountWeight'] as num?)?.toDouble() ?? 0.25,
+      dueDateWeight: (json['dueDateWeight'] as num?)?.toDouble() ?? 0.15,
+      recencyWeight: (json['recencyWeight'] as num?)?.toDouble() ?? 0.10,
+    ).normalized();
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'clientWeight': clientWeight,
+      'serviceWeight': serviceWeight,
+      'amountWeight': amountWeight,
+      'dueDateWeight': dueDateWeight,
+      'recencyWeight': recencyWeight,
+    };
+  }
+}
+
+class PredictionResult {
+  const PredictionResult({
+    required this.predictedClientId,
+    required this.predictedService,
+    required this.predictedAmount,
+    required this.predictedDueDate,
+    required this.actualClientId,
+    required this.actualService,
+    required this.actualAmount,
+    required this.actualDueDate,
+    required this.clientAccuracy,
+    required this.serviceAccuracy,
+    required this.amountAccuracy,
+    required this.dueDateAccuracy,
+    required this.accuracyScore,
+    required this.createdAt,
+  });
+
+  final String? predictedClientId;
+  final String? predictedService;
+  final double? predictedAmount;
+  final DateTime? predictedDueDate;
+  final String actualClientId;
+  final String actualService;
+  final double actualAmount;
+  final DateTime actualDueDate;
+  final double clientAccuracy;
+  final double serviceAccuracy;
+  final double amountAccuracy;
+  final double dueDateAccuracy;
+  final double accuracyScore;
+  final DateTime createdAt;
+
+  bool get hasAnyPrediction {
+    return predictedClientId != null ||
+        predictedService != null ||
+        predictedAmount != null ||
+        predictedDueDate != null;
+  }
+
+  factory PredictionResult.fromJson(Map<String, dynamic> json) {
+    return PredictionResult(
+      predictedClientId: json['predictedClientId'] as String?,
+      predictedService: json['predictedService'] as String?,
+      predictedAmount: (json['predictedAmount'] as num?)?.toDouble(),
+      predictedDueDate: _parseDateTime(json['predictedDueDate'] as String?),
+      actualClientId: json['actualClientId'] as String? ?? '',
+      actualService: json['actualService'] as String? ?? '',
+      actualAmount: (json['actualAmount'] as num?)?.toDouble() ?? 0.0,
+      actualDueDate:
+          _parseDateTime(json['actualDueDate'] as String?) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      clientAccuracy: (json['clientAccuracy'] as num?)?.toDouble() ?? 0.0,
+      serviceAccuracy: (json['serviceAccuracy'] as num?)?.toDouble() ?? 0.0,
+      amountAccuracy: (json['amountAccuracy'] as num?)?.toDouble() ?? 0.0,
+      dueDateAccuracy: (json['dueDateAccuracy'] as num?)?.toDouble() ?? 0.0,
+      accuracyScore: (json['accuracyScore'] as num?)?.toDouble() ?? 0.0,
+      createdAt:
+          _parseDateTime(json['createdAt'] as String?) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'predictedClientId': predictedClientId,
+      'predictedService': predictedService,
+      'predictedAmount': predictedAmount,
+      'predictedDueDate': predictedDueDate?.toIso8601String(),
+      'actualClientId': actualClientId,
+      'actualService': actualService,
+      'actualAmount': actualAmount,
+      'actualDueDate': actualDueDate.toIso8601String(),
+      'clientAccuracy': clientAccuracy,
+      'serviceAccuracy': serviceAccuracy,
+      'amountAccuracy': amountAccuracy,
+      'dueDateAccuracy': dueDateAccuracy,
+      'accuracyScore': accuracyScore,
+      'createdAt': createdAt.toIso8601String(),
+    };
   }
 }
 
@@ -235,6 +637,9 @@ class InvoiceCreationClientMemory {
 class InvoiceCreationLearningController
     extends Notifier<InvoiceCreationLearningState> {
   static const _storageKey = 'invoice_creation_learning_v1';
+  static const _maxPredictionHistory = 30;
+  static const _rollingWindowSize = 10;
+  static const _weightAdjustmentStep = 0.02;
 
   Future<void>? _bootstrapFuture;
 
@@ -336,11 +741,185 @@ class InvoiceCreationLearningController
     await _persist();
   }
 
+  Future<void> recordViewedClient(String clientId) async {
+    if (clientId.isEmpty) {
+      return;
+    }
+
+    await _ensureBootstrapped();
+    final now = DateTime.now();
+    final lastViewedClientAt = state.lastViewedClientAt;
+
+    if (state.lastViewedClientId == clientId &&
+        lastViewedClientAt != null &&
+        now.difference(lastViewedClientAt) < const Duration(minutes: 2)) {
+      return;
+    }
+
+    state = state.copyWith(
+      lastViewedClientId: clientId,
+      lastViewedClientAt: now,
+    );
+    await _persist();
+  }
+
+  Future<void> recordPredictionOutcome({
+    required String? predictedClientId,
+    required String? predictedService,
+    required double? predictedAmount,
+    required DateTime? predictedDueDate,
+    required Invoice actualInvoice,
+  }) async {
+    await _ensureBootstrapped();
+    final now = DateTime.now();
+
+    final clientFeedback = Map<String, PredictionFeedback>.from(
+      state.clientPredictionFeedback,
+    );
+    final serviceFeedback = Map<String, PredictionFeedback>.from(
+      state.servicePredictionFeedback,
+    );
+    final amountFeedback = Map<String, PredictionFeedback>.from(
+      state.amountPredictionFeedback,
+    );
+    final dueDaysFeedback = Map<String, PredictionFeedback>.from(
+      state.dueDaysPredictionFeedback,
+    );
+    final previousWeights = state.predictionWeights;
+
+    final clientAccepted =
+        predictedClientId != null &&
+        predictedClientId == actualInvoice.clientId;
+    final serviceAccepted =
+        predictedService != null &&
+        _normalizedText(predictedService) ==
+            _normalizedText(actualInvoice.service);
+    final amountAccepted =
+        predictedAmount != null &&
+        _amountWithinTolerance(predictedAmount, actualInvoice.amount);
+    final dueDateAccepted =
+        predictedDueDate != null &&
+        _sameCalendarDay(predictedDueDate, actualInvoice.dueDate);
+
+    if (predictedClientId != null && predictedClientId.isNotEmpty) {
+      clientFeedback[predictedClientId] =
+          (clientFeedback[predictedClientId] ??
+                  const PredictionFeedback.initial())
+              .record(accepted: clientAccepted, at: now);
+    }
+
+    if (predictedService != null && predictedService.isNotEmpty) {
+      final serviceKey = _serviceFeedbackKey(
+        actualInvoice.clientId,
+        predictedService,
+      );
+
+      serviceFeedback[serviceKey] =
+          (serviceFeedback[serviceKey] ?? const PredictionFeedback.initial())
+              .record(accepted: serviceAccepted, at: now);
+    }
+
+    if (predictedAmount != null) {
+      final amountKey = _amountFeedbackKey(
+        actualInvoice.clientId,
+        predictedService,
+        predictedAmount,
+      );
+      amountFeedback[amountKey] =
+          (amountFeedback[amountKey] ?? const PredictionFeedback.initial())
+              .record(accepted: amountAccepted, at: now);
+    }
+
+    if (predictedDueDate != null) {
+      final predictedDueDays = _positiveDueDays(
+        actualInvoice.createdAt,
+        predictedDueDate,
+      );
+      if (predictedDueDays != null) {
+        final dueFeedbackKey = _dueDaysFeedbackKey(
+          actualInvoice.clientId,
+          predictedDueDays,
+        );
+        dueDaysFeedback[dueFeedbackKey] =
+            (dueDaysFeedback[dueFeedbackKey] ??
+                    const PredictionFeedback.initial())
+                .record(accepted: dueDateAccepted, at: now);
+      }
+    }
+
+    final predictionResult = PredictionResult(
+      predictedClientId: predictedClientId,
+      predictedService: predictedService,
+      predictedAmount: predictedAmount,
+      predictedDueDate: predictedDueDate,
+      actualClientId: actualInvoice.clientId,
+      actualService: actualInvoice.service,
+      actualAmount: actualInvoice.amount,
+      actualDueDate: actualInvoice.dueDate,
+      clientAccuracy: clientAccepted ? 1.0 : 0.0,
+      serviceAccuracy: serviceAccepted ? 1.0 : 0.0,
+      amountAccuracy: amountAccepted ? 1.0 : 0.0,
+      dueDateAccuracy: dueDateAccepted ? 1.0 : 0.0,
+      accuracyScore:
+          ((clientAccepted ? 1.0 : 0.0) * 0.30) +
+          ((serviceAccepted ? 1.0 : 0.0) * 0.20) +
+          ((amountAccepted ? 1.0 : 0.0) * 0.30) +
+          ((dueDateAccepted ? 1.0 : 0.0) * 0.20),
+      createdAt: now,
+    );
+
+    final updatedPredictionHistory = predictionResult.hasAnyPrediction
+        ? _appendPredictionResult(state.predictionHistory, predictionResult)
+        : state.predictionHistory;
+    final updatedPredictionWeights = predictionResult.hasAnyPrediction
+        ? _autoTuneWeights(state.predictionWeights, updatedPredictionHistory)
+        : state.predictionWeights;
+
+    assert(() {
+      if (predictionResult.hasAnyPrediction) {
+        debugPrint(
+          'Prediction Accuracy: ${(predictionResult.accuracyScore * 100).round()}%',
+        );
+        final weightSummary = _weightDeltaSummary(
+          previousWeights,
+          updatedPredictionWeights,
+        );
+        if (weightSummary != null) {
+          debugPrint('Weights updated: $weightSummary');
+        }
+        if (_trailingWrongPredictionCount(updatedPredictionHistory) >= 3) {
+          debugPrint(
+            'One-tap invoice temporarily disabled after repeated wrong predictions.',
+          );
+        }
+      }
+      return true;
+    }());
+
+    state = state.copyWith(
+      clientPredictionFeedback: clientFeedback,
+      servicePredictionFeedback: serviceFeedback,
+      amountPredictionFeedback: amountFeedback,
+      dueDaysPredictionFeedback: dueDaysFeedback,
+      predictionWeights: updatedPredictionWeights,
+      predictionHistory: updatedPredictionHistory,
+    );
+    await _persist();
+  }
+
   Future<void> rebuildFromInvoices(List<Invoice> invoices) async {
     await _ensureBootstrapped();
 
     final derivedState = _deriveStateFromInvoices(
       invoices,
+      lastViewedClientId: state.lastViewedClientId,
+      lastViewedClientAt: state.lastViewedClientAt,
+      clientPredictionFeedback: state.clientPredictionFeedback,
+      servicePredictionFeedback: state.servicePredictionFeedback,
+      amountPredictionFeedback: state.amountPredictionFeedback,
+      dueDaysPredictionFeedback: state.dueDaysPredictionFeedback,
+      predictionWeights: state.predictionWeights,
+      predictionHistory: state.predictionHistory,
       openDetailAfterQuickCreate: state.openDetailAfterQuickCreate,
     );
     state = derivedState;
@@ -359,6 +938,14 @@ class InvoiceCreationLearningController
 
   static InvoiceCreationLearningState _deriveStateFromInvoices(
     List<Invoice> invoices, {
+    required String? lastViewedClientId,
+    required DateTime? lastViewedClientAt,
+    required Map<String, PredictionFeedback> clientPredictionFeedback,
+    required Map<String, PredictionFeedback> servicePredictionFeedback,
+    required Map<String, PredictionFeedback> amountPredictionFeedback,
+    required Map<String, PredictionFeedback> dueDaysPredictionFeedback,
+    required PredictionModelWeights predictionWeights,
+    required List<PredictionResult> predictionHistory,
     required bool openDetailAfterQuickCreate,
   }) {
     if (invoices.isEmpty) {
@@ -367,6 +954,14 @@ class InvoiceCreationLearningController
         dueDaysUsageCounts: const {},
         amountUsageCounts: const {},
         clientMemories: const {},
+        clientPredictionFeedback: clientPredictionFeedback,
+        servicePredictionFeedback: servicePredictionFeedback,
+        amountPredictionFeedback: amountPredictionFeedback,
+        dueDaysPredictionFeedback: dueDaysPredictionFeedback,
+        lastViewedClientId: lastViewedClientId,
+        lastViewedClientAt: lastViewedClientAt,
+        predictionWeights: predictionWeights,
+        predictionHistory: predictionHistory,
         openDetailAfterQuickCreate: openDetailAfterQuickCreate,
       );
     }
@@ -444,8 +1039,154 @@ class InvoiceCreationLearningController
       dueDaysUsageCounts: dueDayCounts,
       amountUsageCounts: amountUsageCounts,
       clientMemories: clientMemories,
+      clientPredictionFeedback: clientPredictionFeedback,
+      servicePredictionFeedback: servicePredictionFeedback,
+      amountPredictionFeedback: amountPredictionFeedback,
+      dueDaysPredictionFeedback: dueDaysPredictionFeedback,
+      lastViewedClientId: lastViewedClientId,
+      lastViewedClientAt: lastViewedClientAt,
+      predictionWeights: predictionWeights,
+      predictionHistory: predictionHistory,
       openDetailAfterQuickCreate: openDetailAfterQuickCreate,
     );
+  }
+
+  static List<PredictionResult> _appendPredictionResult(
+    List<PredictionResult> history,
+    PredictionResult result,
+  ) {
+    final nextHistory = List<PredictionResult>.from(history)..add(result);
+    if (nextHistory.length <= _maxPredictionHistory) {
+      return nextHistory;
+    }
+    return nextHistory.sublist(nextHistory.length - _maxPredictionHistory);
+  }
+
+  static PredictionModelWeights _autoTuneWeights(
+    PredictionModelWeights currentWeights,
+    List<PredictionResult> history,
+  ) {
+    if (history.isEmpty) {
+      return currentWeights;
+    }
+
+    final recentHistory = history.length > _rollingWindowSize
+        ? history.sublist(history.length - _rollingWindowSize)
+        : history;
+
+    final clientAccuracy = _averageFieldAccuracy(
+      recentHistory,
+      selector: (result) => result.clientAccuracy,
+      includeResult: (result) => result.predictedClientId != null,
+    );
+    final serviceAccuracy = _averageFieldAccuracy(
+      recentHistory,
+      selector: (result) => result.serviceAccuracy,
+      includeResult: (result) => result.predictedService != null,
+    );
+    final amountAccuracy = _averageFieldAccuracy(
+      recentHistory,
+      selector: (result) => result.amountAccuracy,
+      includeResult: (result) => result.predictedAmount != null,
+    );
+    final dueDateAccuracy = _averageFieldAccuracy(
+      recentHistory,
+      selector: (result) => result.dueDateAccuracy,
+      includeResult: (result) => result.predictedDueDate != null,
+    );
+
+    return currentWeights
+        .copyWith(
+          clientWeight: _tuneWeight(
+            currentWeights.clientWeight,
+            clientAccuracy,
+          ),
+          serviceWeight: _tuneWeight(
+            currentWeights.serviceWeight,
+            serviceAccuracy,
+          ),
+          amountWeight: _tuneWeight(
+            currentWeights.amountWeight,
+            amountAccuracy,
+          ),
+          dueDateWeight: _tuneWeight(
+            currentWeights.dueDateWeight,
+            dueDateAccuracy,
+          ),
+        )
+        .normalized();
+  }
+
+  static double _averageFieldAccuracy(
+    List<PredictionResult> results, {
+    required double Function(PredictionResult result) selector,
+    required bool Function(PredictionResult result) includeResult,
+  }) {
+    final matchingResults = results
+        .where(includeResult)
+        .toList(growable: false);
+    if (matchingResults.isEmpty) {
+      return -1.0;
+    }
+
+    final total = matchingResults.fold<double>(
+      0.0,
+      (sum, result) => sum + selector(result),
+    );
+    return total / matchingResults.length;
+  }
+
+  static double _tuneWeight(double currentWeight, double recentAccuracy) {
+    if (recentAccuracy < 0.0) {
+      return currentWeight;
+    }
+    if (recentAccuracy >= 0.80) {
+      return currentWeight + _weightAdjustmentStep;
+    }
+    if (recentAccuracy <= 0.50) {
+      return currentWeight - _weightAdjustmentStep;
+    }
+    return currentWeight;
+  }
+
+  static int _trailingWrongPredictionCount(List<PredictionResult> history) {
+    var count = 0;
+    for (final result in history.reversed) {
+      if (!result.hasAnyPrediction) {
+        continue;
+      }
+      if (result.accuracyScore >= 0.50) {
+        break;
+      }
+      count += 1;
+    }
+    return count;
+  }
+
+  static String? _weightDeltaSummary(
+    PredictionModelWeights previous,
+    PredictionModelWeights next,
+  ) {
+    final changes = <String>[];
+
+    void addChange(String label, double previousValue, double nextValue) {
+      final delta = nextValue - previousValue;
+      if (delta.abs() < 0.0001) {
+        return;
+      }
+      final prefix = delta >= 0 ? '+' : '';
+      changes.add('$label $prefix${delta.toStringAsFixed(2)}');
+    }
+
+    addChange('client', previous.clientWeight, next.clientWeight);
+    addChange('service', previous.serviceWeight, next.serviceWeight);
+    addChange('amount', previous.amountWeight, next.amountWeight);
+    addChange('due', previous.dueDateWeight, next.dueDateWeight);
+
+    if (changes.isEmpty) {
+      return null;
+    }
+    return changes.join(', ');
   }
 
   static Map<String, Map<String, int>> _cloneNestedIntMap(
@@ -457,6 +1198,36 @@ class InvoiceCreationLearningController
     }
     return clone;
   }
+
+  static String _serviceFeedbackKey(String clientId, String service) {
+    return '$clientId|${_normalizedText(service)}';
+  }
+
+  static String _amountFeedbackKey(
+    String clientId,
+    String? service,
+    double amount,
+  ) {
+    return '$clientId|${_normalizedText(service ?? '*')}|${_amountKey(amount)}';
+  }
+
+  static String _dueDaysFeedbackKey(String clientId, int dueDays) {
+    return '$clientId|$dueDays';
+  }
+}
+
+String _normalizedText(String value) => value.trim().toLowerCase();
+
+bool _amountWithinTolerance(double predictedAmount, double actualAmount) {
+  final baseline = actualAmount.abs() < 0.01 ? 0.01 : actualAmount.abs();
+  final delta = (predictedAmount - actualAmount).abs();
+  return (delta / baseline) <= 0.05;
+}
+
+bool _sameCalendarDay(DateTime left, DateTime right) {
+  return left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
 }
 
 class CreateInvoiceIntelligence {

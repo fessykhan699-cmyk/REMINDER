@@ -8,10 +8,10 @@ import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/id_generator.dart';
-import '../../features/clients/domain/entities/client.dart';
 import '../../features/clients/presentation/controllers/clients_controller.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/invoices/presentation/controllers/invoice_creation_learning_controller.dart';
+import '../../features/invoices/presentation/controllers/invoice_prediction_engine.dart';
 import '../../features/invoices/presentation/controllers/invoices_controller.dart';
 
 class AppShellScaffold extends ConsumerStatefulWidget {
@@ -49,6 +49,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
     ref.read(clientsControllerProvider);
     ref.read(invoiceCreationLearningProvider);
     _recordCurrentTabVisit();
+    _recordLocationContext();
     _refreshPrediction(
       ref.read(invoicesControllerProvider).valueOrNull,
       ref.read(adaptiveSystemProvider),
@@ -74,6 +75,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
       _recordCurrentTabVisit();
     }
     if (oldWidget.currentLocation != widget.currentLocation) {
+      _recordLocationContext();
       _refreshPrediction(
         ref.read(invoicesControllerProvider).valueOrNull,
         ref.read(adaptiveSystemProvider),
@@ -97,6 +99,17 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
     await ref
         .read(adaptiveSystemProvider.notifier)
         .recordTabVisit(_tabForBranchIndex(branchIndex));
+  }
+
+  Future<void> _recordLocationContext() async {
+    final viewedClientId = _extractViewedClientId(widget.currentLocation);
+    if (viewedClientId == null) {
+      return;
+    }
+
+    await ref
+        .read(invoiceCreationLearningProvider.notifier)
+        .recordViewedClient(viewedClientId);
   }
 
   void _refreshPrediction(
@@ -207,6 +220,15 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
     return location.startsWith(SettingsTabRoute.routePath);
   }
 
+  String? _extractViewedClientId(String location) {
+    final match = RegExp(r'^/clients/([^/]+)$').firstMatch(location);
+    final clientId = match?.group(1);
+    if (clientId == null || clientId == 'add') {
+      return null;
+    }
+    return clientId;
+  }
+
   String? _extractInvoiceRouteId(String location) {
     final editMatch = RegExp(r'^/invoices/edit/([^/]+)$').firstMatch(location);
     if (editMatch != null) {
@@ -226,25 +248,36 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
     return invoiceId;
   }
 
-  Future<void> _openNewInvoice(BuildContext context) async {
-    await const CreateInvoiceRoute().push(context);
-  }
-
-  CreateInvoiceIntelligence _buildCreateInvoiceIntelligence() {
-    final invoices =
-        ref.read(invoicesControllerProvider).valueOrNull ?? const <Invoice>[];
-    final clients =
-        ref.read(clientsControllerProvider).valueOrNull ?? const <Client>[];
-    final learning = ref.read(invoiceCreationLearningProvider);
-
-    return CreateInvoiceIntelligence.fromData(
-      invoices: invoices,
-      clients: clients,
-      learning: learning,
+  Future<void> _openNewInvoiceWithMode(
+    BuildContext context, {
+    required InvoiceCreateLaunchMode launchMode,
+  }) async {
+    final launchModeNotifier = ref.read(
+      invoiceCreateLaunchModeProvider.notifier,
     );
+    launchModeNotifier.state = launchMode;
+
+    try {
+      await const CreateInvoiceRoute().push(context);
+    } finally {
+      launchModeNotifier.state = InvoiceCreateLaunchMode.assisted;
+    }
   }
 
-  bool _isDuplicateQuickCreate(QuickCreateInvoiceDraft draft, DateTime now) {
+  SmartInvoicePrediction _buildCreateInvoiceIntelligence() {
+    return ref.read(smartInvoicePredictionProvider);
+  }
+
+  void _logDecision(SmartAutomationDecision decision) {
+    assert(() {
+      debugPrint(
+        '${decision.debugSummary} | mode=${decision.mode.name} | suspended=${decision.oneTapTemporarilyDisabled} | reason=${decision.reason}',
+      );
+      return true;
+    }());
+  }
+
+  bool _isDuplicateQuickCreate(SmartInvoiceDraft draft, DateTime now) {
     final lastQuickCreateAt = _lastQuickCreateAt;
     if (lastQuickCreateAt == null || _lastQuickCreateSignature == null) {
       return false;
@@ -300,10 +333,30 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
   }
 
   Future<void> _handleQuickCreate(BuildContext context) async {
+    final prediction = _buildCreateInvoiceIntelligence();
+    final now = DateTime.now();
+    final decision = prediction.buildPrimaryActionDecision(now: now);
+
+    _logDecision(decision);
+
+    if (!decision.allowsAutomation || decision.draft == null) {
+      if (decision.shouldPrefillForm) {
+        await _openNewInvoiceWithMode(
+          context,
+          launchMode: InvoiceCreateLaunchMode.assisted,
+        );
+      } else {
+        await _openNewInvoiceWithMode(
+          context,
+          launchMode: InvoiceCreateLaunchMode.manual,
+        );
+      }
+      return;
+    }
+
     final messenger = ScaffoldMessenger.of(context);
     final learning = ref.read(invoiceCreationLearningProvider);
-    final draft = _buildCreateInvoiceIntelligence().buildQuickDraft();
-    final now = DateTime.now();
+    final draft = decision.draft!;
 
     if (_isQuickCreating || _isDuplicateQuickCreate(draft, now)) {
       return;
@@ -332,6 +385,16 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
       if (!mounted) {
         return;
       }
+
+      await ref
+          .read(invoiceCreationLearningProvider.notifier)
+          .recordPredictionOutcome(
+            predictedClientId: draft.usedFallbackClient ? null : draft.clientId,
+            predictedService: draft.usedFallbackService ? null : draft.service,
+            predictedAmount: draft.usedFallbackAmount ? null : draft.amount,
+            predictedDueDate: draft.usedFallbackDueDays ? null : draft.dueDate,
+            actualInvoice: createdInvoice,
+          );
 
       _triggerQuickCreateSuccess();
       await HapticFeedback.selectionClick();
@@ -395,7 +458,10 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold>
             prediction: prediction,
             successTick: _quickCreateSuccessTick,
             onPrimaryTap: () => _handleQuickCreate(context),
-            onPrimaryLongPress: () => _openNewInvoice(context),
+            onPrimaryLongPress: () => _openNewInvoiceWithMode(
+              context,
+              launchMode: InvoiceCreateLaunchMode.manual,
+            ),
           ),
         );
       },
