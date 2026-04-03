@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../shared/widgets/app_async_state_view.dart';
+import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../domain/entities/client.dart';
 import '../controllers/clients_controller.dart';
 import '../widgets/client_tile.dart';
@@ -13,7 +14,12 @@ class ClientsListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(clientsControllerProvider);
+    final invoicesState = ref.watch(invoicesControllerProvider);
     final controller = ref.read(clientsControllerProvider.notifier);
+    final invoiceCount = invoicesState.valueOrNull?.length ?? 0;
+    final emptyMessage = invoiceCount > 0
+        ? 'Add a client to keep your future invoices organized.'
+        : 'Add your first client to start invoicing faster.';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Clients')),
@@ -23,13 +29,13 @@ class ClientsListScreen extends ConsumerWidget {
           state: state,
           onRetry: controller.loadInitial,
           emptyTitle: 'No clients yet',
-          emptyMessage: 'Add your first client to start invoicing faster.',
+          emptyMessage: emptyMessage,
           isEmpty: (data) => data.isEmpty,
           builder: (clients) {
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
               itemCount: clients.length + 1,
-              separatorBuilder: (context, index) => const SizedBox(height: 4),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 if (index == clients.length) {
                   if (!controller.hasMore) {
@@ -53,11 +59,6 @@ class ClientsListScreen extends ConsumerWidget {
             );
           },
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => const AddClientRoute().push(context),
-        label: const Text('Add Client'),
-        icon: const Icon(Icons.add),
       ),
     );
   }

@@ -10,12 +10,12 @@ class GlassCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
-    this.borderRadius = const BorderRadius.all(Radius.circular(18)),
-    this.blurSigma = 6,
+    this.borderRadius = const BorderRadius.all(Radius.circular(20)),
+    this.blurSigma = 8,
     this.gradient,
-    this.borderColor = AppColors.cardBorder,
+    this.borderColor,
     this.boxShadow = const [
-      BoxShadow(color: Color(0x26000000), blurRadius: 8, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x26000000), blurRadius: 10, offset: Offset(0, 2)),
     ],
   });
 
@@ -25,12 +25,14 @@ class GlassCard extends StatelessWidget {
   final BorderRadius borderRadius;
   final double blurSigma;
   final Gradient? gradient;
-  final Color borderColor;
+  final Color? borderColor;
   final List<BoxShadow> boxShadow;
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBlur = blurSigma > 6 ? 6.0 : blurSigma;
+    final effectiveBlur = blurSigma.clamp(0.0, 8.0);
+    final effectiveBorder =
+        borderColor ?? AppColors.accent.withValues(alpha: 0.25);
 
     return Container(
       margin: margin,
@@ -50,15 +52,15 @@ class GlassCard extends StatelessWidget {
               padding: padding,
               decoration: BoxDecoration(
                 borderRadius: borderRadius,
-                border: Border.all(color: borderColor),
+                border: Border.all(color: effectiveBorder, width: 1.0),
                 gradient:
                     gradient ??
-                    const LinearGradient(
+                    LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        AppColors.cardBackground,
-                        AppColors.cardBackground,
+                        Colors.white.withValues(alpha: 0.06),
+                        Colors.white.withValues(alpha: 0.03),
                       ],
                     ),
               ),

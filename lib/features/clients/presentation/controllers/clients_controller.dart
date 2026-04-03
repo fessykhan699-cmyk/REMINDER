@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/id_generator.dart';
+import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../data/datasources/clients_local_datasource.dart';
 import '../../data/repositories/client_repository_impl.dart';
 import '../../domain/entities/client.dart';
@@ -100,5 +101,8 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
     final created = await ref.read(addClientUseCaseProvider).call(client);
     final current = state.valueOrNull ?? const <Client>[];
     state = AsyncValue.data([created, ...current]);
+    await ref
+        .read(adaptiveSystemProvider.notifier)
+        .recordAction(AdaptiveActionKey.addClient);
   }
 }

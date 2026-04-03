@@ -25,8 +25,8 @@ class ReminderTypeChip extends StatelessWidget {
       ).colorScheme.primary.withValues(alpha: 0.24),
       side: BorderSide(
         color: selected
-            ? Theme.of(context).colorScheme.primary
-            : AppColors.cardBorder,
+            ? AppColors.accent.withValues(alpha: 0.50)
+            : AppColors.glassBorder,
       ),
     );
   }

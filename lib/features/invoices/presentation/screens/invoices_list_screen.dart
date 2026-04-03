@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../shared/widgets/app_async_state_view.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoices_controller.dart';
 import '../widgets/invoice_tile.dart';
@@ -12,8 +13,14 @@ class InvoicesListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final clientsState = ref.watch(clientsControllerProvider);
     final state = ref.watch(invoicesControllerProvider);
     final controller = ref.read(invoicesControllerProvider.notifier);
+    final clientCount = clientsState.valueOrNull?.length ?? 0;
+    final emptyTitle = clientCount > 0 ? 'Ready to bill' : 'No invoices yet';
+    final emptyMessage = clientCount > 0
+        ? 'Start billing your clients with your first invoice.'
+        : 'Create your first invoice to start the reminder loop.';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Invoices')),
@@ -22,14 +29,14 @@ class InvoicesListScreen extends ConsumerWidget {
         child: AppAsyncStateView<List<Invoice>>(
           state: state,
           onRetry: controller.loadInitial,
-          emptyTitle: 'No invoices yet',
-          emptyMessage: 'Create your first invoice to start the reminder loop.',
+          emptyTitle: emptyTitle,
+          emptyMessage: emptyMessage,
           isEmpty: (data) => data.isEmpty,
           builder: (invoices) {
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
               itemCount: invoices.length + 1,
-              separatorBuilder: (context, index) => const SizedBox(height: 4),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 if (index == invoices.length) {
                   if (!controller.hasMore) {
@@ -53,11 +60,6 @@ class InvoicesListScreen extends ConsumerWidget {
             );
           },
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => const CreateInvoiceRoute().push(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Create Invoice'),
       ),
     );
   }

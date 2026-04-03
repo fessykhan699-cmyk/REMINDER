@@ -62,18 +62,18 @@ class _GlassButtonState extends State<GlassButton> {
             height: 54,
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
               color: style.backgroundColor,
-              border: Border.all(color: style.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.20),
-                  blurRadius: _isPressed
-                      ? (style.elevation + 1.5)
-                      : style.elevation,
-                  offset: Offset(0, _isPressed ? 1.5 : 2),
-                ),
-              ],
+              border: Border.all(color: style.borderColor, width: 1.2),
+              boxShadow: widget.variant == GlassButtonVariant.primary
+                  ? [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.10),
+                        blurRadius: 16,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
             ),
             child: Center(
               child: AnimatedSwitcher(
@@ -140,27 +140,28 @@ class _ButtonStyleData {
 }
 
 _ButtonStyleData _styleForVariant(GlassButtonVariant variant) {
+  const darkGlass = Color(0xE51A1D22);
   switch (variant) {
     case GlassButtonVariant.primary:
-      return const _ButtonStyleData(
-        backgroundColor: AppColors.accentPrimary,
-        borderColor: AppColors.accentPrimary,
+      return _ButtonStyleData(
+        backgroundColor: darkGlass,
+        borderColor: AppColors.accent.withValues(alpha: 0.45),
         foregroundColor: AppColors.textPrimary,
-        elevation: 3,
+        elevation: 0,
       );
     case GlassButtonVariant.secondary:
-      return const _ButtonStyleData(
-        backgroundColor: AppColors.backgroundSecondary,
-        borderColor: AppColors.cardBorder,
+      return _ButtonStyleData(
+        backgroundColor: darkGlass,
+        borderColor: AppColors.glassBorder,
         foregroundColor: AppColors.textPrimary,
-        elevation: 2.5,
+        elevation: 0,
       );
     case GlassButtonVariant.google:
-      return const _ButtonStyleData(
-        backgroundColor: AppColors.cardBackground,
-        borderColor: AppColors.cardBorder,
+      return _ButtonStyleData(
+        backgroundColor: darkGlass,
+        borderColor: AppColors.glassBorder,
         foregroundColor: AppColors.textPrimary,
-        elevation: 2,
+        elevation: 0,
       );
   }
 }
@@ -175,8 +176,8 @@ class _GoogleBadge extends StatelessWidget {
       height: 24,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary,
-        border: Border.all(color: AppColors.cardBorder),
+        color: AppColors.glassFill,
+        border: Border.all(color: AppColors.glassBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Text(

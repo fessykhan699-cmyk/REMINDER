@@ -41,12 +41,10 @@ class _PremiumPrimaryButtonState extends State<PremiumPrimaryButton> {
   @override
   Widget build(BuildContext context) {
     final isPrimary = widget.variant == PremiumButtonVariant.primary;
-    final backgroundColor = isPrimary
-        ? const Color(0xFFC9A86A)
-        : const Color(0xFF1A1D22);
-    final textColor = isPrimary
-        ? const Color(0xFF14171C)
-        : AppColors.textPrimary;
+    const darkGlass = Color(0xE51A1D22);
+    final borderColor = isPrimary
+        ? AppColors.accent.withValues(alpha: _isEnabled ? 0.45 : 0.20)
+        : AppColors.glassBorder;
 
     return AnimatedScale(
       scale: _isPressed ? 0.97 : 1,
@@ -68,12 +66,17 @@ class _PremiumPrimaryButtonState extends State<PremiumPrimaryButton> {
           height: 56,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: backgroundColor,
-            border: Border.all(
-              color: _isEnabled
-                  ? AppColors.cardBorder
-                  : AppColors.cardBorder.withValues(alpha: 0.5),
-            ),
+            color: darkGlass,
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: isPrimary
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.10),
+                      blurRadius: 16,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: AnimatedSwitcher(
@@ -105,7 +108,7 @@ class _PremiumPrimaryButtonState extends State<PremiumPrimaryButton> {
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: _isEnabled
-                                    ? textColor
+                                    ? AppColors.textPrimary
                                     : AppColors.textSecondary,
                                 fontWeight: FontWeight.w700,
                               ),

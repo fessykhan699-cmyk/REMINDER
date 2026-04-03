@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
+
 class PremiumFrostedCard extends StatelessWidget {
   const PremiumFrostedCard({
     super.key,
@@ -9,7 +11,7 @@ class PremiumFrostedCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
-    this.blurSigma = 4,
+    this.blurSigma = 6,
   });
 
   final Widget child;
@@ -20,7 +22,7 @@ class PremiumFrostedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sigma = blurSigma.clamp(0, 6).toDouble();
+    final sigma = blurSigma.clamp(0, 8).toDouble();
 
     return Container(
       margin: margin,
@@ -30,9 +32,11 @@ class PremiumFrostedCard extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: borderRadius,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.20),
+              ),
             ),
             child: Padding(padding: padding, child: child),
           ),

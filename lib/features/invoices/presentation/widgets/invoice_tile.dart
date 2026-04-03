@@ -23,32 +23,53 @@ class InvoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(invoice.clientName),
-      subtitle: Text(
-        '${invoice.service} • ${AppFormatters.shortDate(invoice.dueDate)}',
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.glassFill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.glassBorder),
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(AppFormatters.currency(invoice.amount)),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: _statusColor(context).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          invoice.clientName,
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        subtitle: Text(
+          '${invoice.service} • ${AppFormatters.shortDate(invoice.dueDate)}',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              AppFormatters.currency(invoice.amount),
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
-            child: Text(
-              invoice.status.label,
-              style: TextStyle(color: _statusColor(context), fontSize: 12),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _statusColor(context).withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _statusColor(context).withValues(alpha: 0.30),
+                ),
+              ),
+              child: Text(
+                invoice.status.label,
+                style: TextStyle(
+                  color: _statusColor(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

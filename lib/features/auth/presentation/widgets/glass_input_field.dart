@@ -76,8 +76,8 @@ class _GlassInputFieldState extends State<GlassInputField> {
     final borderColor = hasError
         ? AppColors.danger
         : _isFocused
-        ? AppColors.accentPrimary
-        : AppColors.cardBorder;
+        ? AppColors.accent.withValues(alpha: 0.60)
+        : AppColors.glassBorder;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,7 +95,7 @@ class _GlassInputFieldState extends State<GlassInputField> {
           curve: Curves.easeInOut,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: AppColors.cardBackground,
+            color: AppColors.glassFill,
             border: Border.all(color: borderColor),
           ),
           child: TextFormField(
@@ -111,7 +111,7 @@ class _GlassInputFieldState extends State<GlassInputField> {
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: AppColors.textPrimary),
-            cursorColor: AppColors.accentPrimary,
+            cursorColor: AppColors.accent,
             validator: (value) {
               final error = widget.validator?.call(value);
               WidgetsBinding.instance.addPostFrameCallback((_) {

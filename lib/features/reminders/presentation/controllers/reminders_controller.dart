@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/domain/repositories/invoice_repository.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
@@ -73,6 +74,10 @@ final reminderRepositoryProvider = Provider<ReminderRepository>(
 final sendReminderUseCaseProvider = Provider<SendReminderUseCase>(
   (ref) => SendReminderUseCase(ref.watch(reminderRepositoryProvider)),
 );
+
+final remindersHistoryProvider = FutureProvider<List<Reminder>>((ref) {
+  return ref.watch(reminderRepositoryProvider).getReminders();
+});
 
 final reminderFlowControllerProvider =
     AutoDisposeNotifierProviderFamily<
@@ -164,6 +169,10 @@ class RemindersController
         isSending: false,
         successMessage: 'Reminder queued via ${channel.label}.',
       );
+      ref.invalidate(remindersHistoryProvider);
+      await ref
+          .read(adaptiveSystemProvider.notifier)
+          .recordAction(AdaptiveActionKey.sendReminder);
     } catch (error) {
       state = state.copyWith(isSending: false, errorMessage: error.toString());
     }

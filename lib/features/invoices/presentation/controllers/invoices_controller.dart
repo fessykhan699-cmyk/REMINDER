@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
@@ -100,11 +101,22 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
     ref.invalidate(invoiceDetailProvider(invoice.id));
+    await ref
+        .read(adaptiveSystemProvider.notifier)
+        .recordAction(AdaptiveActionKey.newInvoice);
   }
 
   Future<void> updateInvoice(Invoice invoice) async {
-    final updated = await ref.read(updateInvoiceUseCaseProvider).call(invoice);
     final current = state.valueOrNull ?? const <Invoice>[];
+    Invoice? previousInvoice;
+    for (final item in current) {
+      if (item.id == invoice.id) {
+        previousInvoice = item;
+        break;
+      }
+    }
+
+    final updated = await ref.read(updateInvoiceUseCaseProvider).call(invoice);
 
     final updatedList = current
         .map((item) => item.id == updated.id ? updated : item)
@@ -112,5 +124,13 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoice.id));
+
+    final wasUnpaid =
+        previousInvoice != null && previousInvoice.status != InvoiceStatus.paid;
+    if (wasUnpaid && updated.status == InvoiceStatus.paid) {
+      await ref
+          .read(adaptiveSystemProvider.notifier)
+          .recordAction(AdaptiveActionKey.markPaid);
+    }
   }
 }
