@@ -579,7 +579,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             padding: EdgeInsets.only(bottom: bottomInset),
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
               child: PremiumFrostedCard(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 child: Form(

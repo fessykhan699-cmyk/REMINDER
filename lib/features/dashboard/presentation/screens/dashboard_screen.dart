@@ -12,7 +12,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/components/glass_card.dart';
-import '../../../../shared/components/premium_primary_button.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
@@ -508,12 +507,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       case _DashboardUrgency.empty:
         addSection(
           'empty',
-          _EmptyDashboardState(
-            subtitle: model.emptySubtitle,
-            onCreateInvoice: () async {
-              await const CreateInvoiceRoute().push(context);
-            },
-          ),
+          _EmptyDashboardState(subtitle: model.emptySubtitle),
         );
       case _DashboardUrgency.overdue:
         addSection(
@@ -630,7 +624,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                         minHeight: constraints.maxHeight,
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -967,13 +961,9 @@ class _PriorityInvoiceRow extends StatelessWidget {
 }
 
 class _EmptyDashboardState extends StatelessWidget {
-  const _EmptyDashboardState({
-    required this.subtitle,
-    required this.onCreateInvoice,
-  });
+  const _EmptyDashboardState({required this.subtitle});
 
   final String subtitle;
-  final Future<void> Function() onCreateInvoice;
 
   @override
   Widget build(BuildContext context) {
@@ -996,11 +986,6 @@ class _EmptyDashboardState extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          PremiumPrimaryButton(
-            label: '+ New Invoice',
-            onPressed: onCreateInvoice,
           ),
         ],
       ),

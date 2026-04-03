@@ -65,7 +65,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add Client')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         children: [
           AppInputField(controller: _nameController, label: 'Client Name'),
           const SizedBox(height: 12),

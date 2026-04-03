@@ -33,7 +33,7 @@ class ClientsListScreen extends ConsumerWidget {
           isEmpty: (data) => data.isEmpty,
           builder: (clients) {
             return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
               itemCount: clients.length + 1,
               separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

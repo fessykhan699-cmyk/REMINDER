@@ -36,12 +36,12 @@ class ReminderFlowScreen extends ConsumerWidget {
       body: invoice == null
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
                 child: Text(state.errorMessage ?? 'Preparing reminder...'),
               ),
             )
           : ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
               children: [
                 Text(
                   'Invoice ${invoice.id} • ${invoice.clientName}',

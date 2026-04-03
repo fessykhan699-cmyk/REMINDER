@@ -112,7 +112,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           _hydrate(invoice);
 
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
             children: [
               AppInputField(
                 controller: _clientNameController,

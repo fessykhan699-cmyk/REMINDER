@@ -42,7 +42,7 @@ class _DetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       children: [
         Text(client.name, style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 14),

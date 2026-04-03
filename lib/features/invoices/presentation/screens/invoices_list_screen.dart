@@ -23,7 +23,18 @@ class InvoicesListScreen extends ConsumerWidget {
         : 'Create your first invoice to start the reminder loop.';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Invoices')),
+      appBar: AppBar(
+        title: const Text('Invoices'),
+        actions: [
+          IconButton(
+            tooltip: 'New Invoice',
+            onPressed: () {
+              const CreateInvoiceRoute().push(context);
+            },
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: controller.loadInitial,
         child: AppAsyncStateView<List<Invoice>>(
@@ -34,7 +45,7 @@ class InvoicesListScreen extends ConsumerWidget {
           isEmpty: (data) => data.isEmpty,
           builder: (invoices) {
             return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 90),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
               itemCount: invoices.length + 1,
               separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {

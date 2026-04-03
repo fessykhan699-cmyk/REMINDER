@@ -35,7 +35,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
             children: [
               Text(
                 invoice.clientName,
