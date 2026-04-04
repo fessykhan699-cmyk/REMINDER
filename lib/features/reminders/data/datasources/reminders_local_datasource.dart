@@ -1,14 +1,21 @@
+import 'package:hive/hive.dart';
+
 import '../../../../core/utils/id_generator.dart';
+import '../../../../core/storage/hive_storage.dart';
 import '../../domain/entities/reminder.dart';
 import '../../domain/entities/reminder_message_type.dart';
 import '../models/reminder_model.dart';
 
 class RemindersLocalDatasource {
-  final List<ReminderModel> _reminders = [];
+  final Box<ReminderModel> _remindersBox = Hive.box<ReminderModel>(
+    HiveStorage.remindersBoxName,
+  );
 
   Future<List<ReminderModel>> fetchReminders() async {
     await Future<void>.delayed(const Duration(milliseconds: 120));
-    return List<ReminderModel>.unmodifiable(_reminders);
+    final reminders = _remindersBox.values.toList()
+      ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
+    return List<ReminderModel>.unmodifiable(reminders);
   }
 
   Future<ReminderModel> sendReminder({
@@ -36,7 +43,7 @@ class RemindersLocalDatasource {
       status: ReminderStatus.sent,
     );
 
-    _reminders.insert(0, reminder);
+    await _remindersBox.put(reminder.id, reminder);
     return reminder;
   }
 

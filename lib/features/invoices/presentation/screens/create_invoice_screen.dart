@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
@@ -579,7 +580,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             padding: EdgeInsets.only(bottom: bottomInset),
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
               child: PremiumFrostedCard(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                 child: Form(
@@ -713,6 +714,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                             label: 'Client',
                             errorText: field.errorText,
                             child: _InputSurface(
+                              isFocused: false,
                               hasError: field.hasError,
                               onTap: _selectClient,
                               child: Row(
@@ -807,6 +809,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                             label: 'Due Date',
                             errorText: field.errorText,
                             child: _InputSurface(
+                              isFocused: false,
                               hasError: field.hasError,
                               onTap: _selectDueDate,
                               child: Row(
@@ -869,6 +872,11 @@ class _ClientPickerSheet extends ConsumerStatefulWidget {
 }
 
 class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
+  static final RegExp _emailRegex = RegExp(
+    r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
+    caseSensitive: false,
+  );
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -879,7 +887,23 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
 
   bool _showAddForm = false;
   bool _isSaving = false;
+  bool _didResolveLocaleCountry = false;
+  String _initialCountryCode = 'US';
+  String _fullPhoneNumber = '';
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didResolveLocaleCountry) {
+      return;
+    }
+
+    _initialCountryCode = _resolveInitialCountryCode(
+      Localizations.localeOf(context),
+    );
+    _didResolveLocaleCountry = true;
+  }
 
   @override
   void dispose() {
@@ -890,6 +914,85 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
     _emailFocusNode.dispose();
     _phoneFocusNode.dispose();
     super.dispose();
+  }
+
+  String _resolveInitialCountryCode(Locale locale) {
+    final localeCountryCode = locale.countryCode;
+    if (localeCountryCode != null && localeCountryCode.length == 2) {
+      return localeCountryCode.toUpperCase();
+    }
+
+    switch (locale.languageCode.toLowerCase()) {
+      case 'ar':
+        return 'AE';
+      case 'de':
+        return 'DE';
+      case 'es':
+        return 'ES';
+      case 'fr':
+        return 'FR';
+      case 'hi':
+        return 'IN';
+      case 'it':
+        return 'IT';
+      case 'ja':
+        return 'JP';
+      case 'ko':
+        return 'KR';
+      case 'pt':
+        return 'BR';
+      case 'ru':
+        return 'RU';
+      case 'zh':
+        return 'CN';
+      default:
+        return 'US';
+    }
+  }
+
+  String _digitsOnly(String value) {
+    return value.replaceAll(RegExp(r'\D'), '');
+  }
+
+  void _revalidateContactFields() {
+    if (_autovalidateMode != AutovalidateMode.disabled) {
+      _formKey.currentState?.validate();
+    }
+  }
+
+  String? _validateEmail(String? value) {
+    final email = (value ?? '').trim();
+    final phoneDigits = _digitsOnly(_fullPhoneNumber);
+
+    if (email.isEmpty && phoneDigits.isEmpty) {
+      return 'Add an email or phone number.';
+    }
+
+    if (email.isNotEmpty && !_emailRegex.hasMatch(email)) {
+      return 'Enter a valid email.';
+    }
+
+    return null;
+  }
+
+  String? _validatePhone(dynamic phone) {
+    final email = _emailController.text.trim();
+    final localDigits = _digitsOnly(_phoneController.text);
+
+    if (localDigits.isEmpty && email.isEmpty) {
+      return 'Add an email or phone number.';
+    }
+
+    if (localDigits.isEmpty) {
+      return null;
+    }
+
+    final fullDigits = _digitsOnly(_fullPhoneNumber);
+    if (fullDigits.length < 8 || fullDigits.length > 15) {
+      return 'Enter a valid phone number.';
+    }
+
+    return null;
   }
 
   Future<void> _saveClient() async {
@@ -916,7 +1019,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
           .addClient(
             name: _nameController.text.trim(),
             email: _emailController.text.trim(),
-            phone: _phoneController.text.trim(),
+            phone: _fullPhoneNumber.trim(),
           );
 
       if (!mounted) {
@@ -1154,35 +1257,55 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
               focusNode: _emailFocusNode,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
-              validator: (value) {
-                final email = value?.trim() ?? '';
-                final phone = _phoneController.text.trim();
-
-                if (email.isEmpty && phone.isEmpty) {
-                  return 'Add an email or phone number.';
-                }
-
-                if (email.isNotEmpty && !email.contains('@')) {
-                  return 'Enter a valid email.';
-                }
-
-                return null;
-              },
+              validator: _validateEmail,
+              onChanged: (_) => _revalidateContactFields(),
               onFieldSubmitted: (_) {
                 _phoneFocusNode.requestFocus();
               },
             ),
             const SizedBox(height: 16),
-            _InvoiceTextField(
-              controller: _phoneController,
+            _LabeledField(
               label: 'Phone',
-              hintText: '+1 555 010 100',
-              focusNode: _phoneFocusNode,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) async {
-                await _saveClient();
-              },
+              child: IntlPhoneField(
+                controller: _phoneController,
+                focusNode: _phoneFocusNode,
+                initialCountryCode: _initialCountryCode,
+                disableLengthCheck: true,
+                autovalidateMode: _autovalidateMode,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                dropdownTextStyle: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                cursorColor: AppColors.accent,
+                decoration: _buildGlassTextFieldDecoration(
+                  theme,
+                  hintText: '555010100',
+                  counterText: '',
+                ),
+                onChanged: (phone) {
+                  final localNumber = _digitsOnly(phone.number);
+                  _fullPhoneNumber = localNumber.isEmpty
+                      ? ''
+                      : '+${phone.completeNumber}';
+                  _revalidateContactFields();
+                },
+                onCountryChanged: (country) {
+                  final localNumber = _digitsOnly(_phoneController.text);
+                  _fullPhoneNumber = localNumber.isEmpty
+                      ? ''
+                      : '+${country.fullCountryCode}$localNumber';
+                  _revalidateContactFields();
+                },
+                validator: _validatePhone,
+                onSubmitted: (_) async {
+                  await _saveClient();
+                },
+              ),
             ),
             const SizedBox(height: 24),
             PremiumPrimaryButton(
@@ -1348,6 +1471,45 @@ class _ClientListTile extends StatelessWidget {
   }
 }
 
+InputDecoration _buildGlassTextFieldDecoration(
+  ThemeData theme, {
+  String? hintText,
+  String? counterText,
+  bool hasError = false,
+  bool isFocused = false,
+}) {
+  OutlineInputBorder border(Color color) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color),
+    );
+  }
+
+  final defaultBorderColor = Colors.white.withValues(alpha: 0.08);
+  final activeBorderColor = hasError
+      ? AppColors.danger
+      : isFocused
+      ? AppColors.accent.withValues(alpha: 0.60)
+      : defaultBorderColor;
+
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+    filled: true,
+    fillColor: Colors.transparent,
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: border(activeBorderColor),
+    enabledBorder: border(hasError ? AppColors.danger : defaultBorderColor),
+    focusedBorder: border(
+      hasError ? AppColors.danger : AppColors.accent.withValues(alpha: 0.60),
+    ),
+    errorBorder: border(AppColors.danger),
+    focusedErrorBorder: border(AppColors.danger),
+    counterText: counterText,
+  );
+}
+
 class _InvoiceTextField extends FormField<String> {
   _InvoiceTextField({
     required TextEditingController controller,
@@ -1357,6 +1519,7 @@ class _InvoiceTextField extends FormField<String> {
     this.keyboardType,
     this.textInputAction,
     super.validator,
+    this.onChanged,
     this.onFieldSubmitted,
     this.inputFormatters,
   }) : _controller = controller,
@@ -1366,27 +1529,24 @@ class _InvoiceTextField extends FormField<String> {
            final widget = field.widget as _InvoiceTextField;
            final theme = Theme.of(field.context);
            Widget buildSurface(bool isFocused) {
-             return _InputSurface(
-               isFocused: isFocused,
-               hasError: field.hasError,
-               child: TextField(
-                 controller: widget._controller,
-                 focusNode: widget.focusNode,
-                 keyboardType: widget.keyboardType,
-                 textInputAction: widget.textInputAction,
-                 inputFormatters: widget.inputFormatters,
-                 onSubmitted: widget.onFieldSubmitted,
-                 style: theme.textTheme.bodyLarge?.copyWith(
-                   color: AppColors.textPrimary,
-                 ),
-                 cursorColor: AppColors.accent,
-                 scrollPadding: const EdgeInsets.only(bottom: 120),
-                 decoration: InputDecoration.collapsed(
-                   hintText: widget.hintText,
-                   hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                     color: AppColors.textMuted,
-                   ),
-                 ),
+             return TextField(
+               controller: widget._controller,
+               focusNode: widget.focusNode,
+               keyboardType: widget.keyboardType,
+               textInputAction: widget.textInputAction,
+               inputFormatters: widget.inputFormatters,
+               onChanged: widget.onChanged,
+               onSubmitted: widget.onFieldSubmitted,
+               style: theme.textTheme.bodyLarge?.copyWith(
+                 color: AppColors.textPrimary,
+               ),
+               cursorColor: AppColors.accent,
+               scrollPadding: const EdgeInsets.only(bottom: 120),
+               decoration: _buildGlassTextFieldDecoration(
+                 theme,
+                 hintText: widget.hintText,
+                 hasError: field.hasError,
+                 isFocused: isFocused,
                ),
              );
            }
@@ -1416,6 +1576,7 @@ class _InvoiceTextField extends FormField<String> {
   final FocusNode? focusNode;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onFieldSubmitted;
   final List<TextInputFormatter>? inputFormatters;
 
@@ -1595,3 +1756,5 @@ class _ClientAvatar extends StatelessWidget {
     return '$first$second'.toUpperCase();
   }
 }
+
+

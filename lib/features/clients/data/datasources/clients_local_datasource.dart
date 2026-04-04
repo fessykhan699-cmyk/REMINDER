@@ -1,27 +1,23 @@
 import 'dart:math';
 
+import 'package:hive/hive.dart';
+
+import '../../../../core/storage/hive_storage.dart';
 import '../models/client_model.dart';
 
 class ClientsLocalDatasource {
-  final List<ClientModel> _clients = [
-    ClientModel(
-      id: 'client-1',
-      name: 'Northwind Studio',
-      email: 'billing@northwind.com',
-      phone: '+1 555 103 882',
-      createdAt: DateTime.now().subtract(const Duration(days: 20)),
-    ),
-    ClientModel(
-      id: 'client-2',
-      name: 'Acme Retail',
-      email: 'finance@acme.co',
-      phone: '+1 555 912 100',
-      createdAt: DateTime.now().subtract(const Duration(days: 12)),
-    ),
-  ];
+  final Box<ClientModel> _clientsBox = Hive.box<ClientModel>(
+    HiveStorage.clientsBoxName,
+  );
 
   final Map<int, List<ClientModel>> _pageCache = {};
   final Map<String, ClientModel> _clientCache = {};
+
+  List<ClientModel> _sortedClients() {
+    final clients = _clientsBox.values.toList();
+    clients.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return clients;
+  }
 
   Future<List<ClientModel>> fetchClients({
     int page = 1,
@@ -34,14 +30,15 @@ class ClientsLocalDatasource {
 
     await Future<void>.delayed(const Duration(milliseconds: 220));
 
+    final clients = _sortedClients();
     final start = (page - 1) * pageSize;
-    if (start >= _clients.length) {
+    if (start >= clients.length) {
       _pageCache[page] = const [];
       return const [];
     }
 
-    final end = min(start + pageSize, _clients.length);
-    final data = List<ClientModel>.unmodifiable(_clients.sublist(start, end));
+    final end = min(start + pageSize, clients.length);
+    final data = List<ClientModel>.unmodifiable(clients.sublist(start, end));
 
     for (final item in data) {
       _clientCache[item.id] = item;
@@ -53,7 +50,7 @@ class ClientsLocalDatasource {
 
   Future<ClientModel> addClient(ClientModel client) async {
     await Future<void>.delayed(const Duration(milliseconds: 150));
-    _clients.insert(0, client);
+    await _clientsBox.put(client.id, client);
     _clientCache[client.id] = client;
     _pageCache.clear();
     return client;
@@ -67,13 +64,11 @@ class ClientsLocalDatasource {
 
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
-    for (final client in _clients) {
-      if (client.id == id) {
-        _clientCache[id] = client;
-        return client;
-      }
+    final client = _clientsBox.get(id);
+    if (client != null) {
+      _clientCache[id] = client;
     }
 
-    return null;
+    return client;
   }
 }

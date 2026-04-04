@@ -1846,10 +1846,5 @@ int _compareRankedInvoices(_RankedInvoice a, _RankedInvoice b) {
 }
 
 int _compareRecentActivity(Invoice a, Invoice b) {
-  final amountCompare = b.amount.compareTo(a.amount);
-  if (amountCompare != 0) {
-    return amountCompare;
-  }
-
   return b.createdAt.compareTo(a.createdAt);
 }

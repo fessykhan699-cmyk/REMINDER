@@ -242,9 +242,6 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   ) async {
     switch (action) {
       case _FabSheetAction.createInvoice:
-        await ref
-            .read(adaptiveSystemProvider.notifier)
-            .recordAction(AdaptiveActionKey.newInvoice);
         if (!context.mounted) {
           return;
         }
@@ -254,18 +251,12 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         );
         return;
       case _FabSheetAction.addClient:
-        await ref
-            .read(adaptiveSystemProvider.notifier)
-            .recordAction(AdaptiveActionKey.addClient);
         if (!context.mounted) {
           return;
         }
         await const AddClientRoute().push(context);
         return;
       case _FabSheetAction.sendReminder:
-        await ref
-            .read(adaptiveSystemProvider.notifier)
-            .recordAction(AdaptiveActionKey.sendReminder);
         if (!context.mounted) {
           return;
         }

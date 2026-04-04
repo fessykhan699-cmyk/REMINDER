@@ -1,38 +1,25 @@
 import 'dart:math';
 
+import 'package:hive/hive.dart';
+
+import '../../../../core/storage/hive_storage.dart';
 import '../../domain/entities/invoice.dart';
 import '../models/invoice_model.dart';
 
 class InvoicesLocalDatasource {
-  final List<InvoiceModel> _invoices = [
-    InvoiceModel(
-      id: 'inv-1',
-      clientId: 'client-1',
-      clientName: 'Northwind Studio',
-      service: 'Brand identity package',
-      amount: 1850,
-      dueDate: DateTime.now().subtract(const Duration(days: 4)),
-      status: InvoiceStatus.pending,
-      createdAt: DateTime.now().subtract(const Duration(days: 21)),
-    ),
-    InvoiceModel(
-      id: 'inv-2',
-      clientId: 'client-2',
-      clientName: 'Acme Retail',
-      service: 'Monthly analytics report',
-      amount: 920,
-      dueDate: DateTime.now().add(const Duration(days: 6)),
-      status: InvoiceStatus.pending,
-      createdAt: DateTime.now().subtract(const Duration(days: 9)),
-    ),
-  ];
+  final Box<InvoiceModel> _invoicesBox = Hive.box<InvoiceModel>(
+    HiveStorage.invoicesBoxName,
+  );
 
   final Map<int, List<InvoiceModel>> _pageCache = {};
   final Map<String, InvoiceModel> _invoiceCache = {};
 
   List<InvoiceModel> _normalizedInvoices() {
     final now = DateTime.now();
-    return _invoices
+    final invoices = _invoicesBox.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return invoices
         .map(
           (invoice) =>
               invoice.status == InvoiceStatus.pending &&
@@ -76,7 +63,7 @@ class InvoicesLocalDatasource {
 
   Future<InvoiceModel> createInvoice(InvoiceModel invoice) async {
     await Future<void>.delayed(const Duration(milliseconds: 140));
-    _invoices.insert(0, invoice);
+    await _invoicesBox.put(invoice.id, invoice);
     _invoiceCache[invoice.id] = invoice;
     _pageCache.clear();
     return invoice;
@@ -85,12 +72,11 @@ class InvoicesLocalDatasource {
   Future<InvoiceModel> updateInvoice(InvoiceModel invoice) async {
     await Future<void>.delayed(const Duration(milliseconds: 140));
 
-    final index = _invoices.indexWhere((item) => item.id == invoice.id);
-    if (index < 0) {
+    if (!_invoicesBox.containsKey(invoice.id)) {
       throw Exception('Invoice not found.');
     }
 
-    _invoices[index] = invoice;
+    await _invoicesBox.put(invoice.id, invoice);
     _invoiceCache[invoice.id] = invoice;
     _pageCache.clear();
     return invoice;
@@ -99,12 +85,11 @@ class InvoicesLocalDatasource {
   Future<void> deleteInvoice(String id) async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
-    final index = _invoices.indexWhere((item) => item.id == id);
-    if (index < 0) {
+    if (!_invoicesBox.containsKey(id)) {
       throw Exception('Invoice not found.');
     }
 
-    _invoices.removeAt(index);
+    await _invoicesBox.delete(id);
     _invoiceCache.remove(id);
     _pageCache.clear();
   }
