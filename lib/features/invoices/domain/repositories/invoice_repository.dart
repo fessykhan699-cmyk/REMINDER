@@ -14,4 +14,6 @@ abstract interface class InvoiceRepository {
   Future<void> deleteInvoice(String id);
 
   Future<Invoice?> getInvoiceById(String id);
+
+  Future<String> getNextInvoiceId({required String prefix});
 }

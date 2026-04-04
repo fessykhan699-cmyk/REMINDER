@@ -5,11 +5,14 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/utils/id_generator.dart';
 import '../../../../shared/components/premium_frosted_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../../clients/domain/entities/client.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../settings/domain/entities/app_preferences.dart';
+import '../../../settings/presentation/controllers/app_preferences_controller.dart';
+import '../../../settings/presentation/controllers/settings_controller.dart';
+import '../../../settings/presentation/widgets/profile_editor_sheet.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
 import '../controllers/invoice_prediction_engine.dart';
@@ -37,8 +40,10 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   String? _lastAutoServiceValue;
   String? _lastAutoAmountValue;
   DateTime? _lastAutoDueDate;
+  DateTime? _lastSettingsDueDate;
   bool _isSaving = false;
   bool _smartSyncScheduled = false;
+  bool _settingsSyncScheduled = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -65,13 +70,21 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   Future<DateTime?> _showDueDatePicker() {
     FocusScope.of(context).unfocus();
+    final paymentTerms = ref
+        .read(appPreferencesControllerProvider)
+        .valueOrNull
+        ?.paymentTerms
+        .days;
 
     return showDatePicker(
       context: context,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
       initialDate:
-          _selectedDueDate ?? DateTime.now().add(const Duration(days: 7)),
+          _selectedDueDate ??
+          _dateAfterDays(
+            paymentTerms ?? const AppPreferences.defaults().paymentTerms.days,
+          ),
     );
   }
 
@@ -152,6 +165,34 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     });
   }
 
+  void _scheduleSettingsSync(AppPreferences preferences) {
+    if (_settingsSyncScheduled) {
+      return;
+    }
+
+    _settingsSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _settingsSyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      final nextSettingsDueDate = _dateAfterDays(preferences.paymentTerms.days);
+      final currentDueDate = _selectedDueDate;
+      final shouldApply =
+          currentDueDate == null ||
+          _sameCalendarDay(currentDueDate, _lastSettingsDueDate);
+      _lastSettingsDueDate = nextSettingsDueDate;
+      if (!shouldApply ||
+          _sameCalendarDay(currentDueDate, nextSettingsDueDate)) {
+        return;
+      }
+
+      setState(() => _selectedDueDate = nextSettingsDueDate);
+      _dueDateFieldKey.currentState?.didChange(nextSettingsDueDate);
+    });
+  }
+
   void _syncSmartDefaults(SmartInvoicePrediction intelligence) {
     final selectedClient = _selectedClient;
     if (selectedClient != null) {
@@ -163,20 +204,12 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return;
     }
 
-    final preferredDueDays = intelligence.preferredDueDays;
     final suggestedAmount = intelligence.quickAmountConfidence >= 0.50
         ? intelligence.quickAmount
         : null;
-    final suggestedDueDays = intelligence.preferredDueDaysConfidence >= 0.50
-        ? preferredDueDays
-        : null;
 
-    if (suggestedAmount != null || suggestedDueDays != null) {
-      _applySmartValues(
-        amount: suggestedAmount,
-        dueDays: suggestedDueDays,
-        force: false,
-      );
+    if (suggestedAmount != null) {
+      _applySmartValues(amount: suggestedAmount, force: false);
     }
   }
 
@@ -193,7 +226,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     _applySmartValues(
       service: draft.usedFallbackService ? null : draft.service,
       amount: draft.usedFallbackAmount ? null : draft.amount,
-      dueDays: draft.dueDays,
       force: force,
     );
   }
@@ -265,17 +297,18 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   String _buildAmountHintText(
     SmartInvoicePrediction intelligence,
     SmartClientSuggestion? clientSuggestion,
+    String currencyCode,
   ) {
     if (clientSuggestion?.amount != null &&
         (clientSuggestion?.amountConfidence ?? 0) >= 0.50) {
       final amountReason = clientSuggestion?.amountReason ?? 'last used';
-      return '${_compactCurrency(clientSuggestion!.amount!)} ($amountReason)';
+      return '${_compactCurrency(clientSuggestion!.amount!, currencyCode)} ($amountReason)';
     }
 
     if (intelligence.quickAmount != null &&
         intelligence.quickAmountConfidence >= 0.50) {
       final amountReason = intelligence.quickAmountReason ?? 'common amount';
-      return '${_compactCurrency(intelligence.quickAmount!)} ($amountReason)';
+      return '${_compactCurrency(intelligence.quickAmount!, currencyCode)} ($amountReason)';
     }
 
     return '250.00';
@@ -284,6 +317,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   List<_SmartActionChipData> _buildSmartActions(
     SmartInvoicePrediction intelligence,
     SmartClientSuggestion? clientSuggestion,
+    String currencyCode,
   ) {
     final actions = <_SmartActionChipData>[];
 
@@ -358,7 +392,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           intelligence.quickAmountConfidence >= 0.50) {
         actions.add(
           _SmartActionChipData(
-            label: 'Quick ${_compactCurrency(intelligence.quickAmount!)}',
+            label:
+                'Quick ${_compactCurrency(intelligence.quickAmount!, currencyCode)}',
             onTap: () {
               _applySmartValues(amount: intelligence.quickAmount, force: true);
             },
@@ -431,11 +466,31 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     return fixed;
   }
 
-  String _compactCurrency(double value) {
-    if (value == value.roundToDouble()) {
-      return '\$${value.toStringAsFixed(0)}';
+  String _normalizedInvoicePrefix(String rawPrefix) {
+    final sanitized = rawPrefix.trim().toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9-]'),
+      '',
+    );
+    return sanitized.isEmpty ? 'INV' : sanitized;
+  }
+
+  double _applyTax(double amount, double taxPercent) {
+    if (taxPercent <= 0) {
+      return amount;
     }
-    return AppFormatters.currency(value);
+
+    return amount * (1 + (taxPercent / 100));
+  }
+
+  String _compactCurrency(double value, String currencyCode) {
+    if (value == value.roundToDouble()) {
+      return AppFormatters.currency(
+        value,
+        currencyCode: currencyCode,
+        includeDecimals: false,
+      );
+    }
+    return AppFormatters.currency(value, currencyCode: currencyCode);
   }
 
   bool _sameServiceValue(String? left, String? right) {
@@ -458,6 +513,40 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return false;
     }
     return (left - right).abs() < 0.001;
+  }
+
+  Future<bool> _ensureUserProfileReady() async {
+    final profile = await ref.read(getProfileUseCaseProvider).call();
+    if (profile.isComplete) {
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
+    }
+
+    final updatedProfile = await showUserProfileEditorSheet(
+      context,
+      initialProfile: profile,
+      title: 'Set Up Profile',
+      submitLabel: 'Save Profile',
+    );
+
+    if (updatedProfile == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Complete your profile before creating an invoice.'),
+          ),
+        );
+      }
+      return false;
+    }
+
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .saveProfile(updatedProfile);
+    return true;
   }
 
   bool _sameCalendarDay(DateTime? left, DateTime? right) {
@@ -485,29 +574,47 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final selectedClient = _selectedClient;
     final selectedDueDate = _selectedDueDate;
     final service = _serviceController.text.trim();
-    final amount = double.tryParse(_amountController.text.trim());
+    final subtotalAmount = double.tryParse(_amountController.text.trim());
     final now = DateTime.now();
     final intelligence = ref.read(smartInvoicePredictionProvider);
+    final preferences =
+        ref.read(appPreferencesControllerProvider).valueOrNull ??
+        await ref.read(getAppPreferencesUseCaseProvider).call();
 
     if (!(form?.validate() ?? false) ||
         selectedClient == null ||
         selectedDueDate == null ||
-        amount == null) {
+        subtotalAmount == null) {
+      return;
+    }
+
+    final hasProfile = await _ensureUserProfileReady();
+    if (!hasProfile) {
       return;
     }
 
     setState(() => _isSaving = true);
 
     try {
+      final invoiceId = await ref
+          .read(invoiceRepositoryProvider)
+          .getNextInvoiceId(
+            prefix: _normalizedInvoicePrefix(preferences.invoicePrefix),
+          );
+      final taxPercent = preferences.defaultTaxPercent;
+      final totalAmount = _applyTax(subtotalAmount, taxPercent);
       final invoice = Invoice(
-        id: IdGenerator.nextId('inv'),
+        id: invoiceId,
         clientId: selectedClient.id,
         clientName: selectedClient.name,
         service: service,
-        amount: amount,
+        amount: totalAmount,
         dueDate: selectedDueDate,
         status: InvoiceStatus.pending,
         createdAt: now,
+        currencyCode: preferences.defaultCurrency,
+        taxPercent: taxPercent,
+        paymentTermsDays: preferences.paymentTerms.days,
       );
 
       final createdInvoice = await ref
@@ -559,14 +666,28 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     ref.watch(invoiceCreateLaunchModeProvider);
+    final preferencesState = ref.watch(appPreferencesControllerProvider);
+    final preferences = preferencesState.valueOrNull;
+    final displayPreferences = preferences ?? const AppPreferences.defaults();
     final intelligence = ref.watch(smartInvoicePredictionProvider);
     final clientSuggestion = _selectedClient == null
         ? null
         : intelligence.suggestionFor(_selectedClient!.id);
-    final amountHintText = _buildAmountHintText(intelligence, clientSuggestion);
-    final smartActions = _buildSmartActions(intelligence, clientSuggestion);
+    final amountHintText = _buildAmountHintText(
+      intelligence,
+      clientSuggestion,
+      displayPreferences.defaultCurrency,
+    );
+    final smartActions = _buildSmartActions(
+      intelligence,
+      clientSuggestion,
+      displayPreferences.defaultCurrency,
+    );
 
     _scheduleSmartSync();
+    if (preferences != null) {
+      _scheduleSettingsSync(preferences);
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Invoice')),
@@ -1756,5 +1877,3 @@ class _ClientAvatar extends StatelessWidget {
     return '$first$second'.toUpperCase();
   }
 }
-
-

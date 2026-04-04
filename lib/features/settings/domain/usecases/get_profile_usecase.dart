@@ -6,5 +6,5 @@ class GetProfileUseCase {
 
   final SettingsRepository _repository;
 
-  Future<Profile> call() => _repository.getProfile();
+  Future<UserProfile> call() => _repository.getProfile();
 }

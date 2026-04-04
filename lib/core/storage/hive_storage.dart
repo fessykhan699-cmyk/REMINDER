@@ -4,6 +4,8 @@ import '../../features/clients/data/models/client_model.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/reminders/data/models/reminder_model.dart';
+import '../../features/settings/data/models/app_preferences_model.dart';
+import '../../features/settings/data/models/profile_model.dart';
 
 class HiveStorage {
   HiveStorage._();
@@ -11,6 +13,8 @@ class HiveStorage {
   static const String clientsBoxName = 'clientsBox';
   static const String invoicesBoxName = 'invoicesBox';
   static const String remindersBoxName = 'remindersBox';
+  static const String userProfileBoxName = 'userProfileBox';
+  static const String appPreferencesBoxName = 'appPreferencesBox';
 
   static Future<void> initialize() async {
     await Hive.initFlutter();
@@ -19,6 +23,8 @@ class HiveStorage {
     final clientsBox = await _openBox<ClientModel>(clientsBoxName);
     final invoicesBox = await _openBox<InvoiceModel>(invoicesBoxName);
     await _openBox<ReminderModel>(remindersBoxName);
+    await _openBox<ProfileModel>(userProfileBoxName);
+    await _openBox<AppPreferencesModel>(appPreferencesBoxName);
 
     await _seedClients(clientsBox);
     await _seedInvoices(invoicesBox);
@@ -42,6 +48,15 @@ class HiveStorage {
     }
     if (!Hive.isAdapterRegistered(5)) {
       Hive.registerAdapter(ReminderModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(6)) {
+      Hive.registerAdapter(ProfileModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(7)) {
+      Hive.registerAdapter(PaymentTermsOptionAdapter());
+    }
+    if (!Hive.isAdapterRegistered(8)) {
+      Hive.registerAdapter(AppPreferencesModelAdapter());
     }
   }
 
@@ -94,6 +109,9 @@ class HiveStorage {
         dueDate: now.subtract(const Duration(days: 4)),
         status: InvoiceStatus.pending,
         createdAt: now.subtract(const Duration(days: 21)),
+        currencyCode: 'USD',
+        taxPercent: 0,
+        paymentTermsDays: 0,
       ),
       InvoiceModel(
         id: 'inv-2',
@@ -104,6 +122,9 @@ class HiveStorage {
         dueDate: now.add(const Duration(days: 6)),
         status: InvoiceStatus.pending,
         createdAt: now.subtract(const Duration(days: 9)),
+        currencyCode: 'USD',
+        taxPercent: 0,
+        paymentTermsDays: 0,
       ),
     ];
 

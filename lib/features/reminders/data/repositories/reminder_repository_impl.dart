@@ -1,4 +1,5 @@
 import '../../../invoices/domain/entities/invoice.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../domain/entities/reminder.dart';
 import '../../domain/entities/reminder_message_type.dart';
 import '../../domain/repositories/reminder_repository.dart';
@@ -35,22 +36,26 @@ class ReminderRepositoryImpl implements ReminderRepository {
     required ReminderMessageType type,
   }) {
     final dueDate = invoice.dueDate.toLocal().toString().split(' ').first;
+    final amount = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
 
     switch (type) {
       case ReminderMessageType.professional:
         return 'Hello ${invoice.clientName}, this is a reminder that invoice '
             '${invoice.id} (${invoice.service}) for '
-            '\$${invoice.amount.toStringAsFixed(2)} is due on $dueDate. '
+            '$amount is due on $dueDate. '
             'Please confirm your payment timeline.';
       case ReminderMessageType.friendly:
         return 'Hi ${invoice.clientName}! Quick reminder about invoice '
             '${invoice.id} for ${invoice.service} '
-            '(\$${invoice.amount.toStringAsFixed(2)}). '
+            '($amount). '
             'It is due on $dueDate. '
             'Could you please share when payment will be processed? Thanks!';
       case ReminderMessageType.firm:
         return 'Reminder: invoice ${invoice.id} for ${invoice.service} '
-            '(\$${invoice.amount.toStringAsFixed(2)}) is due on $dueDate. '
+            '($amount) is due on $dueDate. '
             'Please arrange payment today to avoid service delays.';
     }
   }

@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../shared/widgets/app_async_state_view.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoices_controller.dart';
 import '../widgets/invoice_tile.dart';
@@ -28,8 +31,27 @@ class InvoicesListScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: 'New Invoice',
-            onPressed: () {
-              const CreateInvoiceRoute().push(context);
+            onPressed: () async {
+              final decision = await ref
+                  .read(subscriptionGatekeeperProvider)
+                  .evaluate(SubscriptionGateFeature.createInvoice);
+              if (!decision.isAllowed) {
+                if (!context.mounted) {
+                  return;
+                }
+                final upgraded = await promptUpgradeForDecision(
+                  context,
+                  decision,
+                );
+                if (!upgraded || !context.mounted) {
+                  return;
+                }
+              }
+
+              if (!context.mounted) {
+                return;
+              }
+              await const CreateInvoiceRoute().push(context);
             },
             icon: const Icon(Icons.add),
           ),

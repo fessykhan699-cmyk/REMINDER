@@ -38,4 +38,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<Invoice?> getInvoiceById(String id) => _datasource.getInvoiceById(id);
+
+  @override
+  Future<String> getNextInvoiceId({required String prefix}) {
+    return _datasource.getNextInvoiceId(prefix: prefix);
+  }
 }

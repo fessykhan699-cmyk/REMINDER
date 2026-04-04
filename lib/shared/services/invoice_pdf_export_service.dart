@@ -1,0 +1,289 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/formatters.dart';
+import '../../features/invoices/domain/entities/invoice.dart';
+import 'invoice_pdf_profile_hook.dart';
+
+final invoicePdfExportServiceProvider = Provider<InvoicePdfExportService>(
+  (ref) => InvoicePdfExportService(ref.watch(invoicePdfProfileHookProvider)),
+);
+
+class InvoicePdfExportService {
+  const InvoicePdfExportService(this._profileHook);
+
+  final InvoicePdfProfileHook _profileHook;
+
+  Future<void> exportInvoicePdf(
+    Invoice invoice, {
+    required bool includeWatermark,
+  }) async {
+    final document = pw.Document();
+    final senderProfile = await _profileHook.loadSenderProfile();
+
+    document.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (context) {
+          return pw.Stack(
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Invoice',
+                            style: pw.TextStyle(
+                              fontSize: 28,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.SizedBox(height: 6),
+                          pw.Text(invoice.id),
+                        ],
+                      ),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(
+                            AppConstants.aboutAppName,
+                            style: pw.TextStyle(
+                              fontSize: 14,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text('Created ${_dateLabel(invoice.createdAt)}'),
+                          pw.Text('Due ${_dateLabel(invoice.dueDate)}'),
+                          pw.Text('Status ${invoice.status.label}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 28),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        child: _buildPartySection(
+                          title: 'From',
+                          lines: senderProfile == null
+                              ? const <String>[
+                                  AppConstants.aboutAppName,
+                                  'Update your profile in Settings to add sender details.',
+                                ]
+                              : <String>[
+                                  senderProfile.businessName,
+                                  senderProfile.name,
+                                  senderProfile.email,
+                                  senderProfile.phone,
+                                  if (senderProfile.address.trim().isNotEmpty)
+                                    senderProfile.address,
+                                ],
+                        ),
+                      ),
+                      pw.SizedBox(width: 16),
+                      pw.Expanded(
+                        child: _buildPartySection(
+                          title: 'Bill To',
+                          lines: <String>[invoice.clientName, invoice.service],
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 28),
+                  _buildLineItemsTable(invoice),
+                  pw.SizedBox(height: 20),
+                  pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: _buildTotalsSection(invoice),
+                  ),
+                ],
+              ),
+              if (includeWatermark)
+                pw.Positioned.fill(
+                  child: pw.Center(
+                    child: pw.Opacity(
+                      opacity: 0.14,
+                      child: pw.Transform.rotate(
+                        angle: -0.48,
+                        child: pw.Text(
+                          'Generated by Invoice Flow',
+                          style: pw.TextStyle(
+                            fontSize: 30,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(
+      bytes: await document.save(),
+      filename: '${invoice.id.toLowerCase()}.pdf',
+    );
+  }
+
+  pw.Widget _buildPartySection({
+    required String title,
+    required List<String> lines,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(10),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            title,
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey700,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          ...lines
+              .where((line) => line.trim().isNotEmpty)
+              .map(
+                (line) => pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 4),
+                  child: pw.Text(line),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildLineItemsTable(Invoice invoice) {
+    final subtotal = AppFormatters.currency(
+      invoice.subtotalAmount,
+      currencyCode: invoice.currencyCode,
+    );
+    final total = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
+
+    return pw.Table(
+      border: pw.TableBorder.all(color: PdfColors.grey300),
+      columnWidths: const <int, pw.TableColumnWidth>{
+        0: pw.FlexColumnWidth(2.4),
+        1: pw.FlexColumnWidth(1.2),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          children: [
+            _tableCell('Service', isHeader: true),
+            _tableCell('Amount', isHeader: true, alignRight: true),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            _tableCell(invoice.service),
+            _tableCell(subtotal == total ? total : subtotal, alignRight: true),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildTotalsSection(Invoice invoice) {
+    final subtotal = AppFormatters.currency(
+      invoice.subtotalAmount,
+      currencyCode: invoice.currencyCode,
+    );
+    final tax = AppFormatters.currency(
+      invoice.taxAmount,
+      currencyCode: invoice.currencyCode,
+    );
+    final total = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
+
+    return pw.Container(
+      width: 220,
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(10),
+      ),
+      child: pw.Column(
+        children: [
+          _summaryRow('Subtotal', subtotal),
+          if (invoice.taxPercent > 0)
+            _summaryRow('Tax (${invoice.taxPercent.toStringAsFixed(0)}%)', tax),
+          pw.Divider(color: PdfColors.grey300),
+          _summaryRow('Total', total, isBold: true),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _summaryRow(String label, String value, {bool isBold = false}) {
+    final style = pw.TextStyle(
+      fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+    );
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: style),
+          pw.Text(value, style: style),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _tableCell(
+    String value, {
+    bool isHeader = false,
+    bool alignRight = false,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(10),
+      child: pw.Align(
+        alignment: alignRight
+            ? pw.Alignment.centerRight
+            : pw.Alignment.centerLeft,
+        child: pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _dateLabel(DateTime value) {
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '$month/$day/${value.year}';
+  }
+}

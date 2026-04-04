@@ -30,6 +30,9 @@ class InvoiceModel extends Invoice {
     required this.dueDate,
     required this.status,
     required this.createdAt,
+    required this.currencyCode,
+    required this.taxPercent,
+    required this.paymentTermsDays,
   }) : super(
          id: id,
          clientId: clientId,
@@ -39,6 +42,9 @@ class InvoiceModel extends Invoice {
          dueDate: dueDate,
          status: status,
          createdAt: createdAt,
+         currencyCode: currencyCode,
+         taxPercent: taxPercent,
+         paymentTermsDays: paymentTermsDays,
        );
 
   @override
@@ -73,6 +79,18 @@ class InvoiceModel extends Invoice {
   @HiveField(7)
   final DateTime createdAt;
 
+  @override
+  @HiveField(8)
+  final String currencyCode;
+
+  @override
+  @HiveField(9)
+  final double taxPercent;
+
+  @override
+  @HiveField(10)
+  final int paymentTermsDays;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -83,6 +101,9 @@ class InvoiceModel extends Invoice {
       dueDate: invoice.dueDate,
       status: invoice.status,
       createdAt: invoice.createdAt,
+      currencyCode: invoice.currencyCode,
+      taxPercent: invoice.taxPercent,
+      paymentTermsDays: invoice.paymentTermsDays,
     );
   }
 
@@ -99,6 +120,9 @@ class InvoiceModel extends Invoice {
         orElse: () => InvoiceStatus.pending,
       ),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      currencyCode: json['currencyCode'] as String? ?? 'USD',
+      taxPercent: (json['taxPercent'] as num?)?.toDouble() ?? 0,
+      paymentTermsDays: (json['paymentTermsDays'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -112,6 +136,9 @@ class InvoiceModel extends Invoice {
       'dueDate': dueDate.toIso8601String(),
       'status': status.name,
       'createdAt': createdAt.toIso8601String(),
+      'currencyCode': currencyCode,
+      'taxPercent': taxPercent,
+      'paymentTermsDays': paymentTermsDays,
     };
   }
 
@@ -125,6 +152,9 @@ class InvoiceModel extends Invoice {
     DateTime? dueDate,
     InvoiceStatus? status,
     DateTime? createdAt,
+    String? currencyCode,
+    double? taxPercent,
+    int? paymentTermsDays,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -135,6 +165,9 @@ class InvoiceModel extends Invoice {
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      currencyCode: currencyCode ?? this.currencyCode,
+      taxPercent: taxPercent ?? this.taxPercent,
+      paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
     );
   }
 }
@@ -145,15 +178,32 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
 
   @override
   InvoiceModel read(BinaryReader reader) {
+    final id = reader.readString();
+    final clientId = reader.readString();
+    final clientName = reader.readString();
+    final service = reader.readString();
+    final amount = reader.readDouble();
+    final dueDate = DateTime.parse(reader.readString());
+    final status = reader.read() as InvoiceStatus;
+    final createdAt = DateTime.parse(reader.readString());
+    final currencyCode = reader.availableBytes > 0
+        ? reader.readString()
+        : 'USD';
+    final taxPercent = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
+    final paymentTermsDays = reader.availableBytes > 0 ? reader.readInt() : 0;
+
     return InvoiceModel(
-      id: reader.readString(),
-      clientId: reader.readString(),
-      clientName: reader.readString(),
-      service: reader.readString(),
-      amount: reader.readDouble(),
-      dueDate: DateTime.parse(reader.readString()),
-      status: reader.read() as InvoiceStatus,
-      createdAt: DateTime.parse(reader.readString()),
+      id: id,
+      clientId: clientId,
+      clientName: clientName,
+      service: service,
+      amount: amount,
+      dueDate: dueDate,
+      status: status,
+      createdAt: createdAt,
+      currencyCode: currencyCode,
+      taxPercent: taxPercent,
+      paymentTermsDays: paymentTermsDays,
     );
   }
 
@@ -167,7 +217,9 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeDouble(obj.amount)
       ..writeString(obj.dueDate.toIso8601String())
       ..write(obj.status)
-      ..writeString(obj.createdAt.toIso8601String());
+      ..writeString(obj.createdAt.toIso8601String())
+      ..writeString(obj.currencyCode)
+      ..writeDouble(obj.taxPercent)
+      ..writeInt(obj.paymentTermsDays);
   }
 }
-

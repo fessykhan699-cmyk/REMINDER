@@ -1,0 +1,115 @@
+enum PaymentTermsOption { net7, net15, net30 }
+
+extension PaymentTermsOptionX on PaymentTermsOption {
+  String get label {
+    switch (this) {
+      case PaymentTermsOption.net7:
+        return 'Net 7';
+      case PaymentTermsOption.net15:
+        return 'Net 15';
+      case PaymentTermsOption.net30:
+        return 'Net 30';
+    }
+  }
+
+  int get days {
+    switch (this) {
+      case PaymentTermsOption.net7:
+        return 7;
+      case PaymentTermsOption.net15:
+        return 15;
+      case PaymentTermsOption.net30:
+        return 30;
+    }
+  }
+}
+
+class AppPreferences {
+  const AppPreferences({
+    required this.pushNotificationsEnabled,
+    required this.whatsAppRemindersEnabled,
+    required this.smsRemindersEnabled,
+    required this.remind24HoursBefore,
+    required this.remind3HoursBefore,
+    required this.remindOnDueDate,
+    required this.appLockEnabled,
+    required this.appLockPin,
+    required this.defaultCurrency,
+    required this.defaultTaxPercent,
+    required this.invoicePrefix,
+    required this.paymentTerms,
+    required this.oneTapInvoiceEnabled,
+    required this.smartPredictionEnabled,
+  });
+
+  const AppPreferences.defaults()
+    : pushNotificationsEnabled = true,
+      whatsAppRemindersEnabled = true,
+      smsRemindersEnabled = true,
+      remind24HoursBefore = true,
+      remind3HoursBefore = true,
+      remindOnDueDate = true,
+      appLockEnabled = false,
+      appLockPin = '',
+      defaultCurrency = 'USD',
+      defaultTaxPercent = 0,
+      invoicePrefix = 'INV',
+      paymentTerms = PaymentTermsOption.net30,
+      oneTapInvoiceEnabled = true,
+      smartPredictionEnabled = true;
+
+  final bool pushNotificationsEnabled;
+  final bool whatsAppRemindersEnabled;
+  final bool smsRemindersEnabled;
+  final bool remind24HoursBefore;
+  final bool remind3HoursBefore;
+  final bool remindOnDueDate;
+  final bool appLockEnabled;
+  final String appLockPin;
+  final String defaultCurrency;
+  final double defaultTaxPercent;
+  final String invoicePrefix;
+  final PaymentTermsOption paymentTerms;
+  final bool oneTapInvoiceEnabled;
+  final bool smartPredictionEnabled;
+
+  bool get hasPin => appLockPin.trim().length >= 4;
+
+  AppPreferences copyWith({
+    bool? pushNotificationsEnabled,
+    bool? whatsAppRemindersEnabled,
+    bool? smsRemindersEnabled,
+    bool? remind24HoursBefore,
+    bool? remind3HoursBefore,
+    bool? remindOnDueDate,
+    bool? appLockEnabled,
+    String? appLockPin,
+    bool clearPin = false,
+    String? defaultCurrency,
+    double? defaultTaxPercent,
+    String? invoicePrefix,
+    PaymentTermsOption? paymentTerms,
+    bool? oneTapInvoiceEnabled,
+    bool? smartPredictionEnabled,
+  }) {
+    return AppPreferences(
+      pushNotificationsEnabled:
+          pushNotificationsEnabled ?? this.pushNotificationsEnabled,
+      whatsAppRemindersEnabled:
+          whatsAppRemindersEnabled ?? this.whatsAppRemindersEnabled,
+      smsRemindersEnabled: smsRemindersEnabled ?? this.smsRemindersEnabled,
+      remind24HoursBefore: remind24HoursBefore ?? this.remind24HoursBefore,
+      remind3HoursBefore: remind3HoursBefore ?? this.remind3HoursBefore,
+      remindOnDueDate: remindOnDueDate ?? this.remindOnDueDate,
+      appLockEnabled: appLockEnabled ?? this.appLockEnabled,
+      appLockPin: clearPin ? '' : (appLockPin ?? this.appLockPin),
+      defaultCurrency: defaultCurrency ?? this.defaultCurrency,
+      defaultTaxPercent: defaultTaxPercent ?? this.defaultTaxPercent,
+      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
+      paymentTerms: paymentTerms ?? this.paymentTerms,
+      oneTapInvoiceEnabled: oneTapInvoiceEnabled ?? this.oneTapInvoiceEnabled,
+      smartPredictionEnabled:
+          smartPredictionEnabled ?? this.smartPredictionEnabled,
+    );
+  }
+}

@@ -17,6 +17,9 @@ import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../../reminders/presentation/controllers/reminders_controller.dart';
 import '../../../settings/presentation/controllers/settings_controller.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -387,18 +390,82 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   ) async {
     switch (suggestion.action) {
       case _DashboardSuggestionAction.createInvoice:
+        final decision = await ref
+            .read(subscriptionGatekeeperProvider)
+            .evaluate(SubscriptionGateFeature.createInvoice);
+        if (!decision.isAllowed) {
+          if (!context.mounted) {
+            return;
+          }
+          final upgraded = await promptUpgradeForDecision(context, decision);
+          if (!upgraded || !context.mounted) {
+            return;
+          }
+        }
+
+        if (!mounted || !context.mounted) {
+          return;
+        }
+
         await const CreateInvoiceRoute().push(context);
+        return;
       case _DashboardSuggestionAction.addClient:
+        final decision = await ref
+            .read(subscriptionGatekeeperProvider)
+            .evaluate(SubscriptionGateFeature.addClient);
+        if (!decision.isAllowed) {
+          if (!context.mounted) {
+            return;
+          }
+          final upgraded = await promptUpgradeForDecision(context, decision);
+          if (!upgraded || !context.mounted) {
+            return;
+          }
+        }
+
+        if (!mounted || !context.mounted) {
+          return;
+        }
+
         await const AddClientRoute().push(context);
+        return;
       case _DashboardSuggestionAction.reviewPayments:
         const InvoicesTabRoute().go(context);
+        return;
       case _DashboardSuggestionAction.sendReminder:
         final invoiceId = suggestion.invoiceId;
         if (invoiceId == null) {
           return;
         }
         await ReminderFlowRoute(invoiceId).push(context);
+        return;
     }
+  }
+
+  Future<void> _handleSmartReminderTap(
+    BuildContext context,
+    _SmartReminderData reminder,
+    SubscriptionState subscription,
+  ) async {
+    if (!subscription.isPro) {
+      final decision = await ref
+          .read(subscriptionGatekeeperProvider)
+          .evaluate(SubscriptionGateFeature.smartReminders);
+      if (!context.mounted) {
+        return;
+      }
+      final upgraded = await promptUpgradeForDecision(context, decision);
+      if (!upgraded || !context.mounted) {
+        return;
+      }
+    }
+
+    final invoiceId = reminder.invoiceId;
+    if (invoiceId == null || !context.mounted) {
+      return;
+    }
+
+    await ReminderFlowRoute(invoiceId).push(context);
   }
 
   Widget _buildSuggestionsSection(
@@ -488,6 +555,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget _buildDashboardContent(
     BuildContext context,
     _DashboardViewModel model,
+    SubscriptionState subscription,
   ) {
     final sections = <Widget>[];
 
@@ -509,43 +577,83 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           'empty',
           _EmptyDashboardState(subtitle: model.emptySubtitle),
         );
+        break;
       case _DashboardUrgency.overdue:
         addSection(
           'priority',
           _PriorityFocusSection(data: model.prioritySection!),
         );
-        addSection('reminder', _SmartReminderSection(data: model.reminder));
+        addSection(
+          'reminder',
+          _SmartReminderSection(
+            data: model.reminder,
+            isLocked: !subscription.isPro,
+            onTap: () {
+              _handleSmartReminderTap(context, model.reminder, subscription);
+            },
+          ),
+        );
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
         addSection('recent', _buildRecentActivitySection(context, model));
+        break;
       case _DashboardUrgency.dueSoon:
         addSection(
           'priority',
           _PriorityFocusSection(data: model.prioritySection!),
         );
-        addSection('reminder', _SmartReminderSection(data: model.reminder));
+        addSection(
+          'reminder',
+          _SmartReminderSection(
+            data: model.reminder,
+            isLocked: !subscription.isPro,
+            onTap: () {
+              _handleSmartReminderTap(context, model.reminder, subscription);
+            },
+          ),
+        );
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
         addSection('recent', _buildRecentActivitySection(context, model));
+        break;
       case _DashboardUrgency.calm:
         if (model.focusMode == _DashboardFocusMode.overview) {
           addSection('stats', _StatsSection(totals: model.totals));
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
-          addSection('reminder', _SmartReminderSection(data: model.reminder));
+          addSection(
+            'reminder',
+            _SmartReminderSection(
+              data: model.reminder,
+              isLocked: !subscription.isPro,
+              onTap: () {
+                _handleSmartReminderTap(context, model.reminder, subscription);
+              },
+            ),
+          );
         } else {
-          addSection('reminder', _SmartReminderSection(data: model.reminder));
+          addSection(
+            'reminder',
+            _SmartReminderSection(
+              data: model.reminder,
+              isLocked: !subscription.isPro,
+              onTap: () {
+                _handleSmartReminderTap(context, model.reminder, subscription);
+              },
+            ),
+          );
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
           addSection('stats', _StatsSection(totals: model.totals));
         }
         addSection('recent', _buildRecentActivitySection(context, model));
+        break;
     }
 
     return AnimatedSwitcher(
@@ -601,6 +709,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final invoices = invoicesState.valueOrNull ?? const <Invoice>[];
     final clientCount = clientsState.valueOrNull?.length ?? 0;
     final reminderCount = remindersState.valueOrNull?.length ?? 0;
+    final subscription =
+        ref.watch(subscriptionControllerProvider).valueOrNull ??
+        const SubscriptionState.free();
     final dashboard = _DashboardViewModel.fromSignals(
       invoices: invoices,
       adaptiveState: adaptiveState,
@@ -638,7 +749,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               ),
                             ),
                             const SizedBox(height: 24),
-                            _buildDashboardContent(context, dashboard),
+                            _buildDashboardContent(
+                              context,
+                              dashboard,
+                              subscription,
+                            ),
                           ],
                         ),
                       ),
@@ -947,7 +1062,10 @@ class _PriorityInvoiceRow extends StatelessWidget {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerRight,
             child: Text(
-              AppFormatters.currency(invoice.invoice.amount),
+              AppFormatters.currency(
+                invoice.invoice.amount,
+                currencyCode: invoice.invoice.currencyCode,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
@@ -994,18 +1112,20 @@ class _EmptyDashboardState extends StatelessWidget {
 }
 
 class _SmartReminderSection extends StatelessWidget {
-  const _SmartReminderSection({required this.data});
+  const _SmartReminderSection({
+    required this.data,
+    this.onTap,
+    this.isLocked = false,
+  });
 
   final _SmartReminderData data;
+  final VoidCallback? onTap;
+  final bool isLocked;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: data.invoiceId == null
-          ? null
-          : () {
-              ReminderFlowRoute(data.invoiceId!).push(context);
-            },
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: RepaintBoundary(
         child: GlassCard(
@@ -1051,7 +1171,9 @@ class _SmartReminderSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      data.detail,
+                      isLocked
+                          ? 'Upgrade to unlock proactive smart reminders.'
+                          : data.detail,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
@@ -1060,8 +1182,8 @@ class _SmartReminderSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
-                Icons.arrow_forward_ios,
+              Icon(
+                isLocked ? Icons.lock_outline_rounded : Icons.arrow_forward_ios,
                 size: 16,
                 color: AppColors.textSecondary,
               ),
@@ -1136,7 +1258,10 @@ class _RecentActivityRow extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  AppFormatters.currency(invoice.amount),
+                  AppFormatters.currency(
+                    invoice.amount,
+                    currencyCode: invoice.currencyCode,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.right,
@@ -1618,8 +1743,8 @@ class _SmartReminderData {
         ? 'Follow up again with $clientName'
         : 'Reminder needed for $clientName';
     final detail = reminderCount == 0 && !invoice.isOverdue
-        ? 'Send your first reminder • ${AppFormatters.currency(invoice.invoice.amount)}'
-        : '${invoice.dueLabel} • ${AppFormatters.currency(invoice.invoice.amount)}';
+        ? 'Send your first reminder • ${AppFormatters.currency(invoice.invoice.amount, currencyCode: invoice.invoice.currencyCode)}'
+        : '${invoice.dueLabel} • ${AppFormatters.currency(invoice.invoice.amount, currencyCode: invoice.invoice.currencyCode)}';
 
     return _SmartReminderData(
       headline: headline,

@@ -7,6 +7,10 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/domain/repositories/invoice_repository.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
+import '../../../settings/domain/repositories/settings_repository.dart';
+import '../../../settings/presentation/controllers/settings_controller.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/reminders_local_datasource.dart';
 import '../../data/repositories/reminder_repository_impl.dart';
 import '../../domain/entities/reminder.dart';
@@ -113,6 +117,9 @@ class RemindersController
   late final InvoiceRepository _invoiceRepository = ref.read(
     invoiceRepositoryProvider,
   );
+  late final SettingsRepository _settingsRepository = ref.read(
+    settingsRepositoryProvider,
+  );
 
   @override
   ReminderFlowState build(String invoiceId) {
@@ -163,6 +170,25 @@ class RemindersController
   Future<void> sendReminder(ReminderChannel channel) async {
     final invoice = state.invoice;
     if (invoice == null || state.isSending) {
+      return;
+    }
+
+    if (channel == ReminderChannel.whatsapp) {
+      await ref
+          .read(subscriptionGatekeeperProvider)
+          .ensureAllowed(SubscriptionGateFeature.whatsappSharing);
+    }
+
+    final preferences = await _settingsRepository.getAppPreferences();
+    final isChannelEnabled = switch (channel) {
+      ReminderChannel.whatsapp => preferences.whatsAppRemindersEnabled,
+      ReminderChannel.sms => preferences.smsRemindersEnabled,
+    };
+    if (!isChannelEnabled) {
+      state = state.copyWith(
+        errorMessage: '${channel.label} reminders are turned off in Settings.',
+        clearSuccess: true,
+      );
       return;
     }
 

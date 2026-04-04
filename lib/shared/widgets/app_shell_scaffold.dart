@@ -8,6 +8,10 @@ import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/invoices/presentation/controllers/invoice_creation_learning_controller.dart';
 import '../../features/invoices/presentation/controllers/invoice_prediction_engine.dart';
+import '../../features/settings/presentation/controllers/app_preferences_controller.dart';
+import '../../features/subscription/domain/entities/subscription_state.dart';
+import '../../features/subscription/presentation/controllers/subscription_controller.dart';
+import '../../features/subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 
 class AppShellScaffold extends ConsumerStatefulWidget {
   const AppShellScaffold({
@@ -183,6 +187,22 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
     }
   }
 
+  Future<bool> _ensureFeatureAccess(
+    BuildContext context,
+    SubscriptionGateFeature feature,
+  ) async {
+    final decision = await ref
+        .read(subscriptionGatekeeperProvider)
+        .evaluate(feature);
+    if (decision.isAllowed) {
+      return true;
+    }
+    if (!context.mounted) {
+      return false;
+    }
+    return promptUpgradeForDecision(context, decision);
+  }
+
   Future<void> _handleFabTap(BuildContext context) async {
     await HapticFeedback.lightImpact();
     if (!context.mounted) {
@@ -242,15 +262,36 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   ) async {
     switch (action) {
       case _FabSheetAction.createInvoice:
+        final canCreateInvoice = await _ensureFeatureAccess(
+          context,
+          SubscriptionGateFeature.createInvoice,
+        );
+        if (!canCreateInvoice || !context.mounted) {
+          return;
+        }
+
+        final preferences = ref
+            .read(appPreferencesControllerProvider)
+            .valueOrNull;
         if (!context.mounted) {
           return;
         }
         await _openNewInvoiceWithMode(
           context,
-          launchMode: InvoiceCreateLaunchMode.assisted,
+          launchMode: preferences?.oneTapInvoiceEnabled ?? true
+              ? InvoiceCreateLaunchMode.assisted
+              : InvoiceCreateLaunchMode.manual,
         );
         return;
       case _FabSheetAction.addClient:
+        final canAddClient = await _ensureFeatureAccess(
+          context,
+          SubscriptionGateFeature.addClient,
+        );
+        if (!canAddClient || !context.mounted) {
+          return;
+        }
+
         if (!context.mounted) {
           return;
         }
@@ -272,6 +313,10 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   }
 
   Widget? _buildFloatingActionButton(BuildContext context) {
+    if (widget.currentLocation.startsWith(SettingsTabRoute.routePath)) {
+      return null;
+    }
+
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
     final fabBottomPadding = safeAreaBottom + 80.0;
 

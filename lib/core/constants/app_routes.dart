@@ -171,3 +171,15 @@ final class ReminderFlowRoute extends AppRouteSpec {
   @override
   String get location => '/invoices/$invoiceId/reminder';
 }
+
+final class UpgradeToProRoute extends AppRouteSpec {
+  const UpgradeToProRoute();
+
+  static const String routePath = '/upgrade';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}

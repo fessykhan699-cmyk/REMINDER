@@ -111,4 +111,25 @@ class InvoicesLocalDatasource {
 
     return null;
   }
+
+  Future<String> getNextInvoiceId({required String prefix}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    final normalizedPrefix = prefix.trim().toUpperCase();
+    final escapedPrefix = RegExp.escape(normalizedPrefix);
+    final pattern = RegExp('^$escapedPrefix-(\\d+)\$', caseSensitive: false);
+
+    var highestNumber = 0;
+    for (final invoice in _invoicesBox.values) {
+      final match = pattern.firstMatch(invoice.id.trim());
+      final number = int.tryParse(match?.group(1) ?? '');
+      if (number != null && number > highestNumber) {
+        highestNumber = number;
+      }
+    }
+
+    final nextNumber = highestNumber + 1;
+    final paddedNumber = nextNumber.toString().padLeft(3, '0');
+    return '$normalizedPrefix-$paddedNumber';
+  }
 }

@@ -16,6 +16,7 @@ import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/reminders/presentation/screens/reminder_flow_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/subscription/presentation/screens/upgrade_to_pro_screen.dart';
 import '../../shared/widgets/app_shell_scaffold.dart';
 import '../constants/app_routes.dart';
 
@@ -36,6 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: LoginRoute.routePath,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: UpgradeToProRoute.routePath,
+        builder: (context, state) => const UpgradeToProScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

@@ -5,6 +5,8 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/primary_button.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../controllers/clients_controller.dart';
 
 class AddClientScreen extends ConsumerStatefulWidget {
@@ -219,6 +221,18 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
         return;
       }
       Navigator.of(context).pop();
+    } on SubscriptionGateException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await promptUpgradeForDecision(context, error.decision);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to add the client right now.')),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);

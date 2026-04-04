@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/notification_service.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
@@ -107,10 +109,15 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<Invoice> createInvoice(Invoice invoice) async {
+    await ref
+        .read(subscriptionGatekeeperProvider)
+        .ensureAllowed(SubscriptionGateFeature.createInvoice);
+
     final created = await ref.read(createInvoiceUseCaseProvider).call(invoice);
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
     ref.invalidate(invoiceDetailProvider(invoice.id));
+    ref.invalidate(subscriptionUsageProvider);
     await ref
         .read(invoiceCreationLearningProvider.notifier)
         .recordCreatedInvoice(created);

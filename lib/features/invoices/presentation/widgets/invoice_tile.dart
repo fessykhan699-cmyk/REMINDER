@@ -46,7 +46,10 @@ class InvoiceTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              AppFormatters.currency(invoice.amount),
+              AppFormatters.currency(
+                invoice.amount,
+                currencyCode: invoice.currencyCode,
+              ),
               style: const TextStyle(color: AppColors.textPrimary),
             ),
             const SizedBox(height: 4),

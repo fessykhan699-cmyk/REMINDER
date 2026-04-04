@@ -23,6 +23,9 @@ class Invoice {
     required this.dueDate,
     required this.status,
     required this.createdAt,
+    this.currencyCode = 'USD',
+    this.taxPercent = 0,
+    this.paymentTermsDays = 0,
   });
 
   final String id;
@@ -33,6 +36,19 @@ class Invoice {
   final DateTime dueDate;
   final InvoiceStatus status;
   final DateTime createdAt;
+  final String currencyCode;
+  final double taxPercent;
+  final int paymentTermsDays;
+
+  double get subtotalAmount {
+    if (taxPercent <= 0) {
+      return amount;
+    }
+
+    return amount / (1 + (taxPercent / 100));
+  }
+
+  double get taxAmount => amount - subtotalAmount;
 
   Invoice copyWith({
     String? id,
@@ -43,6 +59,9 @@ class Invoice {
     DateTime? dueDate,
     InvoiceStatus? status,
     DateTime? createdAt,
+    String? currencyCode,
+    double? taxPercent,
+    int? paymentTermsDays,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -53,6 +72,9 @@ class Invoice {
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      currencyCode: currencyCode ?? this.currencyCode,
+      taxPercent: taxPercent ?? this.taxPercent,
+      paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
     );
   }
 }

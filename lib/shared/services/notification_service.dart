@@ -6,7 +6,11 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/services/app_feedback_service.dart';
+import '../../core/utils/formatters.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
+import '../../features/settings/data/datasources/settings_local_datasource.dart';
+import '../../features/settings/domain/entities/app_preferences.dart';
+import '../../features/subscription/data/datasources/subscription_local_datasource.dart';
 
 final notificationServiceProvider = Provider<NotificationService>(
   (ref) => NotificationService.instance,
@@ -58,6 +62,18 @@ class NotificationService {
   Future<void> scheduleInvoiceReminders(Invoice invoice) async {
     try {
       await initialize();
+      final subscription = await const SubscriptionLocalDatasource()
+          .loadState();
+      if (!subscription.isPro) {
+        await cancelInvoiceReminders(invoice.id);
+        return;
+      }
+
+      final preferences = await _loadPreferences();
+      if (!preferences.pushNotificationsEnabled) {
+        await cancelInvoiceReminders(invoice.id);
+        return;
+      }
 
       final hasPermission = await _requestPermissions();
       if (!hasPermission) {
@@ -72,28 +88,35 @@ class NotificationService {
       final now = DateTime.now();
       final dueDate = invoice.dueDate;
       final scheduleItems = <_ScheduledReminder>[
-        _ScheduledReminder(
-          id: _notificationId(invoice.id, 'due'),
-          title: 'Invoice due now',
-          body: _buildReminderBody(invoice),
-          scheduledAt: dueDate,
-          payload: invoice.id,
-        ),
-        _ScheduledReminder(
-          id: _notificationId(invoice.id, 'day-before'),
-          title: 'Invoice due in 24 hours',
-          body: _buildReminderBody(invoice),
-          scheduledAt: dueDate.subtract(const Duration(hours: 24)),
-          payload: invoice.id,
-        ),
-        _ScheduledReminder(
-          id: _notificationId(invoice.id, 'three-hours'),
-          title: 'Invoice due in 3 hours',
-          body: _buildReminderBody(invoice),
-          scheduledAt: dueDate.subtract(const Duration(hours: 3)),
-          payload: invoice.id,
-        ),
+        if (preferences.remindOnDueDate)
+          _ScheduledReminder(
+            id: _notificationId(invoice.id, 'due'),
+            title: 'Invoice due now',
+            body: _buildReminderBody(invoice),
+            scheduledAt: dueDate,
+            payload: invoice.id,
+          ),
+        if (preferences.remind24HoursBefore)
+          _ScheduledReminder(
+            id: _notificationId(invoice.id, 'day-before'),
+            title: 'Invoice due in 24 hours',
+            body: _buildReminderBody(invoice),
+            scheduledAt: dueDate.subtract(const Duration(hours: 24)),
+            payload: invoice.id,
+          ),
+        if (preferences.remind3HoursBefore)
+          _ScheduledReminder(
+            id: _notificationId(invoice.id, 'three-hours'),
+            title: 'Invoice due in 3 hours',
+            body: _buildReminderBody(invoice),
+            scheduledAt: dueDate.subtract(const Duration(hours: 3)),
+            payload: invoice.id,
+          ),
       ];
+
+      if (scheduleItems.isEmpty) {
+        return;
+      }
 
       var scheduledAny = false;
       for (final item in scheduleItems) {
@@ -111,7 +134,9 @@ class NotificationService {
         scheduledAny = true;
       }
 
-      if (!scheduledAny) {
+      if (!scheduledAny &&
+          preferences.remindOnDueDate &&
+          !dueDate.isAfter(now)) {
         await showInstantReminder(
           id: _notificationId(invoice.id, 'instant'),
           title: 'Invoice reminder',
@@ -251,12 +276,24 @@ class NotificationService {
 
   String _buildReminderBody(Invoice invoice) {
     final dueDate = invoice.dueDate.toLocal().toString().split(' ').first;
+    final amount = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
     return '${invoice.clientName} has an invoice for '
-        '\$${invoice.amount.toStringAsFixed(2)} due on $dueDate.';
+        '$amount due on $dueDate.';
   }
 
   int _notificationId(String invoiceId, String slot) {
     return Object.hash(invoiceId, slot) & 0x7fffffff;
+  }
+
+  Future<AppPreferences> _loadPreferences() async {
+    try {
+      return await SettingsLocalDatasource().getAppPreferences();
+    } catch (_) {
+      return const AppPreferences.defaults();
+    }
   }
 }
 

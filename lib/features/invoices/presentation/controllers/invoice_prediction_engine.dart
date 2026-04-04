@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../clients/domain/entities/client.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../settings/domain/entities/app_preferences.dart';
+import '../../../settings/presentation/controllers/app_preferences_controller.dart';
 import '../../domain/entities/invoice.dart';
 import 'invoice_creation_learning_controller.dart';
 import 'invoices_controller.dart';
@@ -29,6 +31,15 @@ final smartInvoicePredictionProvider = Provider<SmartInvoicePrediction>((ref) {
       ref.watch(clientsControllerProvider).valueOrNull ?? const <Client>[];
   final learning = ref.watch(invoiceCreationLearningProvider);
   final adaptiveState = ref.watch(adaptiveSystemProvider);
+  final preferences = ref.watch(appPreferencesControllerProvider).valueOrNull;
+  final defaultDueDays = preferences?.paymentTerms.days ?? 30;
+
+  if (!(preferences?.smartPredictionEnabled ?? true)) {
+    return SmartInvoicePrediction.disabled(
+      clients: clients,
+      defaultDueDays: defaultDueDays,
+    );
+  }
 
   return SmartInvoicePrediction.fromData(
     invoices: invoices,
@@ -36,6 +47,7 @@ final smartInvoicePredictionProvider = Provider<SmartInvoicePrediction>((ref) {
     learning: learning,
     adaptiveState: adaptiveState,
     now: DateTime.now(),
+    defaultDueDays: defaultDueDays,
   );
 });
 
@@ -319,6 +331,7 @@ class SmartInvoicePrediction {
     required InvoiceCreationLearningState learning,
     required AdaptiveSystemState adaptiveState,
     required DateTime now,
+    int defaultDueDays = 30,
   }) {
     final context = _PredictionContext(now);
     final firstAvailableClient = clients.isEmpty ? null : clients.first;
@@ -416,11 +429,11 @@ class SmartInvoicePrediction {
           : _parseIntCounts(learning.dueDaysUsageCounts),
       lastUsedByValue: globalDueDayLastUsedAt,
       fallbackValue: latestInvoice == null
-          ? 7
+          ? defaultDueDays
           : (_positiveDueDays(latestInvoice.createdAt, latestInvoice.dueDate) ??
-                7),
+                defaultDueDays),
       feedback: null,
-      defaultValue: 7,
+      defaultValue: defaultDueDays,
     );
     final globalAmountSuggestion = _resolveAmountSuggestion(
       amounts: globalAmounts,
@@ -453,7 +466,7 @@ class SmartInvoicePrediction {
       leadingClientConfidence: topClientConfidence,
       preferredDueDays: globalDueSuggestion.value,
       preferredDueDaysConfidence: globalDueSuggestion.confidence,
-      defaultDueDays: globalDueSuggestion.value ?? 7,
+      defaultDueDays: globalDueSuggestion.value ?? defaultDueDays,
       quickAmount: globalAmountSuggestion.value,
       quickAmountReason: globalAmountSuggestion.reason,
       quickAmountConfidence: globalAmountSuggestion.confidence,
@@ -465,6 +478,34 @@ class SmartInvoicePrediction {
       oneTapTemporarilyDisabled: learning.isOneTapTemporarilyDisabled,
       suggestionsByClient: suggestionsByClient,
       clientConfidenceById: clientConfidenceById,
+    );
+  }
+
+  factory SmartInvoicePrediction.disabled({
+    required List<Client> clients,
+    int defaultDueDays = 30,
+  }) {
+    return SmartInvoicePrediction(
+      suggestedClient: null,
+      suggestedClientReason: null,
+      suggestedClientConfidence: 0.0,
+      leadingClient: null,
+      leadingClientReason: null,
+      leadingClientConfidence: 0.0,
+      preferredDueDays: null,
+      preferredDueDaysConfidence: 0.0,
+      defaultDueDays: defaultDueDays,
+      quickAmount: null,
+      quickAmountReason: null,
+      quickAmountConfidence: 0.0,
+      firstAvailableClient: clients.isEmpty ? null : clients.first,
+      hasInvoiceHistory: false,
+      predictionWeights: const PredictionModelWeights.initial(),
+      recentAccuracyAverage: 0.0,
+      confidenceAdjustment: 0.0,
+      oneTapTemporarilyDisabled: false,
+      suggestionsByClient: const <String, SmartClientSuggestion>{},
+      clientConfidenceById: const <String, double>{},
     );
   }
 }
