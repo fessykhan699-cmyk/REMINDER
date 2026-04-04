@@ -8,8 +8,8 @@ abstract interface class ReminderRepository {
   Future<Reminder> sendReminder({
     required String invoiceId,
     required String clientId,
+    required String phoneNumber,
     required ReminderChannel channel,
-    required ReminderMessageType messageType,
     required String message,
   });
 

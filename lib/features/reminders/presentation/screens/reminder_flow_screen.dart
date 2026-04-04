@@ -27,6 +27,13 @@ class ReminderFlowScreen extends ConsumerWidget {
           context,
         ).showSnackBar(SnackBar(content: Text(next.successMessage!)));
       }
+
+      if (next.errorMessage != null &&
+          previous?.errorMessage != next.errorMessage) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+      }
     });
 
     final invoice = state.invoice;
@@ -80,12 +87,13 @@ class ReminderFlowScreen extends ConsumerWidget {
                   label: 'Send on WhatsApp',
                   icon: Icons.chat_bubble_outline,
                   isLoading: state.isSending,
-                  onPressed: () =>
-                      controller.sendReminder(ReminderChannel.whatsapp),
+                  onPressed: state.isSending || !state.canSendReminder
+                      ? null
+                      : () => controller.sendReminder(ReminderChannel.whatsapp),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: state.isSending
+                  onPressed: state.isSending || !state.canSendReminder
                       ? null
                       : () => controller.sendReminder(ReminderChannel.sms),
                   icon: const Icon(Icons.sms_outlined),

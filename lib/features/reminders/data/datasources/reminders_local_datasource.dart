@@ -1,12 +1,15 @@
 import 'package:hive/hive.dart';
 
-import '../../../../core/utils/id_generator.dart';
 import '../../../../core/storage/hive_storage.dart';
+import '../../../../core/utils/id_generator.dart';
+import '../../../../shared/services/reminder_launcher_service.dart';
 import '../../domain/entities/reminder.dart';
-import '../../domain/entities/reminder_message_type.dart';
 import '../models/reminder_model.dart';
 
 class RemindersLocalDatasource {
+  RemindersLocalDatasource(this._launcherService);
+
+  final ReminderLauncherService _launcherService;
   final Box<ReminderModel> _remindersBox = Hive.box<ReminderModel>(
     HiveStorage.remindersBoxName,
   );
@@ -21,37 +24,26 @@ class RemindersLocalDatasource {
   Future<ReminderModel> sendReminder({
     required String invoiceId,
     required String clientId,
+    required String phoneNumber,
     required ReminderChannel channel,
-    required ReminderMessageType messageType,
     required String message,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-
-    // Placeholder trigger logic for external channels.
-    if (channel == ReminderChannel.whatsapp) {
-      await _triggerWhatsApp(message: message);
-    } else {
-      await _triggerSms(message: message);
-    }
+    final launchResult = await _launcherService.launchReminder(
+      preferredChannel: channel,
+      phoneNumber: phoneNumber,
+      message: message,
+    );
 
     final reminder = ReminderModel(
       id: IdGenerator.nextId('rem'),
       invoiceId: invoiceId,
       clientId: clientId,
       sentAt: DateTime.now(),
-      channel: channel,
+      channel: launchResult.channel,
       status: ReminderStatus.sent,
     );
 
     await _remindersBox.put(reminder.id, reminder);
     return reminder;
-  }
-
-  Future<void> _triggerWhatsApp({required String message}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 110));
-  }
-
-  Future<void> _triggerSms({required String message}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 110));
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
+import '../../../../shared/services/reminder_launcher_service.dart';
+import '../../../clients/domain/repositories/client_repository.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/domain/repositories/invoice_repository.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
@@ -14,6 +17,7 @@ import '../../domain/usecases/send_reminder_usecase.dart';
 class ReminderFlowState {
   const ReminderFlowState({
     required this.invoice,
+    required this.clientPhone,
     required this.messageType,
     required this.previewMessage,
     required this.isSending,
@@ -24,6 +28,7 @@ class ReminderFlowState {
   factory ReminderFlowState.initial() {
     return const ReminderFlowState(
       invoice: null,
+      clientPhone: null,
       messageType: ReminderMessageType.professional,
       previewMessage: '',
       isSending: false,
@@ -33,15 +38,23 @@ class ReminderFlowState {
   }
 
   final Invoice? invoice;
+  final String? clientPhone;
   final ReminderMessageType messageType;
   final String previewMessage;
   final bool isSending;
   final String? errorMessage;
   final String? successMessage;
 
+  bool get canSendReminder {
+    final digits = (clientPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.length >= 8 && digits.length <= 15;
+  }
+
   ReminderFlowState copyWith({
     Invoice? invoice,
     bool replaceInvoice = false,
+    String? clientPhone,
+    bool replaceClientPhone = false,
     ReminderMessageType? messageType,
     String? previewMessage,
     bool? isSending,
@@ -52,6 +65,9 @@ class ReminderFlowState {
   }) {
     return ReminderFlowState(
       invoice: replaceInvoice ? invoice : (invoice ?? this.invoice),
+      clientPhone: replaceClientPhone
+          ? clientPhone
+          : (clientPhone ?? this.clientPhone),
       messageType: messageType ?? this.messageType,
       previewMessage: previewMessage ?? this.previewMessage,
       isSending: isSending ?? this.isSending,
@@ -64,7 +80,7 @@ class ReminderFlowState {
 }
 
 final remindersLocalDatasourceProvider = Provider<RemindersLocalDatasource>(
-  (ref) => RemindersLocalDatasource(),
+  (ref) => RemindersLocalDatasource(ref.watch(reminderLauncherServiceProvider)),
 );
 
 final reminderRepositoryProvider = Provider<ReminderRepository>(
@@ -91,6 +107,9 @@ class RemindersController
   late final ReminderRepository _reminderRepository = ref.read(
     reminderRepositoryProvider,
   );
+  late final ClientRepository _clientRepository = ref.read(
+    clientRepositoryProvider,
+  );
   late final InvoiceRepository _invoiceRepository = ref.read(
     invoiceRepositoryProvider,
   );
@@ -109,8 +128,12 @@ class RemindersController
       return;
     }
 
+    final client = await _clientRepository.getClientById(invoice.clientId);
+
     state = state.copyWith(
       invoice: invoice,
+      clientPhone: client?.phone,
+      replaceClientPhone: true,
       previewMessage: _reminderRepository.buildPreviewMessage(
         invoice: invoice,
         type: state.messageType,
@@ -143,6 +166,15 @@ class RemindersController
       return;
     }
 
+    final phoneNumber = state.clientPhone;
+    if (!state.canSendReminder || phoneNumber == null) {
+      state = state.copyWith(
+        errorMessage: 'Client phone number is missing.',
+        clearSuccess: true,
+      );
+      return;
+    }
+
     state = state.copyWith(
       isSending: true,
       clearError: true,
@@ -155,19 +187,21 @@ class RemindersController
         type: state.messageType,
       );
 
-      await ref
+      final reminder = await ref
           .read(sendReminderUseCaseProvider)
           .call(
             invoiceId: invoice.id,
             clientId: invoice.clientId,
+            phoneNumber: phoneNumber,
             channel: channel,
-            messageType: state.messageType,
             message: message,
           );
 
       state = state.copyWith(
         isSending: false,
-        successMessage: 'Reminder queued via ${channel.label}.',
+        successMessage: reminder.channel == channel
+            ? 'Reminder opened in ${reminder.channel.label}.'
+            : 'WhatsApp unavailable. Opened SMS instead.',
       );
       ref.invalidate(remindersHistoryProvider);
       await ref

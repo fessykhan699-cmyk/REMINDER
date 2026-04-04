@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
+import '../../../../shared/services/notification_service.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
@@ -52,6 +53,9 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  late final NotificationService _notificationService = ref.read(
+    notificationServiceProvider,
+  );
 
   bool get hasMore => _hasMore;
 
@@ -113,6 +117,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     await ref
         .read(adaptiveSystemProvider.notifier)
         .recordAction(AdaptiveActionKey.newInvoice);
+    await _notificationService.scheduleInvoiceReminders(created);
     return created;
   }
 
@@ -123,6 +128,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
         .toList(growable: false);
 
     await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
+    await _notificationService.cancelInvoiceReminders(invoiceId);
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoiceId));
@@ -149,6 +155,16 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoice.id));
+
+    final dueDateChanged =
+        previousInvoice != null &&
+        !previousInvoice.dueDate.isAtSameMomentAs(updated.dueDate);
+    if (updated.status == InvoiceStatus.paid) {
+      await _notificationService.cancelInvoiceReminders(updated.id);
+    } else if (dueDateChanged ||
+        previousInvoice?.status == InvoiceStatus.paid) {
+      await _notificationService.scheduleInvoiceReminders(updated);
+    }
 
     final wasUnpaid =
         previousInvoice != null && previousInvoice.status != InvoiceStatus.paid;

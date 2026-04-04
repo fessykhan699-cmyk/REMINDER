@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/services/app_feedback_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_router.dart';
 
@@ -19,6 +20,7 @@ class InvoiceReminderApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Invoice Reminder',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: AppFeedbackService.scaffoldMessengerKey,
       themeMode: ThemeMode.dark,
       theme: AppTheme.darkTheme.copyWith(
         scaffoldBackgroundColor: scaffoldBackgroundColor,
