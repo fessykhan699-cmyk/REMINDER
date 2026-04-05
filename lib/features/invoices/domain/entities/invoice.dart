@@ -1,16 +1,26 @@
-enum InvoiceStatus { pending, paid, overdue }
+const Object _paymentLinkSentinel = Object();
+
+enum InvoiceStatus { draft, sent, viewed, paid, overdue }
 
 extension InvoiceStatusX on InvoiceStatus {
   String get label {
     switch (this) {
-      case InvoiceStatus.pending:
-        return 'Pending';
+      case InvoiceStatus.draft:
+        return 'Draft';
+      case InvoiceStatus.sent:
+        return 'Sent';
+      case InvoiceStatus.viewed:
+        return 'Viewed';
       case InvoiceStatus.paid:
         return 'Paid';
       case InvoiceStatus.overdue:
         return 'Overdue';
     }
   }
+
+  bool get isPaid => this == InvoiceStatus.paid;
+
+  bool get isShareable => !isPaid;
 }
 
 class Invoice {
@@ -26,6 +36,7 @@ class Invoice {
     this.currencyCode = 'USD',
     this.taxPercent = 0,
     this.paymentTermsDays = 0,
+    this.paymentLink,
   });
 
   final String id;
@@ -39,6 +50,17 @@ class Invoice {
   final String currencyCode;
   final double taxPercent;
   final int paymentTermsDays;
+  final String? paymentLink;
+
+  bool get hasPaymentLink {
+    final trimmed = paymentLink?.trim() ?? '';
+    return trimmed.isNotEmpty;
+  }
+
+  String? get normalizedPaymentLink {
+    final trimmed = paymentLink?.trim() ?? '';
+    return trimmed.isEmpty ? null : trimmed;
+  }
 
   double get subtotalAmount {
     if (taxPercent <= 0) {
@@ -62,6 +84,7 @@ class Invoice {
     String? currencyCode,
     double? taxPercent,
     int? paymentTermsDays,
+    Object? paymentLink = _paymentLinkSentinel,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -75,6 +98,9 @@ class Invoice {
       currencyCode: currencyCode ?? this.currencyCode,
       taxPercent: taxPercent ?? this.taxPercent,
       paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
+      paymentLink: identical(paymentLink, _paymentLinkSentinel)
+          ? this.paymentLink
+          : paymentLink as String?,
     );
   }
 }

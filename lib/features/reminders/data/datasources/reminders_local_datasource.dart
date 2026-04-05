@@ -34,13 +34,27 @@ class RemindersLocalDatasource {
       message: message,
     );
 
+    return createReminderRecord(
+      invoiceId: invoiceId,
+      clientId: clientId,
+      channel: launchResult.channel,
+      status: ReminderStatus.sent,
+    );
+  }
+
+  Future<ReminderModel> createReminderRecord({
+    required String invoiceId,
+    required String clientId,
+    required ReminderChannel channel,
+    ReminderStatus status = ReminderStatus.sent,
+  }) async {
     final reminder = ReminderModel(
       id: IdGenerator.nextId('rem'),
       invoiceId: invoiceId,
       clientId: clientId,
       sentAt: DateTime.now(),
-      channel: launchResult.channel,
-      status: ReminderStatus.sent,
+      channel: channel,
+      status: status,
     );
 
     await _remindersBox.put(reminder.id, reminder);

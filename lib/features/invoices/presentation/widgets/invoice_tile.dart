@@ -3,23 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../domain/entities/invoice.dart';
+import 'invoice_status_badge.dart';
 
 class InvoiceTile extends StatelessWidget {
   const InvoiceTile({super.key, required this.invoice, required this.onTap});
 
   final Invoice invoice;
   final VoidCallback onTap;
-
-  Color _statusColor(BuildContext context) {
-    switch (invoice.status) {
-      case InvoiceStatus.paid:
-        return AppColors.success;
-      case InvoiceStatus.overdue:
-        return AppColors.danger;
-      case InvoiceStatus.pending:
-        return AppColors.warning;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,24 +43,7 @@ class InvoiceTile extends StatelessWidget {
               style: const TextStyle(color: AppColors.textPrimary),
             ),
             const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: _statusColor(context).withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _statusColor(context).withValues(alpha: 0.30),
-                ),
-              ),
-              child: Text(
-                invoice.status.label,
-                style: TextStyle(
-                  color: _statusColor(context),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            InvoiceStatusBadge(status: invoice.status),
           ],
         ),
       ),

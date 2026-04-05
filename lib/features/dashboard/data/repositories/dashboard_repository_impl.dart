@@ -24,15 +24,15 @@ class DashboardRepositoryImpl implements DashboardRepository {
     );
 
     final pending = invoices.where(
-      (item) => item.status == InvoiceStatus.pending,
+      (item) => !item.status.isPaid && item.status != InvoiceStatus.overdue,
     );
     final overdue = invoices.where(
       (item) => item.status == InvoiceStatus.overdue,
     );
-    final paid = invoices.where((item) => item.status == InvoiceStatus.paid);
+    final paid = invoices.where((item) => item.status.isPaid);
 
     final totalUnpaid = invoices
-        .where((item) => item.status != InvoiceStatus.paid)
+        .where((item) => !item.status.isPaid)
         .fold<double>(0, (total, item) => total + item.amount);
 
     final smartTarget = _pickSmartReminderTarget(invoices);
@@ -59,7 +59,9 @@ class DashboardRepositoryImpl implements DashboardRepository {
     }
 
     final pending = invoices
-        .where((item) => item.status == InvoiceStatus.pending)
+        .where(
+          (item) => !item.status.isPaid && item.status != InvoiceStatus.overdue,
+        )
         .toList(growable: false);
     if (pending.isEmpty) {
       return null;

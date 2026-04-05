@@ -3,10 +3,11 @@ import 'dart:math';
 import 'package:hive/hive.dart';
 
 import '../../../../core/storage/hive_storage.dart';
-import '../../domain/entities/invoice.dart';
+import '../../../../shared/services/invoice_status_service.dart';
 import '../models/invoice_model.dart';
 
 class InvoicesLocalDatasource {
+  static const InvoiceStatusService _statusService = InvoiceStatusService();
   final Box<InvoiceModel> _invoicesBox = Hive.box<InvoiceModel>(
     HiveStorage.invoicesBoxName,
   );
@@ -21,11 +22,10 @@ class InvoicesLocalDatasource {
 
     return invoices
         .map(
-          (invoice) =>
-              invoice.status == InvoiceStatus.pending &&
-                  invoice.dueDate.isBefore(now)
-              ? invoice.copyWith(status: InvoiceStatus.overdue)
-              : invoice,
+          (invoice) => invoice.copyWith(
+            status: _statusService.resolveStatus(invoice, now: now),
+            paymentLink: invoice.normalizedPaymentLink,
+          ),
         )
         .toList(growable: false);
   }

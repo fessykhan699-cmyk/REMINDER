@@ -107,11 +107,12 @@ class HiveStorage {
         service: 'Brand identity package',
         amount: 1850,
         dueDate: now.subtract(const Duration(days: 4)),
-        status: InvoiceStatus.pending,
+        status: InvoiceStatus.draft,
         createdAt: now.subtract(const Duration(days: 21)),
         currencyCode: 'USD',
         taxPercent: 0,
         paymentTermsDays: 0,
+        paymentLink: 'https://pay.invoiceflow.app/inv-1',
       ),
       InvoiceModel(
         id: 'inv-2',
@@ -120,11 +121,12 @@ class HiveStorage {
         service: 'Monthly analytics report',
         amount: 920,
         dueDate: now.add(const Duration(days: 6)),
-        status: InvoiceStatus.pending,
+        status: InvoiceStatus.draft,
         createdAt: now.subtract(const Duration(days: 9)),
         currencyCode: 'USD',
         taxPercent: 0,
         paymentTermsDays: 0,
+        paymentLink: 'https://pay.invoiceflow.app/inv-2',
       ),
     ];
 

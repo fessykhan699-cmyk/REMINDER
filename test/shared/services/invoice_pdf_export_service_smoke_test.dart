@@ -42,7 +42,7 @@ void main() {
       service: 'Design',
       amount: 550,
       dueDate: DateTime(2026, 4, 20),
-      status: InvoiceStatus.pending,
+      status: InvoiceStatus.draft,
       createdAt: DateTime(2026, 4, 5),
       currencyCode: 'USD',
       taxPercent: 10,
@@ -60,6 +60,7 @@ void main() {
     final document = await service.generateInvoicePdfDocument(
       invoice,
       includeWatermark: true,
+      saveLocally: true,
     );
 
     expect(document.bytes, isNotEmpty);

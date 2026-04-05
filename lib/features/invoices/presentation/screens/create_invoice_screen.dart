@@ -32,6 +32,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   final _dueDateFieldKey = GlobalKey<FormFieldState<DateTime?>>();
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
+  final _paymentLinkController = TextEditingController();
   final _serviceFocusNode = FocusNode();
   final _amountFocusNode = FocusNode();
 
@@ -48,6 +49,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   void dispose() {
     _serviceController.dispose();
     _amountController.dispose();
+    _paymentLinkController.dispose();
     _serviceFocusNode.dispose();
     _amountFocusNode.dispose();
     super.dispose();
@@ -478,6 +480,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     required DateTime selectedDueDate,
     required String service,
     required double amount,
+    required String? paymentLink,
     required DateTime now,
     required SmartInvoicePrediction intelligence,
     required InvoicesController invoicesController,
@@ -490,8 +493,9 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       service: service,
       amount: amount,
       dueDate: selectedDueDate,
-      status: InvoiceStatus.pending,
+      status: InvoiceStatus.draft,
       createdAt: now,
+      paymentLink: paymentLink,
     );
 
     final createdInvoice = await invoicesController.createInvoice(invoice);
@@ -523,6 +527,20 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     return true;
   }
 
+  String? _normalizedPaymentLink() {
+    final trimmed = _paymentLinkController.text.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      return null;
+    }
+
+    return trimmed;
+  }
+
   Future<void> _save() async {
     if (_isSaving) {
       return;
@@ -539,6 +557,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final selectedDueDate = _selectedDueDate;
     final service = _serviceController.text.trim();
     final amount = double.tryParse(_amountController.text.trim());
+    final paymentLink = _normalizedPaymentLink();
     final now = DateTime.now();
     final intelligence = ref.read(smartInvoicePredictionProvider);
     final invoicesController = ref.read(invoicesControllerProvider.notifier);
@@ -554,6 +573,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return;
     }
 
+    if (_paymentLinkController.text.trim().isNotEmpty && paymentLink == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid payment link')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -564,6 +590,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         selectedDueDate: selectedDueDate,
         service: service,
         amount: amount,
+        paymentLink: paymentLink,
         now: now,
         intelligence: intelligence,
         invoicesController: invoicesController,
@@ -883,6 +910,29 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                               ),
                             ),
                           );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _InvoiceTextField(
+                        controller: _paymentLinkController,
+                        label: 'Payment Link',
+                        hintText: 'https://pay.example.com/invoice',
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.done,
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return null;
+                          }
+
+                          final uri = Uri.tryParse(trimmed);
+                          if (uri == null ||
+                              !uri.hasScheme ||
+                              !uri.hasAuthority) {
+                            return 'Enter a valid payment link.';
+                          }
+
+                          return null;
                         },
                       ),
                       const SizedBox(height: 24),

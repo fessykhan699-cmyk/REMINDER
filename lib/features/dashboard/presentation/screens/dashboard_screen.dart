@@ -1346,7 +1346,9 @@ class _DashboardTotals {
       switch (invoice.status) {
         case InvoiceStatus.paid:
           paidCount++;
-        case InvoiceStatus.pending:
+        case InvoiceStatus.draft:
+        case InvoiceStatus.sent:
+        case InvoiceStatus.viewed:
           pendingCount++;
           pendingAmount += invoice.amount;
         case InvoiceStatus.overdue:

@@ -31,7 +31,7 @@ void main() {
           service: 'Design',
           amount: 100,
           dueDate: DateTime(2026, 4, 10),
-          status: InvoiceStatus.pending,
+          status: InvoiceStatus.draft,
           createdAt: DateTime(2026, 4, 3),
         );
 
@@ -66,7 +66,7 @@ void main() {
           service: 'Design',
           amount: 100,
           dueDate: DateTime(2026, 4, 10),
-          status: InvoiceStatus.pending,
+          status: InvoiceStatus.draft,
           createdAt: DateTime(2026, 4, 3),
         );
 
@@ -217,7 +217,7 @@ void main() {
       expect(draft.clientId, equals(client.id));
       expect(draft.service, equals('General Service'));
       expect(draft.amount, equals(0.0));
-      expect(draft.dueDays, equals(7));
+      expect(draft.dueDays, equals(30));
     });
 
     test('predicts service patterns per client independently', () {
@@ -397,7 +397,7 @@ void main() {
               now.month,
               now.day,
             ).add(const Duration(days: 7)),
-            status: InvoiceStatus.pending,
+            status: InvoiceStatus.draft,
             createdAt: now.add(Duration(days: i)),
           );
 
@@ -621,7 +621,7 @@ void main() {
       expect(draft.clientName, equals('General Client'));
       expect(draft.service, equals('General Service'));
       expect(draft.amount, equals(0.0));
-      expect(draft.dueDays, equals(7));
+      expect(draft.dueDays, equals(30));
     });
 
     test(
@@ -678,7 +678,7 @@ void main() {
           service: draft.service,
           amount: draft.amount,
           dueDate: draft.dueDate,
-          status: InvoiceStatus.pending,
+          status: InvoiceStatus.draft,
           createdAt: now,
         );
 
@@ -726,7 +726,7 @@ Invoice _invoice({
   required double amount,
   required DateTime createdAt,
   required int dueDays,
-  InvoiceStatus status = InvoiceStatus.pending,
+  InvoiceStatus status = InvoiceStatus.draft,
 }) {
   final createdDateOnly = DateTime(
     createdAt.year,

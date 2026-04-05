@@ -59,6 +59,11 @@ class NotificationService {
     _initialized = true;
   }
 
+  Future<bool> requestPermissionsIfNeeded() async {
+    await initialize();
+    return _requestPermissions();
+  }
+
   Future<void> scheduleInvoiceReminders(Invoice invoice) async {
     try {
       await initialize();

@@ -21,10 +21,11 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
   final _dueDateController = TextEditingController();
+  final _paymentLinkController = TextEditingController();
 
   Invoice? _invoice;
   DateTime? _dueDate;
-  InvoiceStatus _status = InvoiceStatus.pending;
+  InvoiceStatus _status = InvoiceStatus.draft;
   bool _isSaving = false;
 
   @override
@@ -33,6 +34,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.dispose();
     _amountController.dispose();
     _dueDateController.dispose();
+    _paymentLinkController.dispose();
     super.dispose();
   }
 
@@ -47,6 +49,21 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.text = invoice.service;
     _amountController.text = invoice.amount.toStringAsFixed(2);
     _dueDateController.text = AppFormatters.shortDate(invoice.dueDate);
+    _paymentLinkController.text = invoice.paymentLink ?? '';
+  }
+
+  String? _normalizedPaymentLink() {
+    final trimmed = _paymentLinkController.text.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      return null;
+    }
+
+    return trimmed;
   }
 
   Future<void> _pickDueDate() async {
@@ -70,8 +87,16 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     final source = _invoice;
     final dueDate = _dueDate;
     final amount = double.tryParse(_amountController.text.trim());
+    final paymentLink = _normalizedPaymentLink();
 
     if (source == null || dueDate == null || amount == null) {
+      return;
+    }
+
+    if (_paymentLinkController.text.trim().isNotEmpty && paymentLink == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid payment link')),
+      );
       return;
     }
 
@@ -88,6 +113,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           amount: amount,
           dueDate: dueDate,
           status: _status,
+          paymentLink: paymentLink,
         ),
       );
 
@@ -162,6 +188,13 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                 label: 'Due Date',
                 readOnly: true,
                 onTap: _pickDueDate,
+              ),
+              const SizedBox(height: 12),
+              AppInputField(
+                controller: _paymentLinkController,
+                label: 'Payment Link',
+                hint: 'https://pay.example.com/invoice',
+                keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<InvoiceStatus>(

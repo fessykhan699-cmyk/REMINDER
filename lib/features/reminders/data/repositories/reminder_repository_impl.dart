@@ -31,6 +31,21 @@ class ReminderRepositoryImpl implements ReminderRepository {
   }
 
   @override
+  Future<Reminder> createReminderRecord({
+    required String invoiceId,
+    required String clientId,
+    required ReminderChannel channel,
+    ReminderStatus status = ReminderStatus.sent,
+  }) {
+    return _datasource.createReminderRecord(
+      invoiceId: invoiceId,
+      clientId: clientId,
+      channel: channel,
+      status: status,
+    );
+  }
+
+  @override
   String buildPreviewMessage({
     required Invoice invoice,
     required ReminderMessageType type,
@@ -40,23 +55,29 @@ class ReminderRepositoryImpl implements ReminderRepository {
       invoice.amount,
       currencyCode: invoice.currencyCode,
     );
+    final paymentLinkLine = invoice.hasPaymentLink
+        ? ' You can view or pay here: ${invoice.normalizedPaymentLink}'
+        : '';
 
     switch (type) {
       case ReminderMessageType.professional:
         return 'Hello ${invoice.clientName}, this is a reminder that invoice '
             '${invoice.id} (${invoice.service}) for '
             '$amount is due on $dueDate. '
-            'Please confirm your payment timeline.';
+            'Please confirm your payment timeline.'
+            '$paymentLinkLine';
       case ReminderMessageType.friendly:
         return 'Hi ${invoice.clientName}! Quick reminder about invoice '
             '${invoice.id} for ${invoice.service} '
             '($amount). '
             'It is due on $dueDate. '
-            'Could you please share when payment will be processed? Thanks!';
+            'Could you please share when payment will be processed? Thanks!'
+            '$paymentLinkLine';
       case ReminderMessageType.firm:
         return 'Reminder: invoice ${invoice.id} for ${invoice.service} '
             '($amount) is due on $dueDate. '
-            'Please arrange payment today to avoid service delays.';
+            'Please arrange payment today to avoid service delays.'
+            '$paymentLinkLine';
     }
   }
 }

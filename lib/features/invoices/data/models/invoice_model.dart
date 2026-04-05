@@ -4,18 +4,40 @@ import 'package:hive/hive.dart';
 
 import '../../domain/entities/invoice.dart';
 
+const Object _invoiceModelPaymentLinkSentinel = Object();
+
 class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
   @override
   final int typeId = 1;
 
   @override
   InvoiceStatus read(BinaryReader reader) {
-    return InvoiceStatus.values[reader.readByte()];
+    final rawValue = reader.readByte();
+    switch (rawValue) {
+      case 0:
+        return InvoiceStatus.draft;
+      case 1:
+        return InvoiceStatus.paid;
+      case 2:
+        return InvoiceStatus.overdue;
+      case 3:
+        return InvoiceStatus.sent;
+      case 4:
+        return InvoiceStatus.viewed;
+      default:
+        return InvoiceStatus.draft;
+    }
   }
 
   @override
   void write(BinaryWriter writer, InvoiceStatus obj) {
-    writer.writeByte(obj.index);
+    writer.writeByte(switch (obj) {
+      InvoiceStatus.draft => 0,
+      InvoiceStatus.paid => 1,
+      InvoiceStatus.overdue => 2,
+      InvoiceStatus.sent => 3,
+      InvoiceStatus.viewed => 4,
+    });
   }
 }
 
@@ -33,6 +55,7 @@ class InvoiceModel extends Invoice {
     required this.currencyCode,
     required this.taxPercent,
     required this.paymentTermsDays,
+    this.paymentLink,
   }) : super(
          id: id,
          clientId: clientId,
@@ -45,6 +68,7 @@ class InvoiceModel extends Invoice {
          currencyCode: currencyCode,
          taxPercent: taxPercent,
          paymentTermsDays: paymentTermsDays,
+         paymentLink: paymentLink,
        );
 
   @override
@@ -91,6 +115,10 @@ class InvoiceModel extends Invoice {
   @HiveField(10)
   final int paymentTermsDays;
 
+  @override
+  @HiveField(11)
+  final String? paymentLink;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -104,6 +132,7 @@ class InvoiceModel extends Invoice {
       currencyCode: invoice.currencyCode,
       taxPercent: invoice.taxPercent,
       paymentTermsDays: invoice.paymentTermsDays,
+      paymentLink: invoice.paymentLink,
     );
   }
 
@@ -115,14 +144,12 @@ class InvoiceModel extends Invoice {
       service: json['service'] as String,
       amount: (json['amount'] as num).toDouble(),
       dueDate: DateTime.parse(json['dueDate'] as String),
-      status: InvoiceStatus.values.firstWhere(
-        (value) => value.name == json['status'],
-        orElse: () => InvoiceStatus.pending,
-      ),
+      status: _statusFromJson(json['status'] as String?),
       createdAt: DateTime.parse(json['createdAt'] as String),
       currencyCode: json['currencyCode'] as String? ?? 'USD',
       taxPercent: (json['taxPercent'] as num?)?.toDouble() ?? 0,
       paymentTermsDays: (json['paymentTermsDays'] as num?)?.toInt() ?? 0,
+      paymentLink: json['paymentLink'] as String?,
     );
   }
 
@@ -139,6 +166,7 @@ class InvoiceModel extends Invoice {
       'currencyCode': currencyCode,
       'taxPercent': taxPercent,
       'paymentTermsDays': paymentTermsDays,
+      'paymentLink': paymentLink,
     };
   }
 
@@ -155,6 +183,7 @@ class InvoiceModel extends Invoice {
     String? currencyCode,
     double? taxPercent,
     int? paymentTermsDays,
+    Object? paymentLink = _invoiceModelPaymentLinkSentinel,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -168,7 +197,28 @@ class InvoiceModel extends Invoice {
       currencyCode: currencyCode ?? this.currencyCode,
       taxPercent: taxPercent ?? this.taxPercent,
       paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
+      paymentLink: identical(paymentLink, _invoiceModelPaymentLinkSentinel)
+          ? this.paymentLink
+          : paymentLink as String?,
     );
+  }
+
+  static InvoiceStatus _statusFromJson(String? rawStatus) {
+    switch (rawStatus) {
+      case 'draft':
+      case 'pending':
+        return InvoiceStatus.draft;
+      case 'sent':
+        return InvoiceStatus.sent;
+      case 'viewed':
+        return InvoiceStatus.viewed;
+      case 'paid':
+        return InvoiceStatus.paid;
+      case 'overdue':
+        return InvoiceStatus.overdue;
+      default:
+        return InvoiceStatus.draft;
+    }
   }
 }
 
@@ -191,6 +241,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
         : 'USD';
     final taxPercent = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final paymentTermsDays = reader.availableBytes > 0 ? reader.readInt() : 0;
+    final paymentLink = reader.availableBytes > 0 ? reader.readString() : '';
 
     return InvoiceModel(
       id: id,
@@ -204,6 +255,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       currencyCode: currencyCode,
       taxPercent: taxPercent,
       paymentTermsDays: paymentTermsDays,
+      paymentLink: paymentLink.isEmpty ? null : paymentLink,
     );
   }
 
@@ -220,6 +272,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeString(obj.createdAt.toIso8601String())
       ..writeString(obj.currencyCode)
       ..writeDouble(obj.taxPercent)
-      ..writeInt(obj.paymentTermsDays);
+      ..writeInt(obj.paymentTermsDays)
+      ..writeString(obj.paymentLink ?? '');
   }
 }

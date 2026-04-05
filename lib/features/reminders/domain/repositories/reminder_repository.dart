@@ -13,6 +13,13 @@ abstract interface class ReminderRepository {
     required String message,
   });
 
+  Future<Reminder> createReminderRecord({
+    required String invoiceId,
+    required String clientId,
+    required ReminderChannel channel,
+    ReminderStatus status = ReminderStatus.sent,
+  });
+
   String buildPreviewMessage({
     required Invoice invoice,
     required ReminderMessageType type,

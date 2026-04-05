@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/reminder_launcher_service.dart';
+import '../../../../shared/services/whatsapp_service.dart';
 import '../../../clients/domain/repositories/client_repository.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
@@ -120,6 +121,9 @@ class RemindersController
   late final SettingsRepository _settingsRepository = ref.read(
     settingsRepositoryProvider,
   );
+  late final WhatsAppService _whatsAppService = ref.read(
+    whatsAppServiceProvider,
+  );
 
   @override
   ReminderFlowState build(String invoiceId) {
@@ -213,22 +217,43 @@ class RemindersController
         type: state.messageType,
       );
 
-      final reminder = await ref
-          .read(sendReminderUseCaseProvider)
-          .call(
-            invoiceId: invoice.id,
-            clientId: invoice.clientId,
-            phoneNumber: phoneNumber,
-            channel: channel,
-            message: message,
-          );
+      late final Reminder reminder;
+      String successMessage;
 
-      state = state.copyWith(
-        isSending: false,
-        successMessage: reminder.channel == channel
+      if (channel == ReminderChannel.whatsapp) {
+        final result = await _whatsAppService.sendInvoiceReminder(
+          invoice: invoice,
+          phoneNumber: phoneNumber,
+          customMessage: message,
+        );
+        reminder = await _reminderRepository.createReminderRecord(
+          invoiceId: invoice.id,
+          clientId: invoice.clientId,
+          channel: ReminderChannel.whatsapp,
+        );
+        successMessage = result.usedFallbackShareSheet
+            ? 'WhatsApp unavailable. Opened the share sheet instead.'
+            : 'Reminder opened in WhatsApp.';
+      } else {
+        reminder = await ref
+            .read(sendReminderUseCaseProvider)
+            .call(
+              invoiceId: invoice.id,
+              clientId: invoice.clientId,
+              phoneNumber: phoneNumber,
+              channel: channel,
+              message: message,
+            );
+        successMessage = reminder.channel == channel
             ? 'Reminder opened in ${reminder.channel.label}.'
-            : 'WhatsApp unavailable. Opened SMS instead.',
-      );
+            : 'Reminder opened in ${reminder.channel.label}.';
+      }
+
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .markInvoiceSent(invoice);
+
+      state = state.copyWith(isSending: false, successMessage: successMessage);
       ref.invalidate(remindersHistoryProvider);
       await ref
           .read(adaptiveSystemProvider.notifier)

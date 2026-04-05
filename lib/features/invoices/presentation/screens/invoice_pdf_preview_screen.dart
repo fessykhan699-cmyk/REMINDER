@@ -46,6 +46,7 @@ class _InvoicePdfPreviewScreenState
         .generateInvoicePdfDocument(
           invoice,
           includeWatermark: decision.shouldWatermarkPdf,
+          saveLocally: true,
         );
 
     if (mounted) {
@@ -61,11 +62,28 @@ class _InvoicePdfPreviewScreenState
       return;
     }
 
+    final invoice = await ref
+        .read(invoiceRepositoryProvider)
+        .getInvoiceById(widget.invoiceId);
+    if (invoice == null) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invoice not found.')));
+      return;
+    }
+
     setState(() => _isSharing = true);
     try {
       await ref
           .read(invoicePdfExportServiceProvider)
           .shareInvoicePdfDocument(document);
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .markInvoiceSent(invoice);
     } catch (_) {
       if (!mounted) {
         return;

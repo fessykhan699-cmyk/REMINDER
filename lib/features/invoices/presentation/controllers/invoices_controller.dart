@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
-import '../../../../shared/services/notification_service.dart';
+import '../../../../shared/services/invoice_export_service.dart';
+import '../../../../shared/services/invoice_status_service.dart';
+import '../../../../shared/services/reminder_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
@@ -56,9 +58,14 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
-  late final NotificationService _notificationService = ref.read(
-    notificationServiceProvider,
+  late final ReminderService _reminderService = ref.read(
+    reminderServiceProvider,
   );
+  late final InvoiceExportService _invoiceExportService = ref.read(
+    invoiceExportServiceProvider,
+  );
+  static const InvoiceStatusService _invoiceStatusService =
+      InvoiceStatusService();
 
   bool get hasMore => _hasMore;
 
@@ -114,10 +121,13 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
         .read(subscriptionGatekeeperProvider)
         .ensureAllowed(SubscriptionGateFeature.createInvoice);
 
-    final created = await ref.read(createInvoiceUseCaseProvider).call(invoice);
+    final draftInvoice = _invoiceStatusService.prepareForCreate(invoice);
+    final created = await ref
+        .read(createInvoiceUseCaseProvider)
+        .call(draftInvoice);
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
-    ref.invalidate(invoiceDetailProvider(invoice.id));
+    ref.invalidate(invoiceDetailProvider(created.id));
     await _runBestEffortSideEffect(
       'record invoice creation learning',
       () => ref
@@ -130,9 +140,12 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
           .read(adaptiveSystemProvider.notifier)
           .recordAction(AdaptiveActionKey.newInvoice),
     );
+    await _runBestEffortSideEffect('generate invoice pdf', () async {
+      await _invoiceExportService.saveInvoicePdf(created);
+    });
     await _runBestEffortSideEffect(
       'schedule invoice reminders',
-      () => _notificationService.scheduleInvoiceReminders(created),
+      () => _reminderService.scheduleInvoiceReminders(created),
     );
     return created;
   }
@@ -144,7 +157,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
         .toList(growable: false);
 
     await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
-    await _notificationService.cancelInvoiceReminders(invoiceId);
+    await _reminderService.cancelInvoiceReminders(invoiceId);
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoiceId));
@@ -163,7 +176,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       }
     }
 
-    final updated = await ref.read(updateInvoiceUseCaseProvider).call(invoice);
+    final normalizedInvoice = _invoiceStatusService.prepareForUpdate(invoice);
+    final updated = await ref
+        .read(updateInvoiceUseCaseProvider)
+        .call(normalizedInvoice);
 
     final updatedList = current
         .map((item) => item.id == updated.id ? updated : item)
@@ -178,13 +194,13 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     if (updated.status == InvoiceStatus.paid) {
       await _runBestEffortSideEffect(
         'cancel invoice reminders',
-        () => _notificationService.cancelInvoiceReminders(updated.id),
+        () => _reminderService.cancelInvoiceReminders(updated.id),
       );
     } else if (dueDateChanged ||
         previousInvoice?.status == InvoiceStatus.paid) {
       await _runBestEffortSideEffect(
         'reschedule invoice reminders',
-        () => _notificationService.scheduleInvoiceReminders(updated),
+        () => _reminderService.rescheduleInvoiceReminders(updated),
       );
     }
 
@@ -198,6 +214,18 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
             .recordAction(AdaptiveActionKey.markPaid),
       );
     }
+  }
+
+  Future<Invoice> markInvoiceSent(Invoice invoice) async {
+    final next = _invoiceStatusService.markSent(invoice);
+    await updateInvoice(next);
+    return next;
+  }
+
+  Future<Invoice> markInvoicePaid(Invoice invoice) async {
+    final next = _invoiceStatusService.markPaid(invoice);
+    await updateInvoice(next);
+    return next;
   }
 
   Future<void> _runBestEffortSideEffect(
