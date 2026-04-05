@@ -4,10 +4,16 @@ import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/client.dart';
 
 class ClientTile extends StatelessWidget {
-  const ClientTile({super.key, required this.client, required this.onTap});
+  const ClientTile({
+    super.key,
+    required this.client,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   final Client client;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +25,7 @@ class ClientTile extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
+        onLongPress: onLongPress,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         leading: Container(
@@ -44,9 +51,26 @@ class ClientTile extends StatelessWidget {
           client.name,
           style: const TextStyle(color: AppColors.textPrimary),
         ),
-        subtitle: Text(
-          client.email,
-          style: const TextStyle(color: AppColors.textSecondary),
+        subtitle: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (client.email.isNotEmpty)
+              Text(
+                client.email,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            if (client.phone.isNotEmpty)
+              Text(
+                client.phone,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            if (client.email.isEmpty && client.phone.isEmpty)
+              const Text(
+                'No contact details',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+          ],
         ),
         trailing: Icon(Icons.chevron_right, color: AppColors.textMuted),
       ),

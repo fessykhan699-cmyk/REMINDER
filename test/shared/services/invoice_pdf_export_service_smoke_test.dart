@@ -91,6 +91,9 @@ class _FakeClientRepository implements ClientRepository {
   Future<Client> addClient(Client client) async => client;
 
   @override
+  Future<void> deleteClient(String id) async {}
+
+  @override
   Future<Client?> getClientById(String id) async {
     return Client(
       id: id,
@@ -109,6 +112,9 @@ class _FakeClientRepository implements ClientRepository {
   }) async {
     return const <Client>[];
   }
+
+  @override
+  Future<Client> updateClient(Client client) async => client;
 }
 
 class _FakeSettingsRepository implements SettingsRepository {

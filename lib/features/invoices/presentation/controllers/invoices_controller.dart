@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -117,14 +118,22 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
     ref.invalidate(invoiceDetailProvider(invoice.id));
-    ref.invalidate(subscriptionUsageProvider);
-    await ref
-        .read(invoiceCreationLearningProvider.notifier)
-        .recordCreatedInvoice(created);
-    await ref
-        .read(adaptiveSystemProvider.notifier)
-        .recordAction(AdaptiveActionKey.newInvoice);
-    await _notificationService.scheduleInvoiceReminders(created);
+    await _runBestEffortSideEffect(
+      'record invoice creation learning',
+      () => ref
+          .read(invoiceCreationLearningProvider.notifier)
+          .recordCreatedInvoice(created),
+    );
+    await _runBestEffortSideEffect(
+      'record new invoice adaptive action',
+      () => ref
+          .read(adaptiveSystemProvider.notifier)
+          .recordAction(AdaptiveActionKey.newInvoice),
+    );
+    await _runBestEffortSideEffect(
+      'schedule invoice reminders',
+      () => _notificationService.scheduleInvoiceReminders(created),
+    );
     return created;
   }
 
@@ -167,18 +176,39 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
         previousInvoice != null &&
         !previousInvoice.dueDate.isAtSameMomentAs(updated.dueDate);
     if (updated.status == InvoiceStatus.paid) {
-      await _notificationService.cancelInvoiceReminders(updated.id);
+      await _runBestEffortSideEffect(
+        'cancel invoice reminders',
+        () => _notificationService.cancelInvoiceReminders(updated.id),
+      );
     } else if (dueDateChanged ||
         previousInvoice?.status == InvoiceStatus.paid) {
-      await _notificationService.scheduleInvoiceReminders(updated);
+      await _runBestEffortSideEffect(
+        'reschedule invoice reminders',
+        () => _notificationService.scheduleInvoiceReminders(updated),
+      );
     }
 
     final wasUnpaid =
         previousInvoice != null && previousInvoice.status != InvoiceStatus.paid;
     if (wasUnpaid && updated.status == InvoiceStatus.paid) {
-      await ref
-          .read(adaptiveSystemProvider.notifier)
-          .recordAction(AdaptiveActionKey.markPaid);
+      await _runBestEffortSideEffect(
+        'record mark paid adaptive action',
+        () => ref
+            .read(adaptiveSystemProvider.notifier)
+            .recordAction(AdaptiveActionKey.markPaid),
+      );
+    }
+  }
+
+  Future<void> _runBestEffortSideEffect(
+    String label,
+    Future<void> Function() task,
+  ) async {
+    try {
+      await task();
+    } catch (error, stackTrace) {
+      debugPrint('Invoice side effect failed for $label: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 }

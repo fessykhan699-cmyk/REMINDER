@@ -3,16 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/id_generator.dart';
 import '../../../../shared/components/premium_frosted_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../../clients/domain/entities/client.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
-import '../../../settings/domain/entities/app_preferences.dart';
-import '../../../settings/presentation/controllers/app_preferences_controller.dart';
-import '../../../settings/presentation/controllers/settings_controller.dart';
-import '../../../settings/presentation/widgets/profile_editor_sheet.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
 import '../controllers/invoice_prediction_engine.dart';
@@ -40,10 +40,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   String? _lastAutoServiceValue;
   String? _lastAutoAmountValue;
   DateTime? _lastAutoDueDate;
-  DateTime? _lastSettingsDueDate;
   bool _isSaving = false;
   bool _smartSyncScheduled = false;
-  bool _settingsSyncScheduled = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -70,21 +68,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   Future<DateTime?> _showDueDatePicker() {
     FocusScope.of(context).unfocus();
-    final paymentTerms = ref
-        .read(appPreferencesControllerProvider)
-        .valueOrNull
-        ?.paymentTerms
-        .days;
 
     return showDatePicker(
       context: context,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
       initialDate:
-          _selectedDueDate ??
-          _dateAfterDays(
-            paymentTerms ?? const AppPreferences.defaults().paymentTerms.days,
-          ),
+          _selectedDueDate ?? DateTime.now().add(const Duration(days: 7)),
     );
   }
 
@@ -165,34 +155,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     });
   }
 
-  void _scheduleSettingsSync(AppPreferences preferences) {
-    if (_settingsSyncScheduled) {
-      return;
-    }
-
-    _settingsSyncScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _settingsSyncScheduled = false;
-      if (!mounted) {
-        return;
-      }
-
-      final nextSettingsDueDate = _dateAfterDays(preferences.paymentTerms.days);
-      final currentDueDate = _selectedDueDate;
-      final shouldApply =
-          currentDueDate == null ||
-          _sameCalendarDay(currentDueDate, _lastSettingsDueDate);
-      _lastSettingsDueDate = nextSettingsDueDate;
-      if (!shouldApply ||
-          _sameCalendarDay(currentDueDate, nextSettingsDueDate)) {
-        return;
-      }
-
-      setState(() => _selectedDueDate = nextSettingsDueDate);
-      _dueDateFieldKey.currentState?.didChange(nextSettingsDueDate);
-    });
-  }
-
   void _syncSmartDefaults(SmartInvoicePrediction intelligence) {
     final selectedClient = _selectedClient;
     if (selectedClient != null) {
@@ -204,12 +166,20 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       return;
     }
 
+    final preferredDueDays = intelligence.preferredDueDays;
     final suggestedAmount = intelligence.quickAmountConfidence >= 0.50
         ? intelligence.quickAmount
         : null;
+    final suggestedDueDays = intelligence.preferredDueDaysConfidence >= 0.50
+        ? preferredDueDays
+        : null;
 
-    if (suggestedAmount != null) {
-      _applySmartValues(amount: suggestedAmount, force: false);
+    if (suggestedAmount != null || suggestedDueDays != null) {
+      _applySmartValues(
+        amount: suggestedAmount,
+        dueDays: suggestedDueDays,
+        force: false,
+      );
     }
   }
 
@@ -226,6 +196,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     _applySmartValues(
       service: draft.usedFallbackService ? null : draft.service,
       amount: draft.usedFallbackAmount ? null : draft.amount,
+      dueDays: draft.dueDays,
       force: force,
     );
   }
@@ -297,18 +268,17 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   String _buildAmountHintText(
     SmartInvoicePrediction intelligence,
     SmartClientSuggestion? clientSuggestion,
-    String currencyCode,
   ) {
     if (clientSuggestion?.amount != null &&
         (clientSuggestion?.amountConfidence ?? 0) >= 0.50) {
       final amountReason = clientSuggestion?.amountReason ?? 'last used';
-      return '${_compactCurrency(clientSuggestion!.amount!, currencyCode)} ($amountReason)';
+      return '${_compactCurrency(clientSuggestion!.amount!)} ($amountReason)';
     }
 
     if (intelligence.quickAmount != null &&
         intelligence.quickAmountConfidence >= 0.50) {
       final amountReason = intelligence.quickAmountReason ?? 'common amount';
-      return '${_compactCurrency(intelligence.quickAmount!, currencyCode)} ($amountReason)';
+      return '${_compactCurrency(intelligence.quickAmount!)} ($amountReason)';
     }
 
     return '250.00';
@@ -317,7 +287,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   List<_SmartActionChipData> _buildSmartActions(
     SmartInvoicePrediction intelligence,
     SmartClientSuggestion? clientSuggestion,
-    String currencyCode,
   ) {
     final actions = <_SmartActionChipData>[];
 
@@ -392,8 +361,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           intelligence.quickAmountConfidence >= 0.50) {
         actions.add(
           _SmartActionChipData(
-            label:
-                'Quick ${_compactCurrency(intelligence.quickAmount!, currencyCode)}',
+            label: 'Quick ${_compactCurrency(intelligence.quickAmount!)}',
             onTap: () {
               _applySmartValues(amount: intelligence.quickAmount, force: true);
             },
@@ -466,31 +434,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     return fixed;
   }
 
-  String _normalizedInvoicePrefix(String rawPrefix) {
-    final sanitized = rawPrefix.trim().toUpperCase().replaceAll(
-      RegExp(r'[^A-Z0-9-]'),
-      '',
-    );
-    return sanitized.isEmpty ? 'INV' : sanitized;
-  }
-
-  double _applyTax(double amount, double taxPercent) {
-    if (taxPercent <= 0) {
-      return amount;
-    }
-
-    return amount * (1 + (taxPercent / 100));
-  }
-
-  String _compactCurrency(double value, String currencyCode) {
+  String _compactCurrency(double value) {
     if (value == value.roundToDouble()) {
-      return AppFormatters.currency(
-        value,
-        currencyCode: currencyCode,
-        includeDecimals: false,
-      );
+      return '\$${value.toStringAsFixed(0)}';
     }
-    return AppFormatters.currency(value, currencyCode: currencyCode);
+    return AppFormatters.currency(value);
   }
 
   bool _sameServiceValue(String? left, String? right) {
@@ -515,40 +463,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     return (left - right).abs() < 0.001;
   }
 
-  Future<bool> _ensureUserProfileReady() async {
-    final profile = await ref.read(getProfileUseCaseProvider).call();
-    if (profile.isComplete) {
-      return true;
-    }
-
-    if (!mounted) {
-      return false;
-    }
-
-    final updatedProfile = await showUserProfileEditorSheet(
-      context,
-      initialProfile: profile,
-      title: 'Set Up Profile',
-      submitLabel: 'Save Profile',
-    );
-
-    if (updatedProfile == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Complete your profile before creating an invoice.'),
-          ),
-        );
-      }
-      return false;
-    }
-
-    await ref
-        .read(settingsControllerProvider.notifier)
-        .saveProfile(updatedProfile);
-    return true;
-  }
-
   bool _sameCalendarDay(DateTime? left, DateTime? right) {
     if (left == null || right == null) {
       return false;
@@ -557,6 +471,56 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     return left.year == right.year &&
         left.month == right.month &&
         left.day == right.day;
+  }
+
+  Future<bool> _saveInvoice({
+    required Client selectedClient,
+    required DateTime selectedDueDate,
+    required String service,
+    required double amount,
+    required DateTime now,
+    required SmartInvoicePrediction intelligence,
+    required InvoicesController invoicesController,
+    required InvoiceCreationLearningController learningController,
+  }) async {
+    final invoice = Invoice(
+      id: IdGenerator.nextId('inv'),
+      clientId: selectedClient.id,
+      clientName: selectedClient.name,
+      service: service,
+      amount: amount,
+      dueDate: selectedDueDate,
+      status: InvoiceStatus.pending,
+      createdAt: now,
+    );
+
+    final createdInvoice = await invoicesController.createInvoice(invoice);
+    final predictedDraft = intelligence.buildDraftForClient(
+      selectedClient,
+      now: now,
+      minimumConfidence: 0,
+    );
+
+    try {
+      await learningController.recordPredictionOutcome(
+        predictedClientId: intelligence.suggestedClient?.id,
+        predictedService: predictedDraft.usedFallbackService
+            ? null
+            : predictedDraft.service,
+        predictedAmount: predictedDraft.usedFallbackAmount
+            ? null
+            : predictedDraft.amount,
+        predictedDueDate: predictedDraft.usedFallbackDueDays
+            ? null
+            : predictedDraft.dueDate,
+        actualInvoice: createdInvoice,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Failed to record invoice learning outcome: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    return true;
   }
 
   Future<void> _save() async {
@@ -574,88 +538,67 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final selectedClient = _selectedClient;
     final selectedDueDate = _selectedDueDate;
     final service = _serviceController.text.trim();
-    final subtotalAmount = double.tryParse(_amountController.text.trim());
+    final amount = double.tryParse(_amountController.text.trim());
     final now = DateTime.now();
     final intelligence = ref.read(smartInvoicePredictionProvider);
-    final preferences =
-        ref.read(appPreferencesControllerProvider).valueOrNull ??
-        await ref.read(getAppPreferencesUseCaseProvider).call();
+    final invoicesController = ref.read(invoicesControllerProvider.notifier);
+    final learningController = ref.read(
+      invoiceCreationLearningProvider.notifier,
+    );
+    var shouldResetSavingState = true;
 
     if (!(form?.validate() ?? false) ||
         selectedClient == null ||
         selectedDueDate == null ||
-        subtotalAmount == null) {
-      return;
-    }
-
-    final hasProfile = await _ensureUserProfileReady();
-    if (!hasProfile) {
+        amount == null) {
       return;
     }
 
     setState(() => _isSaving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     try {
-      final invoiceId = await ref
-          .read(invoiceRepositoryProvider)
-          .getNextInvoiceId(
-            prefix: _normalizedInvoicePrefix(preferences.invoicePrefix),
-          );
-      final taxPercent = preferences.defaultTaxPercent;
-      final totalAmount = _applyTax(subtotalAmount, taxPercent);
-      final invoice = Invoice(
-        id: invoiceId,
-        clientId: selectedClient.id,
-        clientName: selectedClient.name,
+      final result = await _saveInvoice(
+        selectedClient: selectedClient,
+        selectedDueDate: selectedDueDate,
         service: service,
-        amount: totalAmount,
-        dueDate: selectedDueDate,
-        status: InvoiceStatus.pending,
-        createdAt: now,
-        currencyCode: preferences.defaultCurrency,
-        taxPercent: taxPercent,
-        paymentTermsDays: preferences.paymentTerms.days,
-      );
-
-      final createdInvoice = await ref
-          .read(invoicesControllerProvider.notifier)
-          .createInvoice(invoice);
-      final predictedDraft = intelligence.buildDraftForClient(
-        selectedClient,
+        amount: amount,
         now: now,
-        minimumConfidence: 0,
+        intelligence: intelligence,
+        invoicesController: invoicesController,
+        learningController: learningController,
       );
-      await ref
-          .read(invoiceCreationLearningProvider.notifier)
-          .recordPredictionOutcome(
-            predictedClientId: intelligence.suggestedClient?.id,
-            predictedService: predictedDraft.usedFallbackService
-                ? null
-                : predictedDraft.service,
-            predictedAmount: predictedDraft.usedFallbackAmount
-                ? null
-                : predictedDraft.amount,
-            predictedDueDate: predictedDraft.usedFallbackDueDays
-                ? null
-                : predictedDraft.dueDate,
-            actualInvoice: createdInvoice,
-          );
 
       if (!mounted) {
         return;
       }
 
-      Navigator.of(context).pop();
+      if (result == true) {
+        messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
+        shouldResetSavingState = false;
+        navigator.pop();
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Unable to save invoice')),
+        );
+      }
+    } on SubscriptionGateException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      await promptUpgradeForDecision(context, error.decision);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to save the invoice right now.')),
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to save invoice')),
       );
     } finally {
-      if (mounted) {
+      if (mounted && shouldResetSavingState) {
         setState(() => _isSaving = false);
       }
     }
@@ -666,28 +609,14 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     ref.watch(invoiceCreateLaunchModeProvider);
-    final preferencesState = ref.watch(appPreferencesControllerProvider);
-    final preferences = preferencesState.valueOrNull;
-    final displayPreferences = preferences ?? const AppPreferences.defaults();
     final intelligence = ref.watch(smartInvoicePredictionProvider);
     final clientSuggestion = _selectedClient == null
         ? null
         : intelligence.suggestionFor(_selectedClient!.id);
-    final amountHintText = _buildAmountHintText(
-      intelligence,
-      clientSuggestion,
-      displayPreferences.defaultCurrency,
-    );
-    final smartActions = _buildSmartActions(
-      intelligence,
-      clientSuggestion,
-      displayPreferences.defaultCurrency,
-    );
+    final amountHintText = _buildAmountHintText(intelligence, clientSuggestion);
+    final smartActions = _buildSmartActions(intelligence, clientSuggestion);
 
     _scheduleSmartSync();
-    if (preferences != null) {
-      _scheduleSettingsSync(preferences);
-    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Invoice')),
@@ -835,7 +764,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                             label: 'Client',
                             errorText: field.errorText,
                             child: _InputSurface(
-                              isFocused: false,
                               hasError: field.hasError,
                               onTap: _selectClient,
                               child: Row(
@@ -930,7 +858,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                             label: 'Due Date',
                             errorText: field.errorText,
                             child: _InputSurface(
-                              isFocused: false,
                               hasError: field.hasError,
                               onTap: _selectDueDate,
                               child: Row(
@@ -993,11 +920,6 @@ class _ClientPickerSheet extends ConsumerStatefulWidget {
 }
 
 class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
-  static final RegExp _emailRegex = RegExp(
-    r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
-    caseSensitive: false,
-  );
-
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -1081,36 +1003,43 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
     }
   }
 
-  String? _validateEmail(String? value) {
-    final email = (value ?? '').trim();
-    final phoneDigits = _digitsOnly(_fullPhoneNumber);
-
-    if (email.isEmpty && phoneDigits.isEmpty) {
-      return 'Add an email or phone number.';
+  String _buildInternationalPhone({String? completeNumber, String? dialCode}) {
+    if (completeNumber != null) {
+      final digits = _digitsOnly(completeNumber);
+      return digits.isEmpty ? '' : '+$digits';
     }
 
-    if (email.isNotEmpty && !_emailRegex.hasMatch(email)) {
-      return 'Enter a valid email.';
+    final localDigits = _digitsOnly(_phoneController.text);
+    if (localDigits.isEmpty) {
+      return '';
+    }
+
+    final normalizedDialCode = _digitsOnly(dialCode ?? '');
+    if (normalizedDialCode.isEmpty) {
+      return '+$localDigits';
+    }
+
+    return '+$normalizedDialCode$localDigits';
+  }
+
+  String? _validateEmail(String? value) {
+    final email = (value ?? '').trim();
+    if (!Client.isValidEmail(email)) {
+      return 'Email invalid';
     }
 
     return null;
   }
 
   String? _validatePhone(dynamic phone) {
-    final email = _emailController.text.trim();
     final localDigits = _digitsOnly(_phoneController.text);
 
-    if (localDigits.isEmpty && email.isEmpty) {
-      return 'Add an email or phone number.';
-    }
-
     if (localDigits.isEmpty) {
-      return null;
+      return 'Phone invalid';
     }
 
-    final fullDigits = _digitsOnly(_fullPhoneNumber);
-    if (fullDigits.length < 8 || fullDigits.length > 15) {
-      return 'Enter a valid phone number.';
+    if (!Client.hasValidInternationalPhone(_fullPhoneNumber)) {
+      return 'Phone invalid';
     }
 
     return null;
@@ -1133,31 +1062,57 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
     }
 
     setState(() => _isSaving = true);
+    var shouldResetSavingState = true;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final clientsController = ref.read(clientsControllerProvider.notifier);
 
     try {
-      final createdClient = await ref
-          .read(clientsControllerProvider.notifier)
-          .addClient(
-            name: _nameController.text.trim(),
-            email: _emailController.text.trim(),
-            phone: _fullPhoneNumber.trim(),
-          );
+      final createdClient = await clientsController.addClient(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _fullPhoneNumber.trim(),
+      );
 
       if (!mounted) {
         return;
       }
 
-      Navigator.of(context).pop(createdClient);
-    } catch (_) {
+      shouldResetSavingState = false;
+      navigator.pop(createdClient);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Client saved successfully.')),
+      );
+    } on SubscriptionGateException catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to add the client right now.')),
+      await promptUpgradeForDecision(context, error.decision);
+    } on ValidationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } on AppException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error, stackTrace) {
+      debugPrint('Failed to save client from invoice sheet: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) {
+        return;
+      }
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to save client')),
       );
     } finally {
-      if (mounted) {
+      if (mounted && shouldResetSavingState) {
         setState(() => _isSaving = false);
       }
     }
@@ -1362,7 +1317,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
               textInputAction: TextInputAction.next,
               validator: (value) {
                 if ((value?.trim() ?? '').isEmpty) {
-                  return 'Enter the client name.';
+                  return 'Name required';
                 }
                 return null;
               },
@@ -1409,17 +1364,15 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
                   counterText: '',
                 ),
                 onChanged: (phone) {
-                  final localNumber = _digitsOnly(phone.number);
-                  _fullPhoneNumber = localNumber.isEmpty
-                      ? ''
-                      : '+${phone.completeNumber}';
+                  _fullPhoneNumber = _buildInternationalPhone(
+                    completeNumber: phone.completeNumber,
+                  );
                   _revalidateContactFields();
                 },
                 onCountryChanged: (country) {
-                  final localNumber = _digitsOnly(_phoneController.text);
-                  _fullPhoneNumber = localNumber.isEmpty
-                      ? ''
-                      : '+${country.fullCountryCode}$localNumber';
+                  _fullPhoneNumber = _buildInternationalPhone(
+                    dialCode: country.fullCountryCode,
+                  );
                   _revalidateContactFields();
                 },
                 validator: _validatePhone,
@@ -1649,6 +1602,7 @@ class _InvoiceTextField extends FormField<String> {
          builder: (field) {
            final widget = field.widget as _InvoiceTextField;
            final theme = Theme.of(field.context);
+
            Widget buildSurface(bool isFocused) {
              return TextField(
                controller: widget._controller,
@@ -1672,21 +1626,10 @@ class _InvoiceTextField extends FormField<String> {
              );
            }
 
-           Widget surface = buildSurface(widget.focusNode?.hasFocus ?? false);
-
-           if (widget.focusNode != null) {
-             surface = AnimatedBuilder(
-               animation: widget.focusNode!,
-               builder: (context, _) {
-                 return buildSurface(widget.focusNode!.hasFocus);
-               },
-             );
-           }
-
            return _LabeledField(
              label: widget.label,
              errorText: field.errorText,
-             child: surface,
+             child: buildSurface(false),
            );
          },
        );
@@ -1782,25 +1725,15 @@ class _LabeledField extends StatelessWidget {
 }
 
 class _InputSurface extends StatelessWidget {
-  const _InputSurface({
-    required this.child,
-    this.onTap,
-    this.hasError = false,
-    this.isFocused = false,
-  });
+  const _InputSurface({required this.child, this.onTap, this.hasError = false});
 
   final Widget child;
   final VoidCallback? onTap;
   final bool hasError;
-  final bool isFocused;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = hasError
-        ? AppColors.danger
-        : isFocused
-        ? AppColors.accent.withValues(alpha: 0.60)
-        : AppColors.glassBorder;
+    final borderColor = hasError ? AppColors.danger : AppColors.glassBorder;
 
     final content = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
@@ -1811,7 +1744,7 @@ class _InputSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.glassFill,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: isFocused ? 1.2 : 1),
+        border: Border.all(color: borderColor),
       ),
       child: child,
     );

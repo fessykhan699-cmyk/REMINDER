@@ -27,5 +27,15 @@ class ClientRepositoryImpl implements ClientRepository {
   }
 
   @override
+  Future<Client> updateClient(Client client) {
+    return _datasource.updateClient(ClientModel.fromEntity(client));
+  }
+
+  @override
+  Future<void> deleteClient(String id) {
+    return _datasource.deleteClient(id);
+  }
+
+  @override
   Future<Client?> getClientById(String id) => _datasource.getClientById(id);
 }

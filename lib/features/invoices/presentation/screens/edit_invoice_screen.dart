@@ -77,30 +77,50 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
     setState(() => _isSaving = true);
     var shouldResetSavingState = true;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     try {
-      final updated = source.copyWith(
-        clientName: _clientNameController.text.trim(),
-        service: _serviceController.text.trim(),
-        amount: amount,
-        dueDate: dueDate,
-        status: _status,
+      final result = await _saveInvoice(
+        source.copyWith(
+          clientName: _clientNameController.text.trim(),
+          service: _serviceController.text.trim(),
+          amount: amount,
+          dueDate: dueDate,
+          status: _status,
+        ),
       );
-
-      await ref
-          .read(invoicesControllerProvider.notifier)
-          .updateInvoice(updated);
 
       if (!mounted) {
         return;
       }
-      shouldResetSavingState = false;
-      Navigator.of(context).pop();
+
+      if (result == true) {
+        messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
+        shouldResetSavingState = false;
+        navigator.pop();
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Unable to save invoice')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Unable to save invoice')),
+      );
     } finally {
       if (mounted && shouldResetSavingState) {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<bool> _saveInvoice(Invoice updated) async {
+    await ref.read(invoicesControllerProvider.notifier).updateInvoice(updated);
+    return true;
   }
 
   @override
