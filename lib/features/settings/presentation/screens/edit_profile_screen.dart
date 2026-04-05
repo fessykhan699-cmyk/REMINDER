@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../domain/entities/profile.dart';
@@ -42,8 +43,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameController.text = profile.name;
     _emailController.text = profile.email;
     _businessNameController.text = profile.businessName;
-    _phoneController.text = profile.phone.isEmpty ? '+' : profile.phone;
+    _phoneController.text = profile.phone.trim().replaceFirst(
+      RegExp(r'^\+'),
+      '',
+    );
     _addressController.text = profile.address;
+  }
+
+  String _normalizedPhoneValue([String? rawValue]) {
+    final trimmed = (rawValue ?? _phoneController.text).trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    return '+${trimmed.replaceFirst(RegExp(r'^\+'), '')}';
   }
 
   Future<void> _save() async {
@@ -64,38 +77,74 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       businessName: _businessNameController.text.trim(),
-      phone: _phoneController.text.trim(),
+      phone: _normalizedPhoneValue(),
       address: _addressController.text.trim(),
     );
-    await ref.read(settingsControllerProvider.notifier).saveProfile(profile);
-    if (!mounted) {
-      return;
+    var shouldResetSavingState = true;
+
+    try {
+      await ref.read(settingsControllerProvider.notifier).saveProfile(profile);
+      if (!mounted) {
+        return;
+      }
+
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      shouldResetSavingState = false;
+      navigator.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Profile saved.')));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to save the profile right now.')),
+      );
+    } finally {
+      if (mounted && shouldResetSavingState) {
+        setState(() => _isSaving = false);
+      }
     }
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profile saved.')));
   }
 
-  InputDecoration _decoration(String label, {String? hintText}) {
-    OutlineInputBorder border() {
-      return OutlineInputBorder(borderRadius: BorderRadius.circular(14));
+  InputDecoration _decoration({
+    String? hintText,
+    String? prefixText,
+    int? maxLines,
+  }) {
+    OutlineInputBorder border(Color color) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color),
+      );
     }
 
     return InputDecoration(
-      labelText: label,
       hintText: hintText,
-      border: border(),
-      enabledBorder: border(),
-      focusedBorder: border(),
-      errorBorder: border(),
-      focusedErrorBorder: border(),
+      hintStyle: const TextStyle(color: AppColors.textMuted),
+      prefixText: prefixText,
+      prefixStyle: const TextStyle(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w600,
+      ),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: border(AppColors.glassBorder),
+      enabledBorder: border(AppColors.glassBorder),
+      focusedBorder: border(AppColors.accent.withValues(alpha: 0.55)),
+      errorBorder: border(AppColors.danger.withValues(alpha: 0.65)),
+      focusedErrorBorder: border(AppColors.danger.withValues(alpha: 0.85)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(settingsControllerProvider);
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth < 380 ? 16.0 : 20.0;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom + 24;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
@@ -105,7 +154,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         data: (profile) {
           _hydrate(profile);
           return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              20,
+              horizontalPadding,
+              bottomPadding,
+            ),
             children: [
               GlassCard(
                 padding: const EdgeInsets.all(16),
@@ -116,55 +171,98 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Profile',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        'Edit Profile',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Keep your billing details current for invoices and exports.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _ProfileField(
+                        label: 'Name',
+                        child: TextFormField(
+                          controller: _nameController,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: _decoration(hintText: 'John Doe'),
+                          validator: (value) => (value ?? '').trim().isEmpty
+                              ? 'Name is required.'
+                              : null,
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _nameController,
-                        textInputAction: TextInputAction.next,
-                        decoration: _decoration('Name'),
-                        validator: (value) => (value ?? '').trim().isEmpty
-                            ? 'Name is required.'
-                            : null,
+                      _ProfileField(
+                        label: 'Business Name',
+                        child: TextFormField(
+                          controller: _businessNameController,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: _decoration(
+                            hintText: 'Studio Ledger Co.',
+                          ),
+                          validator: (value) => (value ?? '').trim().isEmpty
+                              ? 'Business name is required.'
+                              : null,
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _businessNameController,
-                        textInputAction: TextInputAction.next,
-                        decoration: _decoration('Business Name'),
-                        validator: (value) => (value ?? '').trim().isEmpty
-                            ? 'Business name is required.'
-                            : null,
+                      const SizedBox(height: 16),
+                      _ProfileField(
+                        label: 'Email',
+                        child: TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: _decoration(
+                            hintText: 'name@business.com',
+                          ),
+                          validator: (value) =>
+                              UserProfile.isValidEmail(value ?? '')
+                              ? null
+                              : 'Enter a valid email address.',
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: _decoration('Email'),
-                        validator: (value) =>
-                            UserProfile.isValidEmail(value ?? '')
-                            ? null
-                            : 'Enter a valid email address.',
+                      const SizedBox(height: 16),
+                      _ProfileField(
+                        label: 'Phone',
+                        child: TextFormField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.next,
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: _decoration(
+                            hintText: '1 555 123 4567',
+                            prefixText: '+ ',
+                          ),
+                          validator: (value) =>
+                              UserProfile.hasValidInternationalPhone(
+                                _normalizedPhoneValue(value),
+                              )
+                              ? null
+                              : 'Use a phone number with country code.',
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                        decoration: _decoration('Phone'),
-                        validator: (value) =>
-                            UserProfile.hasValidInternationalPhone(value ?? '')
-                            ? null
-                            : 'Use a phone number with country code.',
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _addressController,
-                        keyboardType: TextInputType.streetAddress,
-                        maxLines: 2,
-                        decoration: _decoration('Address'),
+                      const SizedBox(height: 16),
+                      _ProfileField(
+                        label: 'Address',
+                        child: TextFormField(
+                          controller: _addressController,
+                          keyboardType: TextInputType.streetAddress,
+                          maxLines: 2,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: _decoration(
+                            hintText: 'Business address',
+                            maxLines: 2,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       PrimaryButton(
@@ -177,11 +275,37 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+class _ProfileField extends StatelessWidget {
+  const _ProfileField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
     );
   }
 }

@@ -20,6 +20,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   final _clientNameController = TextEditingController();
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
+  final _dueDateController = TextEditingController();
 
   Invoice? _invoice;
   DateTime? _dueDate;
@@ -31,6 +32,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _clientNameController.dispose();
     _serviceController.dispose();
     _amountController.dispose();
+    _dueDateController.dispose();
     super.dispose();
   }
 
@@ -44,6 +46,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _clientNameController.text = invoice.clientName;
     _serviceController.text = invoice.service;
     _amountController.text = invoice.amount.toStringAsFixed(2);
+    _dueDateController.text = AppFormatters.shortDate(invoice.dueDate);
   }
 
   Future<void> _pickDueDate() async {
@@ -55,9 +58,12 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       initialDate: initial,
     );
 
-    if (picked != null) {
-      setState(() => _dueDate = picked);
+    if (!mounted || picked == null) {
+      return;
     }
+
+    setState(() => _dueDate = picked);
+    _dueDateController.text = AppFormatters.shortDate(picked);
   }
 
   Future<void> _save() async {
@@ -70,6 +76,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     }
 
     setState(() => _isSaving = true);
+    var shouldResetSavingState = true;
 
     try {
       final updated = source.copyWith(
@@ -87,9 +94,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       if (!mounted) {
         return;
       }
+      shouldResetSavingState = false;
       Navigator.of(context).pop();
     } finally {
-      if (mounted) {
+      if (mounted && shouldResetSavingState) {
         setState(() => _isSaving = false);
       }
     }
@@ -130,9 +138,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
               ),
               const SizedBox(height: 12),
               AppInputField(
-                controller: TextEditingController(
-                  text: AppFormatters.shortDate(_dueDate ?? invoice.dueDate),
-                ),
+                controller: _dueDateController,
                 label: 'Due Date',
                 readOnly: true,
                 onTap: _pickDueDate,

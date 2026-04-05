@@ -9,9 +9,11 @@ import '../../../../core/services/app_feedback_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
+import '../../../../shared/components/premium_primary_button.dart';
 import '../../../../shared/widgets/app_failure_state.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/app_preferences.dart';
+import '../../domain/entities/profile.dart';
 import '../controllers/app_preferences_controller.dart';
 import '../controllers/settings_controller.dart';
 import '../widgets/app_lock_gate.dart';
@@ -35,97 +37,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'GBP',
     'INR',
   ];
-
-  final TextEditingController _taxController = TextEditingController();
-  final TextEditingController _invoicePrefixController =
-      TextEditingController();
-  final FocusNode _taxFocusNode = FocusNode();
-  final FocusNode _invoicePrefixFocusNode = FocusNode();
-
-  bool _didHydratePreferences = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _taxFocusNode.addListener(() {
-      if (!_taxFocusNode.hasFocus) {
-        _commitTaxSetting();
-      }
-    });
-    _invoicePrefixFocusNode.addListener(() {
-      if (!_invoicePrefixFocusNode.hasFocus) {
-        _commitInvoicePrefixSetting();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _taxController.dispose();
-    _invoicePrefixController.dispose();
-    _taxFocusNode.dispose();
-    _invoicePrefixFocusNode.dispose();
-    super.dispose();
-  }
-
-  void _hydratePreferenceFields(AppPreferences preferences) {
-    if (_didHydratePreferences) {
-      return;
-    }
-
-    _didHydratePreferences = true;
-    _taxController.text = _formatTaxPercent(preferences.defaultTaxPercent);
-    _invoicePrefixController.text = preferences.invoicePrefix;
-  }
-
-  Future<void> _commitTaxSetting() async {
-    final current = ref.read(appPreferencesControllerProvider).valueOrNull;
-    if (current == null) {
-      return;
-    }
-
-    final sanitized = _sanitizeTaxPercent(_taxController.text);
-    final normalizedText = _formatTaxPercent(sanitized);
-    if (_taxController.text != normalizedText) {
-      _taxController.value = TextEditingValue(
-        text: normalizedText,
-        selection: TextSelection.collapsed(offset: normalizedText.length),
-      );
-    }
-
-    if ((current.defaultTaxPercent - sanitized).abs() < 0.0001) {
-      return;
-    }
-
-    await ref
-        .read(appPreferencesControllerProvider.notifier)
-        .patch(
-          (preferences) => preferences.copyWith(defaultTaxPercent: sanitized),
-        );
-  }
-
-  Future<void> _commitInvoicePrefixSetting() async {
-    final current = ref.read(appPreferencesControllerProvider).valueOrNull;
-    if (current == null) {
-      return;
-    }
-
-    final sanitized = _sanitizeInvoicePrefix(_invoicePrefixController.text);
-    if (_invoicePrefixController.text != sanitized) {
-      _invoicePrefixController.value = TextEditingValue(
-        text: sanitized,
-        selection: TextSelection.collapsed(offset: sanitized.length),
-      );
-    }
-
-    if (current.invoicePrefix == sanitized) {
-      return;
-    }
-
-    await ref
-        .read(appPreferencesControllerProvider.notifier)
-        .patch((preferences) => preferences.copyWith(invoicePrefix: sanitized));
-  }
 
   Future<void> _openProfileEditor() async {
     await Navigator.of(context).push<void>(
@@ -159,11 +70,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _toggleAppLock(AppPreferences preferences, bool enabled) async {
+    final preferencesController = ref.read(
+      appPreferencesControllerProvider.notifier,
+    );
+    final appLockSession = ref.read(appLockSessionProvider.notifier);
+
     if (!enabled) {
-      await ref
-          .read(appPreferencesControllerProvider.notifier)
-          .patch((current) => current.copyWith(appLockEnabled: false));
-      ref.read(appLockSessionProvider.notifier).state = false;
+      await preferencesController.patch(
+        (current) => current.copyWith(appLockEnabled: false),
+      );
+      appLockSession.state = false;
       return;
     }
 
@@ -180,17 +96,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       nextPin = createdPin;
     }
 
-    await ref
-        .read(appPreferencesControllerProvider.notifier)
-        .patch(
-          (current) =>
-              current.copyWith(appLockEnabled: true, appLockPin: nextPin),
-        );
-    ref.read(appLockSessionProvider.notifier).state = true;
-    AppFeedbackService.showSnackBar('App lock is enabled.');
+    await preferencesController.patch(
+      (current) => current.copyWith(appLockEnabled: true, appLockPin: nextPin),
+    );
+    appLockSession.state = true;
+    if (mounted) {
+      AppFeedbackService.showSnackBar('App lock is enabled.');
+    }
   }
 
   Future<void> _changePin(AppPreferences preferences) async {
+    final preferencesController = ref.read(
+      appPreferencesControllerProvider.notifier,
+    );
+    final appLockSession = ref.read(appLockSessionProvider.notifier);
+
     final nextPin = await showPinEditorSheet(
       context,
       title: preferences.hasPin ? 'Change PIN' : 'Set PIN',
@@ -200,11 +120,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
 
-    await ref
-        .read(appPreferencesControllerProvider.notifier)
-        .patch((current) => current.copyWith(appLockPin: nextPin));
-    ref.read(appLockSessionProvider.notifier).state = true;
-    AppFeedbackService.showSnackBar('PIN updated.');
+    await preferencesController.patch(
+      (current) => current.copyWith(appLockPin: nextPin),
+    );
+    appLockSession.state = true;
+    if (mounted) {
+      AppFeedbackService.showSnackBar('PIN updated.');
+    }
   }
 
   String _formatTaxPercent(double value) {
@@ -230,10 +152,190 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return sanitized.isEmpty ? 'INV' : sanitized;
   }
 
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+  Future<T?> _showSelectionSettingSheet<T>({
+    required String title,
+    required String subtitle,
+    required T currentValue,
+    required List<_SettingOption<T>> options,
+  }) {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final bottomPadding = MediaQuery.paddingOf(context).bottom + 16;
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+          child: GlassCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                for (var index = 0; index < options.length; index++) ...[
+                  _SettingSheetOptionRow(
+                    label: options[index].label,
+                    description: options[index].description,
+                    selected: options[index].value == currentValue,
+                    onTap: () {
+                      Navigator.of(context).pop(options[index].value);
+                    },
+                  ),
+                  if (index != options.length - 1) const SizedBox(height: 12),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<String?> _showTextSettingSheet({
+    required String title,
+    required String subtitle,
+    required String initialValue,
+    required String hintText,
+    required TextInputType keyboardType,
+    required List<TextInputFormatter> inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    String? suffixText,
+  }) {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return _TextSettingSheet(
+          title: title,
+          subtitle: subtitle,
+          initialValue: initialValue,
+          hintText: hintText,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          textCapitalization: textCapitalization,
+          suffixText: suffixText,
+        );
+      },
+    );
+  }
+
+  Future<void> _editDefaultCurrency(AppPreferences preferences) async {
+    final nextValue = await _showSelectionSettingSheet<String>(
+      title: 'Default Currency',
+      subtitle: 'Used for all invoices',
+      currentValue: preferences.defaultCurrency,
+      options: _currencyOptions
+          .map(
+            (currency) =>
+                _SettingOption<String>(value: currency, label: currency),
+          )
+          .toList(growable: false),
+    );
+
+    if (!mounted ||
+        nextValue == null ||
+        nextValue == preferences.defaultCurrency) {
+      return;
+    }
+
+    await _togglePreference(
+      (current) => current.copyWith(defaultCurrency: nextValue),
+    );
+  }
+
+  Future<void> _editDefaultTaxPercent(AppPreferences preferences) async {
+    final rawValue = await _showTextSettingSheet(
+      title: 'Default Tax %',
+      subtitle: 'Automatically applied to totals',
+      initialValue: _formatTaxPercent(preferences.defaultTaxPercent),
+      hintText: '0',
+      suffixText: '%',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+    );
+
+    if (!mounted || rawValue == null) {
+      return;
+    }
+
+    final sanitized = _sanitizeTaxPercent(rawValue);
+    if ((preferences.defaultTaxPercent - sanitized).abs() < 0.0001) {
+      return;
+    }
+
+    await _togglePreference(
+      (current) => current.copyWith(defaultTaxPercent: sanitized),
+    );
+  }
+
+  Future<void> _editInvoicePrefix(AppPreferences preferences) async {
+    final rawValue = await _showTextSettingSheet(
+      title: 'Invoice Prefix',
+      subtitle: 'Used for invoice numbering',
+      initialValue: preferences.invoicePrefix,
+      hintText: 'INV',
+      keyboardType: TextInputType.text,
+      textCapitalization: TextCapitalization.characters,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9-]')),
+      ],
+    );
+
+    if (!mounted || rawValue == null) {
+      return;
+    }
+
+    final sanitized = _sanitizeInvoicePrefix(rawValue);
+    if (sanitized == preferences.invoicePrefix) {
+      return;
+    }
+
+    await _togglePreference(
+      (current) => current.copyWith(invoicePrefix: sanitized),
+    );
+  }
+
+  Future<void> _editPaymentTerms(AppPreferences preferences) async {
+    final nextValue = await _showSelectionSettingSheet<PaymentTermsOption>(
+      title: 'Payment Terms',
+      subtitle: 'Default due date calculation',
+      currentValue: preferences.paymentTerms,
+      options: PaymentTermsOption.values
+          .map(
+            (terms) => _SettingOption<PaymentTermsOption>(
+              value: terms,
+              label: terms.label,
+              description: 'Sets the due date ${terms.days} days after issue.',
+            ),
+          )
+          .toList(growable: false),
+    );
+
+    if (!mounted ||
+        nextValue == null ||
+        nextValue == preferences.paymentTerms) {
+      return;
+    }
+
+    await _togglePreference(
+      (current) => current.copyWith(paymentTerms: nextValue),
     );
   }
 
@@ -280,43 +382,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
-    _hydratePreferenceFields(preferences);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth < 380 ? 16.0 : 20.0;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom + 24;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          20,
+          horizontalPadding,
+          bottomPadding,
+        ),
         children: [
-          GestureDetector(
-            onTap: _openProfileEditor,
-            behavior: HitTestBehavior.opaque,
-            child: _SectionCard(
-              title: 'Profile',
-              children: [
-                _InfoRow(label: 'Name', value: _displayValue(profile.name)),
-                _InfoRow(label: 'Email', value: _displayValue(profile.email)),
-                _InfoRow(
-                  label: 'Business Name',
-                  value: _displayValue(profile.businessName),
-                ),
-                _InfoRow(label: 'Phone', value: _displayValue(profile.phone)),
-                _InfoRow(
-                  label: 'Address',
-                  value: _displayValue(profile.address),
-                  isLast: true,
-                ),
-                const SizedBox(height: 14),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _openProfileEditor,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit Profile'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _ProfileSectionCard(profile: profile, onEdit: _openProfileEditor),
           const SizedBox(height: 20),
           _PlanSectionCard(
             subscription: subscription,
@@ -414,73 +495,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SectionCard(
             title: 'Invoice Settings',
             children: [
-              DropdownButtonFormField<String>(
-                initialValue:
-                    _currencyOptions.contains(preferences.defaultCurrency)
+              _SettingValueRow(
+                title: 'Default Currency',
+                subtitle: 'Used for all invoices',
+                value: _currencyOptions.contains(preferences.defaultCurrency)
                     ? preferences.defaultCurrency
                     : _currencyOptions.first,
-                decoration: _inputDecoration('Default currency'),
-                items: _currencyOptions
-                    .map(
-                      (currency) => DropdownMenuItem<String>(
-                        value: currency,
-                        child: Text(currency),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  _togglePreference(
-                    (current) => current.copyWith(defaultCurrency: value),
-                  );
-                },
+                trailingIcon: Icons.keyboard_arrow_down_rounded,
+                onTap: () => _editDefaultCurrency(preferences),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _taxController,
-                focusNode: _taxFocusNode,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                ],
-                decoration: _inputDecoration('Default tax %'),
-                onSubmitted: (_) => _commitTaxSetting(),
+              _SettingValueRow(
+                title: 'Default Tax %',
+                subtitle: 'Automatically applied to totals',
+                value: '${_formatTaxPercent(preferences.defaultTaxPercent)}%',
+                trailingIcon: Icons.edit_outlined,
+                onTap: () => _editDefaultTaxPercent(preferences),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _invoicePrefixController,
-                focusNode: _invoicePrefixFocusNode,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9-]')),
-                ],
-                decoration: _inputDecoration('Invoice prefix'),
-                onSubmitted: (_) => _commitInvoicePrefixSetting(),
+              _SettingValueRow(
+                title: 'Invoice Prefix',
+                subtitle: 'Used for invoice numbering',
+                value: preferences.invoicePrefix,
+                trailingIcon: Icons.edit_outlined,
+                onTap: () => _editInvoicePrefix(preferences),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<PaymentTermsOption>(
-                initialValue: preferences.paymentTerms,
-                decoration: _inputDecoration('Payment terms'),
-                items: PaymentTermsOption.values
-                    .map(
-                      (terms) => DropdownMenuItem<PaymentTermsOption>(
-                        value: terms,
-                        child: Text(terms.label),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  _togglePreference(
-                    (current) => current.copyWith(paymentTerms: value),
-                  );
-                },
+              _SettingValueRow(
+                title: 'Payment Terms',
+                subtitle: 'Default due date calculation',
+                value: preferences.paymentTerms.label,
+                trailingIcon: Icons.keyboard_arrow_down_rounded,
+                onTap: () => _editPaymentTerms(preferences),
+                isLast: true,
               ),
             ],
           ),
@@ -550,15 +594,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ref.read(authControllerProvider.notifier).logout();
             },
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
-  }
-
-  String _displayValue(String value) {
-    final trimmed = value.trim();
-    return trimmed.isEmpty ? 'Not set' : trimmed;
   }
 }
 
@@ -579,10 +617,107 @@ class _SectionCard extends StatelessWidget {
             title,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
           ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileSectionCard extends StatelessWidget {
+  const _ProfileSectionCard({required this.profile, required this.onEdit});
+
+  final UserProfile profile;
+  final VoidCallback onEdit;
+
+  ({String value, bool isPlaceholder}) _valueOrPrompt(
+    String value,
+    String prompt,
+  ) {
+    final trimmed = value.trim();
+    return (
+      value: trimmed.isEmpty ? prompt : trimmed,
+      isPlaceholder: trimmed.isEmpty,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final header = profile.name.trim().isEmpty
+        ? 'Your Profile'
+        : profile.name.trim();
+
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            header,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _ProfileDetailRow(
+            label: 'Name',
+            info: _valueOrPrompt(profile.name, 'Add your name'),
+          ),
+          _ProfileDetailRow(
+            label: 'Email',
+            info: _valueOrPrompt(profile.email, 'Add your email'),
+          ),
+          _ProfileDetailRow(
+            label: 'Business Name',
+            info: _valueOrPrompt(
+              profile.businessName,
+              'Add your business name',
+            ),
+          ),
+          _ProfileDetailRow(
+            label: 'Phone',
+            info: _valueOrPrompt(profile.phone, 'Add your phone number'),
+          ),
+          _ProfileDetailRow(
+            label: 'Address',
+            info: _valueOrPrompt(profile.address, 'Add your address'),
+            isLast: true,
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onEdit,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                backgroundColor: AppColors.cardBackground,
+                side: const BorderSide(color: AppColors.glassBorder),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: Text(
+                'Edit Profile',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -603,23 +738,35 @@ class _PlanSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isPro = subscription.isPro;
+    final title = isPro ? 'Pro Plan' : 'Free Plan';
+    final badgeLabel = isPro ? 'Active' : 'Current Plan';
+    final clientUsage = isPro
+        ? '${usage.clientCount} / Unlimited'
+        : '${usage.clientCount} / ${SubscriptionState.freeClientLimit}';
+    final invoiceUsage = isPro
+        ? '${usage.monthlyInvoiceCount} / Unlimited'
+        : '${usage.monthlyInvoiceCount} / ${SubscriptionState.freeMonthlyInvoiceLimit}';
+    final highlights = isPro
+        ? const <String>[
+            'Unlimited clients',
+            'Unlimited invoices',
+            'No PDF watermark',
+          ]
+        : const <String>[
+            '5 clients limit',
+            '5 invoices/month',
+            'PDF includes watermark',
+          ];
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Plan',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Container(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final badge = Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
@@ -632,42 +779,77 @@ class _PlanSectionCard extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  subscription.isPro ? 'Invoice Flow Pro' : 'Free',
+                  badgeLabel,
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
+              );
+
+              final titleText = Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              );
+
+              if (constraints.maxWidth < 340) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [titleText, const SizedBox(height: 12), badge],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: titleText),
+                  const SizedBox(width: 12),
+                  badge,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
+          for (var index = 0; index < highlights.length; index++) ...[
+            _PlanFeatureRow(text: highlights[index]),
+            if (index != highlights.length - 1) const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 20),
           Text(
-            subscription.isPro
-                ? 'Unlimited clients, unlimited invoices, smart reminders, WhatsApp sharing, and no PDF watermark.'
-                : 'Free includes up to 5 clients, 5 invoices each month, and watermarked PDF exports.',
-            style: theme.textTheme.bodyMedium,
+            isPro ? 'Usage' : 'Usage this month',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
-          _InfoRow(label: 'Usage', value: usage.clientUsageLabel),
-          _InfoRow(
-            label: 'Invoices',
-            value: usage.invoiceUsageLabel,
-            isLast: subscription.isPro || onUpgrade != null,
-          ),
-          if (subscription.isPro) ...[
-            const SizedBox(height: 6),
+          _UsageStatRow(label: 'Clients', value: clientUsage),
+          const SizedBox(height: 12),
+          _UsageStatRow(label: 'Invoices', value: invoiceUsage),
+          if (!isPro && onUpgrade != null) ...[
+            const SizedBox(height: 20),
+            PremiumPrimaryButton(
+              label: 'Upgrade to Pro',
+              leading: const Icon(
+                Icons.workspace_premium_outlined,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+              onPressed: () async {
+                onUpgrade!.call();
+              },
+            ),
+          ] else if (isPro) ...[
+            const SizedBox(height: 16),
             Text(
               'Invoice Flow Pro is active on this device.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
-            ),
-          ] else if (onUpgrade != null) ...[
-            const SizedBox(height: 12),
-            PrimaryButton(
-              label: 'Upgrade to Pro',
-              icon: Icons.workspace_premium_outlined,
-              onPressed: onUpgrade,
             ),
           ],
         ],
@@ -676,31 +858,270 @@ class _PlanSectionCard extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
+class _PlanFeatureRow extends StatelessWidget {
+  const _PlanFeatureRow({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            '•',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.accent,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileDetailRow extends StatelessWidget {
+  const _ProfileDetailRow({
     required this.label,
-    required this.value,
+    required this.info,
     this.isLast = false,
   });
 
   final String label;
-  final String value;
+  final ({String value, bool isPlaceholder}) info;
   final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isPlaceholder = info.isPlaceholder;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            info.value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: isPlaceholder
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary,
+              fontWeight: isPlaceholder ? FontWeight.w600 : FontWeight.w700,
+              height: 1.3,
+            ),
+            softWrap: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UsageStatRow extends StatelessWidget {
+  const _UsageStatRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '$label:',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: textTheme.labelMedium),
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: textTheme.bodyLarge, softWrap: true),
+          Text(
+            value,
+            style: textTheme.titleMedium?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+            softWrap: true,
+          ),
         ],
       ),
     );
+  }
+}
+
+class _SettingRowText extends StatelessWidget {
+  const _SettingRowText({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingValueRow extends StatelessWidget {
+  const _SettingValueRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onTap,
+    this.trailingIcon = Icons.keyboard_arrow_right_rounded,
+    this.isLast = false,
+  });
+
+  final String title;
+  final String subtitle;
+  final String value;
+  final VoidCallback onTap;
+  final IconData trailingIcon;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final row = InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _SettingRowText(title: title, subtitle: subtitle),
+            ),
+            const SizedBox(width: 16),
+            Flexible(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      trailingIcon,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (isLast) {
+      return row;
+    }
+
+    return Column(children: [row, const SizedBox(height: 14)]);
   }
 }
 
@@ -723,7 +1144,6 @@ class _SwitchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final row = Opacity(
       opacity: enabled ? 1 : 0.6,
       child: InkWell(
@@ -736,24 +1156,7 @@ class _SwitchRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+                child: _SettingRowText(title: title, subtitle: subtitle),
               ),
               const SizedBox(width: 16),
               Padding(
@@ -773,7 +1176,7 @@ class _SwitchRow extends StatelessWidget {
       return row;
     }
 
-    return Column(children: [row, const SizedBox(height: 12)]);
+    return Column(children: [row, const SizedBox(height: 14)]);
   }
 }
 
@@ -794,7 +1197,6 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final row = InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -805,24 +1207,7 @@ class _ActionRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+              child: _SettingRowText(title: title, subtitle: subtitle),
             ),
             const SizedBox(width: 16),
             SizedBox(
@@ -844,6 +1229,197 @@ class _ActionRow extends StatelessWidget {
       return row;
     }
 
-    return Column(children: [row, const SizedBox(height: 12)]);
+    return Column(children: [row, const SizedBox(height: 14)]);
+  }
+}
+
+class _SettingOption<T> {
+  const _SettingOption({
+    required this.value,
+    required this.label,
+    this.description,
+  });
+
+  final T value;
+  final String label;
+  final String? description;
+}
+
+class _SettingSheetOptionRow extends StatelessWidget {
+  const _SettingSheetOptionRow({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.description,
+  });
+
+  final String label;
+  final String? description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? AppColors.accent.withValues(alpha: 0.35)
+                : AppColors.glassBorder,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (description != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 18,
+              color: selected ? AppColors.accent : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TextSettingSheet extends StatefulWidget {
+  const _TextSettingSheet({
+    required this.title,
+    required this.subtitle,
+    required this.initialValue,
+    required this.hintText,
+    required this.keyboardType,
+    required this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
+    this.suffixText,
+  });
+
+  final String title;
+  final String subtitle;
+  final String initialValue;
+  final String hintText;
+  final TextInputType keyboardType;
+  final List<TextInputFormatter> inputFormatters;
+  final TextCapitalization textCapitalization;
+  final String? suffixText;
+
+  @override
+  State<_TextSettingSheet> createState() => _TextSettingSheetState();
+}
+
+class _TextSettingSheetState extends State<_TextSettingSheet> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _inputDecoration() {
+    OutlineInputBorder border(Color color) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color),
+      );
+    }
+
+    return InputDecoration(
+      hintText: widget.hintText,
+      hintStyle: const TextStyle(color: AppColors.textMuted),
+      suffixText: widget.suffixText,
+      suffixStyle: const TextStyle(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w600,
+      ),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: border(AppColors.glassBorder),
+      enabledBorder: border(AppColors.glassBorder),
+      focusedBorder: border(AppColors.accent.withValues(alpha: 0.45)),
+    );
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(_controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom + 16;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + bottomPadding),
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: widget.keyboardType,
+              inputFormatters: widget.inputFormatters,
+              textCapitalization: widget.textCapitalization,
+              decoration: _inputDecoration(),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(label: 'Save', icon: Icons.check, onPressed: _submit),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -5,139 +7,285 @@ import 'package:printing/printing.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../features/clients/domain/repositories/client_repository.dart';
+import '../../features/clients/presentation/controllers/clients_controller.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
+import 'pdf_file_storage.dart';
 import 'invoice_pdf_profile_hook.dart';
 
 final invoicePdfExportServiceProvider = Provider<InvoicePdfExportService>(
-  (ref) => InvoicePdfExportService(ref.watch(invoicePdfProfileHookProvider)),
+  (ref) => InvoicePdfExportService(
+    profileHook: ref.watch(invoicePdfProfileHookProvider),
+    clientRepository: ref.watch(clientRepositoryProvider),
+  ),
 );
 
+class InvoicePdfDocument {
+  const InvoicePdfDocument({
+    required this.bytes,
+    required this.filename,
+    this.savedFilePath,
+  });
+
+  final Uint8List bytes;
+  final String filename;
+  final String? savedFilePath;
+}
+
 class InvoicePdfExportService {
-  const InvoicePdfExportService(this._profileHook);
+  InvoicePdfExportService({
+    required InvoicePdfProfileHook profileHook,
+    required ClientRepository clientRepository,
+  }) : _profileHook = profileHook,
+       _clientRepository = clientRepository;
 
   final InvoicePdfProfileHook _profileHook;
+  final ClientRepository _clientRepository;
 
-  Future<void> exportInvoicePdf(
+  static final PdfColor _accentColor = PdfColor.fromHex('#C9A86A');
+  static final PdfColor _mutedColor = PdfColor.fromHex('#667085');
+  static final PdfColor _surfaceColor = PdfColor.fromHex('#F7F7F5');
+  static final PdfColor _dividerColor = PdfColor.fromHex('#D9D9D4');
+
+  Future<InvoicePdfDocument> generateInvoicePdfDocument(
     Invoice invoice, {
     required bool includeWatermark,
   }) async {
     final document = pw.Document();
     final senderProfile = await _profileHook.loadSenderProfile();
+    final client = await _clientRepository.getClientById(invoice.clientId);
 
     document.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (context) {
-          return pw.Stack(
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(
-                            'Invoice',
-                            style: pw.TextStyle(
-                              fontSize: 28,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                          pw.SizedBox(height: 6),
-                          pw.Text(invoice.id),
-                        ],
-                      ),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.end,
-                        children: [
-                          pw.Text(
-                            AppConstants.aboutAppName,
-                            style: pw.TextStyle(
-                              fontSize: 14,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                          pw.SizedBox(height: 4),
-                          pw.Text('Created ${_dateLabel(invoice.createdAt)}'),
-                          pw.Text('Due ${_dateLabel(invoice.dueDate)}'),
-                          pw.Text('Status ${invoice.status.label}'),
-                        ],
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 28),
-                  pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Expanded(
-                        child: _buildPartySection(
-                          title: 'From',
-                          lines: senderProfile == null
-                              ? const <String>[
-                                  AppConstants.aboutAppName,
-                                  'Update your profile in Settings to add sender details.',
-                                ]
-                              : <String>[
-                                  senderProfile.businessName,
-                                  senderProfile.name,
-                                  senderProfile.email,
-                                  senderProfile.phone,
-                                  if (senderProfile.address.trim().isNotEmpty)
-                                    senderProfile.address,
-                                ],
-                        ),
-                      ),
-                      pw.SizedBox(width: 16),
-                      pw.Expanded(
-                        child: _buildPartySection(
-                          title: 'Bill To',
-                          lines: <String>[invoice.clientName, invoice.service],
-                        ),
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 28),
-                  _buildLineItemsTable(invoice),
-                  pw.SizedBox(height: 20),
-                  pw.Align(
-                    alignment: pw.Alignment.centerRight,
-                    child: _buildTotalsSection(invoice),
-                  ),
-                ],
-              ),
-              if (includeWatermark)
-                pw.Positioned.fill(
-                  child: pw.Center(
-                    child: pw.Opacity(
-                      opacity: 0.14,
-                      child: pw.Transform.rotate(
-                        angle: -0.48,
-                        child: pw.Text(
-                          'Generated by Invoice Flow',
-                          style: pw.TextStyle(
-                            fontSize: 30,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.grey700,
-                          ),
-                        ),
-                      ),
+        margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 28),
+        footer: includeWatermark
+            ? (context) => pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 10),
+                child: pw.Center(
+                  child: pw.Text(
+                    'Generated by Invoice Flow',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      color: _mutedColor,
+                      fontWeight: pw.FontWeight.normal,
                     ),
                   ),
                 ),
-            ],
-          );
+              )
+            : null,
+        build: (context) {
+          return <pw.Widget>[
+            _buildHeader(senderProfile),
+            pw.SizedBox(height: 24),
+            _buildInvoiceInfoSection(invoice),
+            pw.SizedBox(height: 20),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: _buildPartySection(
+                    title: 'FROM',
+                    lines: <String>[
+                      senderProfile?.name.trim().isNotEmpty == true
+                          ? senderProfile!.name.trim()
+                          : 'Add your name in Settings',
+                      senderProfile?.email.trim().isNotEmpty == true
+                          ? senderProfile!.email.trim()
+                          : 'Add your email in Settings',
+                      senderProfile?.phone.trim().isNotEmpty == true
+                          ? senderProfile!.phone.trim()
+                          : 'Add your phone in Settings',
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 18),
+                pw.Expanded(
+                  child: _buildPartySection(
+                    title: 'TO',
+                    lines: <String>[
+                      client?.name.trim().isNotEmpty == true
+                          ? client!.name.trim()
+                          : invoice.clientName,
+                      client?.email.trim().isNotEmpty == true
+                          ? client!.email.trim()
+                          : 'No email on file',
+                      client?.phone.trim().isNotEmpty == true
+                          ? client!.phone.trim()
+                          : 'No phone on file',
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 24),
+            _buildServiceSection(invoice),
+            pw.SizedBox(height: 24),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: _buildTotalsSection(invoice),
+            ),
+          ];
         },
       ),
     );
 
-    await Printing.sharePdf(
-      bytes: await document.save(),
-      filename: '${invoice.id.toLowerCase()}.pdf',
+    final bytes = await document.save();
+    final filename = _filenameForInvoice(invoice);
+    String? savedFilePath;
+    try {
+      savedFilePath = await savePdfBytesToLocalFile(bytes, filename);
+    } catch (_) {
+      savedFilePath = null;
+    }
+
+    return InvoicePdfDocument(
+      bytes: bytes,
+      filename: filename,
+      savedFilePath: savedFilePath,
+    );
+  }
+
+  Future<void> shareInvoicePdfDocument(InvoicePdfDocument document) async {
+    await Printing.sharePdf(bytes: document.bytes, filename: document.filename);
+  }
+
+  pw.Widget _buildHeader(InvoicePdfSenderProfile? senderProfile) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 20),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(color: _dividerColor, width: 1),
+        ),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Row(
+            children: [
+              pw.Container(
+                width: 42,
+                height: 42,
+                decoration: pw.BoxDecoration(
+                  color: _accentColor,
+                  borderRadius: pw.BorderRadius.circular(12),
+                ),
+                alignment: pw.Alignment.center,
+                child: pw.Text(
+                  'IF',
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 12),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    AppConstants.aboutAppName,
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.black,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Professional invoice',
+                    style: pw.TextStyle(fontSize: 10, color: _mutedColor),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(width: 20),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(
+                  senderProfile?.displayBusinessName ?? 'Your Business',
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                ),
+                if (senderProfile?.address.trim().isNotEmpty == true) ...[
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    senderProfile!.address.trim(),
+                    textAlign: pw.TextAlign.right,
+                    style: pw.TextStyle(fontSize: 10, color: _mutedColor),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildInvoiceInfoSection(Invoice invoice) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: _surfaceColor,
+        borderRadius: pw.BorderRadius.circular(14),
+        border: pw.Border.all(color: _dividerColor),
+      ),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: _buildInfoItem(label: 'Invoice ID', value: invoice.id),
+          ),
+          pw.SizedBox(width: 16),
+          pw.Expanded(
+            child: _buildInfoItem(
+              label: 'Issue Date',
+              value: _dateLabel(invoice.createdAt),
+            ),
+          ),
+          pw.SizedBox(width: 16),
+          pw.Expanded(
+            child: _buildInfoItem(
+              label: 'Due Date',
+              value: _dateLabel(invoice.dueDate),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildInfoItem({required String label, required String value}) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 10,
+            color: _mutedColor,
+            fontWeight: pw.FontWeight.normal,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontSize: 12,
+            color: PdfColors.black,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -146,10 +294,11 @@ class InvoicePdfExportService {
     required List<String> lines,
   }) {
     return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
+      padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey300),
-        borderRadius: pw.BorderRadius.circular(10),
+        color: _surfaceColor,
+        borderRadius: pw.BorderRadius.circular(14),
+        border: pw.Border.all(color: _dividerColor),
       ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -157,44 +306,48 @@ class InvoicePdfExportService {
           pw.Text(
             title,
             style: pw.TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               fontWeight: pw.FontWeight.bold,
-              color: PdfColors.grey700,
+              color: _mutedColor,
             ),
           ),
-          pw.SizedBox(height: 8),
-          ...lines
-              .where((line) => line.trim().isNotEmpty)
-              .map(
-                (line) => pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 4),
-                  child: pw.Text(line),
+          pw.SizedBox(height: 10),
+          for (var index = 0; index < lines.length; index++)
+            pw.Padding(
+              padding: pw.EdgeInsets.only(
+                bottom: index == lines.length - 1 ? 0 : 6,
+              ),
+              child: pw.Text(
+                lines[index],
+                style: pw.TextStyle(
+                  fontSize: index == 0 ? 12 : 11,
+                  color: PdfColors.black,
+                  fontWeight: index == 0
+                      ? pw.FontWeight.bold
+                      : pw.FontWeight.normal,
                 ),
               ),
+            ),
         ],
       ),
     );
   }
 
-  pw.Widget _buildLineItemsTable(Invoice invoice) {
-    final subtotal = AppFormatters.currency(
+  pw.Widget _buildServiceSection(Invoice invoice) {
+    final amount = AppFormatters.currency(
       invoice.subtotalAmount,
-      currencyCode: invoice.currencyCode,
-    );
-    final total = AppFormatters.currency(
-      invoice.amount,
       currencyCode: invoice.currencyCode,
     );
 
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey300),
+      border: pw.TableBorder.all(color: _dividerColor),
       columnWidths: const <int, pw.TableColumnWidth>{
         0: pw.FlexColumnWidth(2.4),
         1: pw.FlexColumnWidth(1.2),
       },
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          decoration: pw.BoxDecoration(color: _surfaceColor),
           children: [
             _tableCell('Service', isHeader: true),
             _tableCell('Amount', isHeader: true, alignRight: true),
@@ -203,7 +356,7 @@ class InvoicePdfExportService {
         pw.TableRow(
           children: [
             _tableCell(invoice.service),
-            _tableCell(subtotal == total ? total : subtotal, alignRight: true),
+            _tableCell(amount, alignRight: true),
           ],
         ),
       ],
@@ -225,26 +378,37 @@ class InvoicePdfExportService {
     );
 
     return pw.Container(
-      width: 220,
-      padding: const pw.EdgeInsets.all(14),
+      width: 240,
+      padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey300),
-        borderRadius: pw.BorderRadius.circular(10),
+        color: _surfaceColor,
+        border: pw.Border.all(color: _dividerColor),
+        borderRadius: pw.BorderRadius.circular(14),
       ),
       child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
           _summaryRow('Subtotal', subtotal),
-          if (invoice.taxPercent > 0)
-            _summaryRow('Tax (${invoice.taxPercent.toStringAsFixed(0)}%)', tax),
-          pw.Divider(color: PdfColors.grey300),
-          _summaryRow('Total', total, isBold: true),
+          _summaryRow('Tax (${invoice.taxPercent.toStringAsFixed(0)}%)', tax),
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 8),
+            child: pw.Divider(color: _dividerColor),
+          ),
+          _summaryRow('Total', total, isBold: true, emphasize: true),
         ],
       ),
     );
   }
 
-  pw.Widget _summaryRow(String label, String value, {bool isBold = false}) {
+  pw.Widget _summaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    bool emphasize = false,
+  }) {
     final style = pw.TextStyle(
+      fontSize: emphasize ? 14 : 11,
+      color: emphasize ? _accentColor : PdfColors.black,
       fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
     );
 
@@ -274,11 +438,20 @@ class InvoicePdfExportService {
         child: pw.Text(
           value,
           style: pw.TextStyle(
+            color: PdfColors.black,
             fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
           ),
         ),
       ),
     );
+  }
+
+  String _filenameForInvoice(Invoice invoice) {
+    final sanitizedId = invoice.id.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9_-]'),
+      '_',
+    );
+    return 'invoice_$sanitizedId.pdf';
   }
 
   String _dateLabel(DateTime value) {

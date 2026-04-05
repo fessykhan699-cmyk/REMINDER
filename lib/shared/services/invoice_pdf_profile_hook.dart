@@ -14,16 +14,16 @@ class InvoicePdfProfileHook {
 
   Future<InvoicePdfSenderProfile?> loadSenderProfile() async {
     final profile = await _getProfileUseCase.call();
-    if (!profile.isComplete) {
+    if (profile.isEmpty) {
       return null;
     }
 
     return InvoicePdfSenderProfile(
-      name: profile.name,
-      businessName: profile.businessName,
-      email: profile.email,
-      phone: profile.phone,
-      address: profile.address,
+      name: profile.name.trim(),
+      businessName: profile.businessName.trim(),
+      email: profile.email.trim(),
+      phone: profile.phone.trim(),
+      address: profile.address.trim(),
     );
   }
 }
@@ -42,6 +42,16 @@ class InvoicePdfSenderProfile {
   final String email;
   final String phone;
   final String address;
+
+  String get displayBusinessName {
+    if (businessName.trim().isNotEmpty) {
+      return businessName.trim();
+    }
+    if (name.trim().isNotEmpty) {
+      return name.trim();
+    }
+    return 'Your Business';
+  }
 
   Map<String, String> toPdfFromSection() {
     return <String, String>{

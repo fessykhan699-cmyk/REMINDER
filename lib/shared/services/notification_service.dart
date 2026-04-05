@@ -213,13 +213,13 @@ class NotificationService {
         'getLocalTimezone',
       );
       if (timezoneName == null || timezoneName.isEmpty) {
-        tz.setLocalLocation(tz.getLocation('UTC'));
+        tz.setLocalLocation(tz.UTC);
         return;
       }
 
       tz.setLocalLocation(tz.getLocation(timezoneName));
     } catch (_) {
-      tz.setLocalLocation(tz.getLocation('UTC'));
+      tz.setLocalLocation(tz.UTC);
     }
   }
 
