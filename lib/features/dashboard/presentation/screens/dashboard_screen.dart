@@ -740,11 +740,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   Expanded(
                     child: ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
+                      padding: EdgeInsets.fromLTRB(
                         spacingMD,
                         spacingMD,
                         spacingMD,
-                        listBottomPadding,
+                        MediaQuery.of(context).padding.bottom + 80,
                       ),
                       itemCount: dashboardSections.length,
                       itemBuilder: (context, index) {

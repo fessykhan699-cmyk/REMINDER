@@ -206,83 +206,90 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
           _hydrate(invoice);
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-            children: [
-              AppInputField(
-                controller: _clientNameController,
-                label: 'Client Name',
+          return SafeArea(
+            child: ListView(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 80,
               ),
-              const SizedBox(height: 12),
-              AppInputField(controller: _serviceController, label: 'Service'),
-              const SizedBox(height: 12),
-              AppInputField(
-                controller: _amountController,
-                label: 'Amount',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              children: [
+                AppInputField(
+                  controller: _clientNameController,
+                  label: 'Client Name',
                 ),
-              ),
-              const SizedBox(height: 12),
-              AppInputField(
-                controller: _dueDateController,
-                label: 'Due Date',
-                readOnly: true,
-                onTap: _pickDueDate,
-              ),
-              const SizedBox(height: 12),
-              AppInputField(
-                controller: _paymentLinkController,
-                label: 'Payment Link',
-                hint: 'https://pay.example.com/invoice',
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 12),
-              AppInputField(
-                controller: _discountController,
-                label: 'Discount (Pro)',
-                hint: '0.00',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 12),
+                AppInputField(controller: _serviceController, label: 'Service'),
+                const SizedBox(height: 12),
+                AppInputField(
+                  controller: _amountController,
+                  label: 'Amount',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Discounted totals are a Pro feature.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              AppInputField(
-                controller: _notesController,
-                label: 'Notes',
-                hint: 'Payment instructions or terms',
-                maxLines: 4,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<InvoiceStatus>(
-                initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: InvoiceStatus.values
-                    .map(
-                      (status) => DropdownMenuItem(
-                        value: status,
-                        child: Text(status.label),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _status = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 18),
-              PrimaryButton(
-                label: 'Save Changes',
-                isLoading: _isSaving,
-                onPressed: _save,
-              ),
-            ],
+                const SizedBox(height: 12),
+                AppInputField(
+                  controller: _dueDateController,
+                  label: 'Due Date',
+                  readOnly: true,
+                  onTap: _pickDueDate,
+                ),
+                const SizedBox(height: 12),
+                AppInputField(
+                  controller: _paymentLinkController,
+                  label: 'Payment Link',
+                  hint: 'https://pay.example.com/invoice',
+                  keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 12),
+                AppInputField(
+                  controller: _discountController,
+                  label: 'Discount (Pro)',
+                  hint: '0.00',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Discounted totals are a Pro feature.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                AppInputField(
+                  controller: _notesController,
+                  label: 'Notes',
+                  hint: 'Payment instructions or terms',
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<InvoiceStatus>(
+                  initialValue: _status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: InvoiceStatus.values
+                      .map(
+                        (status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status.label),
+                        ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _status = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 18),
+                PrimaryButton(
+                  label: 'Save Changes',
+                  isLoading: _isSaving,
+                  onPressed: _save,
+                ),
+              ],
+            ),
           );
         },
       ),

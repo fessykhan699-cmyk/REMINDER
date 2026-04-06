@@ -63,90 +63,102 @@ class ReminderFlowScreen extends ConsumerWidget {
       body: invoice == null
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  24,
+                  24,
+                  MediaQuery.of(context).padding.bottom + 80,
+                ),
                 child: Text(state.errorMessage ?? 'Preparing reminder...'),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-              children: [
-                Text(
-                  'Invoice ${invoice.id} • ${invoice.clientName}',
-                  style: Theme.of(context).textTheme.titleLarge,
+          : SafeArea(
+              child: ListView(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).padding.bottom + 80,
                 ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ReminderMessageType.values
-                      .map(
-                        (type) => ReminderTypeChip(
-                          label: type.label,
-                          selected: state.messageType == type,
-                          onTap: () => controller.selectMessageType(type),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-                const SizedBox(height: 16),
-                GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Message Preview',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(state.previewMessage),
-                    ],
+                children: [
+                  Text(
+                    'Invoice ${invoice.id} • ${invoice.clientName}',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                ),
-                const SizedBox(height: 18),
-                PrimaryButton(
-                  label: 'Send on WhatsApp',
-                  icon: Icons.chat_bubble_outline,
-                  isLoading: state.isSending,
-                  onPressed: canSendWhatsapp
-                      ? () async {
-                          try {
-                            await controller.sendReminder(
-                              ReminderChannel.whatsapp,
-                            );
-                          } on SubscriptionGateException catch (error) {
-                            if (!context.mounted) {
-                              return;
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ReminderMessageType.values
+                        .map(
+                          (type) => ReminderTypeChip(
+                            label: type.label,
+                            selected: state.messageType == type,
+                            onTap: () => controller.selectMessageType(type),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 16),
+                  GlassCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Message Preview',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(state.previewMessage),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  PrimaryButton(
+                    label: 'Send on WhatsApp',
+                    icon: Icons.chat_bubble_outline,
+                    isLoading: state.isSending,
+                    onPressed: canSendWhatsapp
+                        ? () async {
+                            try {
+                              await controller.sendReminder(
+                                ReminderChannel.whatsapp,
+                              );
+                            } on SubscriptionGateException catch (error) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              final upgraded = await promptUpgradeForDecision(
+                                context,
+                                error.decision,
+                              );
+                              if (!upgraded || !context.mounted) {
+                                return;
+                              }
+                              await controller.sendReminder(
+                                ReminderChannel.whatsapp,
+                              );
                             }
-                            final upgraded = await promptUpgradeForDecision(
-                              context,
-                              error.decision,
-                            );
-                            if (!upgraded || !context.mounted) {
-                              return;
-                            }
-                            await controller.sendReminder(
-                              ReminderChannel.whatsapp,
-                            );
                           }
-                        }
-                      : null,
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: canSendSms
-                      ? () async {
-                          await controller.sendReminder(ReminderChannel.sms);
-                        }
-                      : null,
-                  icon: const Icon(Icons.sms_outlined),
-                  label: const Text('Send via SMS'),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  helperText ?? '3-tap flow: tone -> preview -> send.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: canSendSms
+                        ? () async {
+                            await controller.sendReminder(ReminderChannel.sms);
+                          }
+                        : null,
+                    icon: const Icon(Icons.sms_outlined),
+                    label: const Text('Send via SMS'),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    helperText ?? '3-tap flow: tone -> preview -> send.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
     );
   }

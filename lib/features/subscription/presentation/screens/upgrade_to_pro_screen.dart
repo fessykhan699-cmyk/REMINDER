@@ -275,7 +275,9 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 120),
+                      SizedBox(
+                        height: MediaQuery.of(context).padding.bottom + 100,
+                      ),
                     ],
                   ),
                 ),

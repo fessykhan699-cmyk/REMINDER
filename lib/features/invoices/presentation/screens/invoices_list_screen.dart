@@ -45,7 +45,9 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: appListViewPadding,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 80,
+      ),
       itemCount: itemCount,
       itemBuilder: (context, index) {
         if (showNudge && index == 0) {
