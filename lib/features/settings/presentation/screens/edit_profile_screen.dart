@@ -276,157 +276,159 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         error: (error, stack) => Center(child: Text(error.toString())),
         data: (profile) {
           _hydrate(profile);
-          return ListView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              20,
-              horizontalPadding,
-              bottomPadding,
-            ),
-            children: [
-              GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: _autovalidateMode,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Edit Profile',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Keep your billing details current for invoices and exports.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _ProfileField(
-                        label: 'Name',
-                        child: TextFormField(
-                          controller: _nameController,
-                          textCapitalization: TextCapitalization.words,
-                          textInputAction: TextInputAction.next,
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: _decoration(hintText: 'John Doe'),
-                          validator: (value) => (value ?? '').trim().isEmpty
-                              ? 'Name is required.'
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _ProfileField(
-                        label: 'Business Name',
-                        child: TextFormField(
-                          controller: _businessNameController,
-                          textCapitalization: TextCapitalization.words,
-                          textInputAction: TextInputAction.next,
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: _decoration(
-                            hintText: 'Studio Ledger Co.',
+          return SafeArea(
+            child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                20,
+                horizontalPadding,
+                bottomPadding,
+              ),
+              children: [
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    autovalidateMode: _autovalidateMode,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Edit Profile',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
-                          validator: (value) => (value ?? '').trim().isEmpty
-                              ? 'Business name is required.'
-                              : null,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _ProfileField(
-                        label: 'Email',
-                        child: TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: _decoration(
-                            hintText: 'name@business.com',
+                        const SizedBox(height: 6),
+                        Text(
+                          'Keep your billing details current for invoices and exports.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
                           ),
-                          validator: (value) =>
-                              UserProfile.isValidEmail(value ?? '')
-                              ? null
-                              : 'Enter a valid email address.',
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _ProfileField(
-                        label: 'Phone',
-                        child: TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: _decoration(
-                            hintText: '1 555 123 4567',
-                            prefixText: '+ ',
+                        const SizedBox(height: 20),
+                        _ProfileField(
+                          label: 'Name',
+                          child: TextFormField(
+                            controller: _nameController,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: _decoration(hintText: 'John Doe'),
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Name is required.'
+                                : null,
                           ),
-                          validator: (value) =>
-                              UserProfile.hasValidInternationalPhone(
-                                _normalizedPhoneValue(value),
-                              )
-                              ? null
-                              : 'Use a phone number with country code.',
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _ProfileField(
-                        label: 'Address',
-                        child: TextFormField(
-                          controller: _addressController,
-                          keyboardType: TextInputType.streetAddress,
-                          maxLines: 2,
-                          textAlignVertical: TextAlignVertical.top,
-                          decoration: _decoration(
-                            hintText: 'Business address',
+                        const SizedBox(height: 16),
+                        _ProfileField(
+                          label: 'Business Name',
+                          child: TextFormField(
+                            controller: _businessNameController,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: _decoration(
+                              hintText: 'Studio Ledger Co.',
+                            ),
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Business name is required.'
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ProfileField(
+                          label: 'Email',
+                          child: TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: _decoration(
+                              hintText: 'name@business.com',
+                            ),
+                            validator: (value) =>
+                                UserProfile.isValidEmail(value ?? '')
+                                ? null
+                                : 'Enter a valid email address.',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ProfileField(
+                          label: 'Phone',
+                          child: TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: _decoration(
+                              hintText: '1 555 123 4567',
+                              prefixText: '+ ',
+                            ),
+                            validator: (value) =>
+                                UserProfile.hasValidInternationalPhone(
+                                  _normalizedPhoneValue(value),
+                                )
+                                ? null
+                                : 'Use a phone number with country code.',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ProfileField(
+                          label: 'Address',
+                          child: TextFormField(
+                            controller: _addressController,
+                            keyboardType: TextInputType.streetAddress,
                             maxLines: 2,
+                            textAlignVertical: TextAlignVertical.top,
+                            decoration: _decoration(
+                              hintText: 'Business address',
+                              maxLines: 2,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _BrandAssetField(
-                        label: 'Brand Logo',
-                        helper: isPro
-                            ? 'Used on Pro invoices. Falls back to the app logo if empty.'
-                            : 'Pro only. Upgrade to use your own logo on invoices.',
-                        assetPath: _logoPath,
-                        isLoading: _isPickingLogo,
-                        emptyLabel: 'No logo selected',
-                        onPick: () => _pickBrandAsset(isSignature: false),
-                        onClear: _logoPath.trim().isEmpty
-                            ? null
-                            : () => _clearBrandAsset(isSignature: false),
-                      ),
-                      const SizedBox(height: 16),
-                      _BrandAssetField(
-                        label: 'Authorized Signature',
-                        helper: isPro
-                            ? 'Optional signature image for Pro invoices.'
-                            : 'Pro only. Upgrade to add a signature block to invoices.',
-                        assetPath: _signaturePath,
-                        isLoading: _isPickingSignature,
-                        emptyLabel: 'No signature selected',
-                        onPick: () => _pickBrandAsset(isSignature: true),
-                        onClear: _signaturePath.trim().isEmpty
-                            ? null
-                            : () => _clearBrandAsset(isSignature: true),
-                      ),
-                      const SizedBox(height: 20),
-                      PrimaryButton(
-                        label: 'Save Profile',
-                        icon: Icons.save_outlined,
-                        isLoading: _isSaving,
-                        onPressed: _save,
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        _BrandAssetField(
+                          label: 'Brand Logo',
+                          helper: isPro
+                              ? 'Used on Pro invoices. Falls back to the app logo if empty.'
+                              : 'Pro only. Upgrade to use your own logo on invoices.',
+                          assetPath: _logoPath,
+                          isLoading: _isPickingLogo,
+                          emptyLabel: 'No logo selected',
+                          onPick: () => _pickBrandAsset(isSignature: false),
+                          onClear: _logoPath.trim().isEmpty
+                              ? null
+                              : () => _clearBrandAsset(isSignature: false),
+                        ),
+                        const SizedBox(height: 16),
+                        _BrandAssetField(
+                          label: 'Authorized Signature',
+                          helper: isPro
+                              ? 'Optional signature image for Pro invoices.'
+                              : 'Pro only. Upgrade to add a signature block to invoices.',
+                          assetPath: _signaturePath,
+                          isLoading: _isPickingSignature,
+                          emptyLabel: 'No signature selected',
+                          onPick: () => _pickBrandAsset(isSignature: true),
+                          onClear: _signaturePath.trim().isEmpty
+                              ? null
+                              : () => _clearBrandAsset(isSignature: true),
+                        ),
+                        const SizedBox(height: 20),
+                        PrimaryButton(
+                          label: 'Save Profile',
+                          icon: Icons.save_outlined,
+                          isLoading: _isSaving,
+                          onPressed: _save,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),

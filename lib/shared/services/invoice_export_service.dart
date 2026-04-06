@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:printing/printing.dart';
 
 import '../../features/invoices/domain/entities/invoice.dart';
@@ -29,8 +30,7 @@ class InvoiceExportService {
   Future<File> saveInvoicePdf(Invoice invoice) async {
     try {
       final generatedPdf = await _generatePdf(invoice);
-      final file = await _nextAvailableFile(generatedPdf.filename);
-      await file.writeAsBytes(generatedPdf.bytes, flush: true);
+      final file = await _saveToPublicStorage(generatedPdf);
       return file;
     } catch (error) {
       throw InvoiceExportException.save(error);
@@ -63,37 +63,46 @@ class InvoiceExportService {
     );
   }
 
-  Future<File> _nextAvailableFile(String filename) async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final invoicesDirectory = Directory(
-      '${documentsDirectory.path}${Platform.pathSeparator}invoice_pdfs',
-    );
+  Future<File> _saveToPublicStorage(InvoicePdfDocument generatedPdf) async {
+    final filename = 'invoice_${_sanitizeFilename(generatedPdf.filename)}';
+    final bytes = generatedPdf.bytes;
 
-    if (!await invoicesDirectory.exists()) {
-      await invoicesDirectory.create(recursive: true);
+    if (Platform.isAndroid) {
+      final status = await _requestStoragePermission();
+      if (!status) {
+        throw const InvoiceExportException._(
+          'Storage permission denied. Cannot save to Downloads.',
+        );
+      }
     }
 
-    final sanitizedFilename = _sanitizeFilename(filename);
-    var file = File(
-      '${invoicesDirectory.path}${Platform.pathSeparator}$sanitizedFilename',
-    );
-    if (!await file.exists()) {
-      return file;
+    final Directory downloadsDirectory;
+    if (Platform.isAndroid) {
+      downloadsDirectory = Directory(
+        '/storage/emulated/0/Download/InvoiceFlow',
+      );
+    } else {
+      downloadsDirectory = Directory(
+        '${(await getApplicationDocumentsDirectory()).path}/InvoiceFlow',
+      );
     }
 
-    final extensionIndex = sanitizedFilename.lastIndexOf('.');
-    final basename = extensionIndex >= 0
-        ? sanitizedFilename.substring(0, extensionIndex)
-        : sanitizedFilename;
-    final extension = extensionIndex >= 0
-        ? sanitizedFilename.substring(extensionIndex)
-        : '';
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    file = File(
-      '${invoicesDirectory.path}${Platform.pathSeparator}$basename-$timestamp$extension',
-    );
+    if (!await downloadsDirectory.exists()) {
+      await downloadsDirectory.create(recursive: true);
+    }
 
+    final file = File('${downloadsDirectory.path}/$filename');
+    await file.writeAsBytes(bytes, flush: true);
     return file;
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (await Permission.storage.isGranted) {
+      return true;
+    }
+
+    final status = await Permission.storage.request();
+    return status.isGranted;
   }
 
   String _filenameForInvoice(Invoice invoice) {

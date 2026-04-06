@@ -67,7 +67,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         return;
       }
 
-      _showSnackBar('Invoice saved successfully');
+      _showSnackBar('Saved to Downloads/InvoiceFlow');
     } catch (_) {
       if (!mounted) {
         return;
@@ -259,117 +259,118 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
             return const Center(child: Text('Invoice not found'));
           }
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-            children: [
-              Text(
-                invoice.clientName,
-                style: Theme.of(context).textTheme.headlineMedium,
+          return SafeArea(
+            child: ListView(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 80,
               ),
-              const SizedBox(height: 8),
-              Text(
-                invoice.service,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: InvoiceStatusBadge(status: invoice.status),
-              ),
-              const SizedBox(height: 16),
-              _InfoRow(
-                label: 'Amount',
-                value: AppFormatters.currency(
-                  invoice.amount,
-                  currencyCode: invoice.currencyCode,
-                ),
-              ),
-              _InfoRow(
-                label: 'Due Date',
-                value: AppFormatters.shortDate(invoice.dueDate),
-              ),
-              _InfoRow(label: 'Status', value: invoice.status.label),
-              if (invoice.hasPaymentLink)
-                _InfoRow(label: 'Payment', value: 'Link attached'),
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: _isSendingWhatsApp
-                    ? 'Opening WhatsApp...'
-                    : 'Send via WhatsApp',
-                icon: Icons.chat_bubble_outline_rounded,
-                isLoading: _isSendingWhatsApp,
-                onPressed: _isSharingPdf || _isSavingPdf || _isOpeningPdfPreview
-                    ? null
-                    : () => _sendViaWhatsApp(invoice),
-              ),
-              const SizedBox(height: 10),
-              PrimaryButton(
-                label: _isSavingPdf ? 'Saving PDF...' : 'Download PDF',
-                icon: Icons.download_rounded,
-                isLoading: _isSavingPdf,
-                onPressed: _isSharingPdf || _isOpeningPdfPreview
-                    ? null
-                    : () => _saveInvoicePdf(invoice),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _isPdfBusy ? null : () => _shareInvoicePdf(invoice),
-                icon: _isSharingPdf
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.share_outlined),
-                label: Text(_isSharingPdf ? 'Sharing PDF...' : 'Share PDF'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => ReminderFlowRoute(invoice.id).push(context),
-                icon: const Icon(Icons.notifications_active_outlined),
-                label: const Text('Advanced Reminder Flow'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _isPdfBusy ? null : () => _openPdfPreview(invoice),
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: Text(
-                  _isOpeningPdfPreview ? 'Opening PDF...' : 'Open PDF',
-                ),
-              ),
-              if (!subscription.isPro) ...[
-                const SizedBox(height: 10),
+              children: [
                 Text(
-                  'Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  invoice.clientName,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
+                Text(
+                  invoice.service,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: _promptWatermarkUpgrade,
-                    child: const Text('Upgrade to remove watermark'),
+                  child: InvoiceStatusBadge(status: invoice.status),
+                ),
+                const SizedBox(height: 16),
+                _InfoRow(
+                  label: 'Amount',
+                  value: AppFormatters.currency(
+                    invoice.amount,
+                    currencyCode: invoice.currencyCode,
+                  ),
+                ),
+                _InfoRow(
+                  label: 'Due Date',
+                  value: AppFormatters.shortDate(invoice.dueDate),
+                ),
+                _InfoRow(label: 'Status', value: invoice.status.label),
+                if (invoice.hasPaymentLink)
+                  _InfoRow(label: 'Payment', value: 'Link attached'),
+                const SizedBox(height: 20),
+                PrimaryButton(
+                  label: _isSendingWhatsApp
+                      ? 'Opening WhatsApp...'
+                      : 'Send via WhatsApp',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  isLoading: _isSendingWhatsApp,
+                  onPressed:
+                      _isSharingPdf || _isSavingPdf || _isOpeningPdfPreview
+                      ? null
+                      : () => _sendViaWhatsApp(invoice),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _isPdfBusy
+                      ? null
+                      : () => _shareInvoicePdf(invoice),
+                  icon: _isSharingPdf
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.share_outlined),
+                  label: Text(_isSharingPdf ? 'Sharing PDF...' : 'Share PDF'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => ReminderFlowRoute(invoice.id).push(context),
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  label: const Text('Advanced Reminder Flow'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _isPdfBusy ? null : () => _openPdfPreview(invoice),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: Text(
+                    _isOpeningPdfPreview ? 'Opening PDF...' : 'Open PDF',
+                  ),
+                ),
+                if (!subscription.isPro) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: _promptWatermarkUpgrade,
+                      child: const Text('Upgrade to remove watermark'),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed:
+                      invoice.status == InvoiceStatus.paid || _isMarkingPaid
+                      ? null
+                      : () => _markInvoicePaid(invoice),
+                  icon: _isMarkingPaid
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle_outline),
+                  label: Text(
+                    _isMarkingPaid ? 'Marking Paid...' : 'Mark as Paid',
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed:
-                    invoice.status == InvoiceStatus.paid || _isMarkingPaid
-                    ? null
-                    : () => _markInvoicePaid(invoice),
-                icon: _isMarkingPaid
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check_circle_outline),
-                label: Text(
-                  _isMarkingPaid ? 'Marking Paid...' : 'Mark as Paid',
-                ),
-              ),
-            ],
+            ),
           );
         },
       ),

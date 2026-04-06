@@ -385,217 +385,221 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final horizontalPadding = screenWidth < 380 ? 16.0 : 20.0;
     final bottomPadding =
-        MediaQuery.paddingOf(context).bottom + kBottomNavigationBarHeight + 24;
+        MediaQuery.paddingOf(context).bottom + kBottomNavigationBarHeight + 80;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: EdgeInsets.fromLTRB(
-          horizontalPadding,
-          20,
-          horizontalPadding,
-          bottomPadding,
+      body: SafeArea(
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            20,
+            horizontalPadding,
+            bottomPadding,
+          ),
+          children: [
+            _ProfileSectionCard(profile: profile, onEdit: _openProfileEditor),
+            const SizedBox(height: 20),
+            _PlanSectionCard(
+              subscription: subscription,
+              usage: usage,
+              onUpgrade: subscription.isPro
+                  ? null
+                  : () {
+                      const UpgradeToProRoute().push(context);
+                    },
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Notifications',
+              children: [
+                _SwitchRow(
+                  title: 'Push notifications',
+                  subtitle: 'Schedule local due reminders on this device.',
+                  value: preferences.pushNotificationsEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) =>
+                        current.copyWith(pushNotificationsEnabled: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: 'WhatsApp reminders',
+                  subtitle: 'Allow reminder launches through WhatsApp.',
+                  value: preferences.whatsAppRemindersEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) =>
+                        current.copyWith(whatsAppRemindersEnabled: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: 'SMS reminders',
+                  subtitle: 'Allow reminder launches through SMS.',
+                  value: preferences.smsRemindersEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) => current.copyWith(smsRemindersEnabled: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: '24h before',
+                  subtitle: 'Schedule a reminder one day before the due date.',
+                  value: preferences.remind24HoursBefore,
+                  enabled: preferences.pushNotificationsEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) => current.copyWith(remind24HoursBefore: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: '3h before',
+                  subtitle: 'Schedule a final heads-up three hours before due.',
+                  value: preferences.remind3HoursBefore,
+                  enabled: preferences.pushNotificationsEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) => current.copyWith(remind3HoursBefore: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: 'On due date',
+                  subtitle: 'Notify when the invoice becomes due.',
+                  value: preferences.remindOnDueDate,
+                  enabled: preferences.pushNotificationsEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) => current.copyWith(remindOnDueDate: value),
+                  ),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Security',
+              children: [
+                _SwitchRow(
+                  title: 'App lock',
+                  subtitle: preferences.appLockEnabled
+                      ? 'PIN lock is active for app launch and return.'
+                      : 'Protect the app with a PIN.',
+                  value: preferences.appLockEnabled,
+                  onChanged: (value) => _toggleAppLock(preferences, value),
+                ),
+                _ActionRow(
+                  title: 'Change PIN',
+                  subtitle: preferences.hasPin
+                      ? 'Update your current app lock PIN.'
+                      : 'Set a 4 to 6 digit PIN first.',
+                  icon: Icons.lock_outline,
+                  onTap: () => _changePin(preferences),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Invoice Settings',
+              children: [
+                _SettingValueRow(
+                  title: 'Default Currency',
+                  subtitle: 'Used for all invoices',
+                  value: _currencyOptions.contains(preferences.defaultCurrency)
+                      ? preferences.defaultCurrency
+                      : _currencyOptions.first,
+                  trailingIcon: Icons.keyboard_arrow_down_rounded,
+                  onTap: () => _editDefaultCurrency(preferences),
+                ),
+                _SettingValueRow(
+                  title: 'Default Tax %',
+                  subtitle: 'Automatically applied to totals',
+                  value: '${_formatTaxPercent(preferences.defaultTaxPercent)}%',
+                  trailingIcon: Icons.edit_outlined,
+                  onTap: () => _editDefaultTaxPercent(preferences),
+                ),
+                _SettingValueRow(
+                  title: 'Invoice Prefix',
+                  subtitle: 'Used for invoice numbering',
+                  value: preferences.invoicePrefix,
+                  trailingIcon: Icons.edit_outlined,
+                  onTap: () => _editInvoicePrefix(preferences),
+                ),
+                _SettingValueRow(
+                  title: 'Payment Terms',
+                  subtitle: 'Default due date calculation',
+                  value: preferences.paymentTerms.label,
+                  trailingIcon: Icons.keyboard_arrow_down_rounded,
+                  onTap: () => _editPaymentTerms(preferences),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Automation',
+              children: [
+                _SwitchRow(
+                  title: 'One-tap invoice',
+                  subtitle: 'Use assisted invoice creation from quick actions.',
+                  value: preferences.oneTapInvoiceEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) => current.copyWith(oneTapInvoiceEnabled: value),
+                  ),
+                ),
+                _SwitchRow(
+                  title: 'Smart prediction',
+                  subtitle: 'Allow the app to prefill invoice suggestions.',
+                  value: preferences.smartPredictionEnabled,
+                  onChanged: (value) => _togglePreference(
+                    (current) =>
+                        current.copyWith(smartPredictionEnabled: value),
+                  ),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Legal',
+              children: [
+                _ActionRow(
+                  title: 'Privacy Policy',
+                  subtitle: 'Open the privacy policy in your browser.',
+                  icon: Icons.privacy_tip_outlined,
+                  onTap: () => _openExternalLink(AppConstants.privacyPolicyUrl),
+                ),
+                _ActionRow(
+                  title: 'Terms of Service',
+                  subtitle: 'Open the terms of service in your browser.',
+                  icon: Icons.description_outlined,
+                  onTap: () =>
+                      _openExternalLink(AppConstants.termsOfServiceUrl),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'About',
+              children: [
+                _InfoRow(label: 'App', value: AppConstants.aboutAppName),
+                _InfoRow(label: 'Version', value: AppConstants.appVersion),
+                _ActionRow(
+                  title: 'Support email',
+                  subtitle: AppConstants.supportEmail,
+                  icon: Icons.email_outlined,
+                  onTap: _openSupportEmail,
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: 'Logout',
+              icon: Icons.logout,
+              onPressed: () {
+                ref.read(appLockSessionProvider.notifier).state = false;
+                ref.read(authControllerProvider.notifier).logout();
+              },
+            ),
+          ],
         ),
-        children: [
-          _ProfileSectionCard(profile: profile, onEdit: _openProfileEditor),
-          const SizedBox(height: 20),
-          _PlanSectionCard(
-            subscription: subscription,
-            usage: usage,
-            onUpgrade: subscription.isPro
-                ? null
-                : () {
-                    const UpgradeToProRoute().push(context);
-                  },
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'Notifications',
-            children: [
-              _SwitchRow(
-                title: 'Push notifications',
-                subtitle: 'Schedule local due reminders on this device.',
-                value: preferences.pushNotificationsEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) =>
-                      current.copyWith(pushNotificationsEnabled: value),
-                ),
-              ),
-              _SwitchRow(
-                title: 'WhatsApp reminders',
-                subtitle: 'Allow reminder launches through WhatsApp.',
-                value: preferences.whatsAppRemindersEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) =>
-                      current.copyWith(whatsAppRemindersEnabled: value),
-                ),
-              ),
-              _SwitchRow(
-                title: 'SMS reminders',
-                subtitle: 'Allow reminder launches through SMS.',
-                value: preferences.smsRemindersEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(smsRemindersEnabled: value),
-                ),
-              ),
-              _SwitchRow(
-                title: '24h before',
-                subtitle: 'Schedule a reminder one day before the due date.',
-                value: preferences.remind24HoursBefore,
-                enabled: preferences.pushNotificationsEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(remind24HoursBefore: value),
-                ),
-              ),
-              _SwitchRow(
-                title: '3h before',
-                subtitle: 'Schedule a final heads-up three hours before due.',
-                value: preferences.remind3HoursBefore,
-                enabled: preferences.pushNotificationsEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(remind3HoursBefore: value),
-                ),
-              ),
-              _SwitchRow(
-                title: 'On due date',
-                subtitle: 'Notify when the invoice becomes due.',
-                value: preferences.remindOnDueDate,
-                enabled: preferences.pushNotificationsEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(remindOnDueDate: value),
-                ),
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'Security',
-            children: [
-              _SwitchRow(
-                title: 'App lock',
-                subtitle: preferences.appLockEnabled
-                    ? 'PIN lock is active for app launch and return.'
-                    : 'Protect the app with a PIN.',
-                value: preferences.appLockEnabled,
-                onChanged: (value) => _toggleAppLock(preferences, value),
-              ),
-              _ActionRow(
-                title: 'Change PIN',
-                subtitle: preferences.hasPin
-                    ? 'Update your current app lock PIN.'
-                    : 'Set a 4 to 6 digit PIN first.',
-                icon: Icons.lock_outline,
-                onTap: () => _changePin(preferences),
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'Invoice Settings',
-            children: [
-              _SettingValueRow(
-                title: 'Default Currency',
-                subtitle: 'Used for all invoices',
-                value: _currencyOptions.contains(preferences.defaultCurrency)
-                    ? preferences.defaultCurrency
-                    : _currencyOptions.first,
-                trailingIcon: Icons.keyboard_arrow_down_rounded,
-                onTap: () => _editDefaultCurrency(preferences),
-              ),
-              _SettingValueRow(
-                title: 'Default Tax %',
-                subtitle: 'Automatically applied to totals',
-                value: '${_formatTaxPercent(preferences.defaultTaxPercent)}%',
-                trailingIcon: Icons.edit_outlined,
-                onTap: () => _editDefaultTaxPercent(preferences),
-              ),
-              _SettingValueRow(
-                title: 'Invoice Prefix',
-                subtitle: 'Used for invoice numbering',
-                value: preferences.invoicePrefix,
-                trailingIcon: Icons.edit_outlined,
-                onTap: () => _editInvoicePrefix(preferences),
-              ),
-              _SettingValueRow(
-                title: 'Payment Terms',
-                subtitle: 'Default due date calculation',
-                value: preferences.paymentTerms.label,
-                trailingIcon: Icons.keyboard_arrow_down_rounded,
-                onTap: () => _editPaymentTerms(preferences),
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'Automation',
-            children: [
-              _SwitchRow(
-                title: 'One-tap invoice',
-                subtitle: 'Use assisted invoice creation from quick actions.',
-                value: preferences.oneTapInvoiceEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(oneTapInvoiceEnabled: value),
-                ),
-              ),
-              _SwitchRow(
-                title: 'Smart prediction',
-                subtitle: 'Allow the app to prefill invoice suggestions.',
-                value: preferences.smartPredictionEnabled,
-                onChanged: (value) => _togglePreference(
-                  (current) => current.copyWith(smartPredictionEnabled: value),
-                ),
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'Legal',
-            children: [
-              _ActionRow(
-                title: 'Privacy Policy',
-                subtitle: 'Open the privacy policy in your browser.',
-                icon: Icons.privacy_tip_outlined,
-                onTap: () => _openExternalLink(AppConstants.privacyPolicyUrl),
-              ),
-              _ActionRow(
-                title: 'Terms of Service',
-                subtitle: 'Open the terms of service in your browser.',
-                icon: Icons.description_outlined,
-                onTap: () => _openExternalLink(AppConstants.termsOfServiceUrl),
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionCard(
-            title: 'About',
-            children: [
-              _InfoRow(label: 'App', value: AppConstants.aboutAppName),
-              _InfoRow(label: 'Version', value: AppConstants.appVersion),
-              _ActionRow(
-                title: 'Support email',
-                subtitle: AppConstants.supportEmail,
-                icon: Icons.email_outlined,
-                onTap: _openSupportEmail,
-                isLast: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          PrimaryButton(
-            label: 'Logout',
-            icon: Icons.logout,
-            onPressed: () {
-              ref.read(appLockSessionProvider.notifier).state = false;
-              ref.read(authControllerProvider.notifier).logout();
-            },
-          ),
-        ],
       ),
     );
   }
