@@ -9,6 +9,8 @@ class ProfileModel extends UserProfile {
     required super.businessName,
     required super.phone,
     required super.address,
+    super.logoPath,
+    super.signaturePath,
   });
 
   factory ProfileModel.fromEntity(UserProfile profile) {
@@ -18,6 +20,8 @@ class ProfileModel extends UserProfile {
       businessName: profile.businessName,
       phone: profile.phone,
       address: profile.address,
+      logoPath: profile.logoPath,
+      signaturePath: profile.signaturePath,
     );
   }
 }
@@ -33,6 +37,8 @@ class ProfileModelAdapter extends TypeAdapter<ProfileModel> {
     String businessName = '';
     String phone = '';
     String address = '';
+    String logoPath = '';
+    String signaturePath = '';
 
     if (reader.availableBytes > 0) {
       final thirdValue = reader.readString();
@@ -40,6 +46,8 @@ class ProfileModelAdapter extends TypeAdapter<ProfileModel> {
         businessName = thirdValue;
         phone = reader.readString();
         address = reader.availableBytes > 0 ? reader.readString() : '';
+        logoPath = reader.availableBytes > 0 ? reader.readString() : '';
+        signaturePath = reader.availableBytes > 0 ? reader.readString() : '';
       } else {
         phone = thirdValue;
       }
@@ -51,6 +59,8 @@ class ProfileModelAdapter extends TypeAdapter<ProfileModel> {
       businessName: businessName,
       phone: phone,
       address: address,
+      logoPath: logoPath,
+      signaturePath: signaturePath,
     );
   }
 
@@ -61,6 +71,8 @@ class ProfileModelAdapter extends TypeAdapter<ProfileModel> {
       ..writeString(obj.email)
       ..writeString(obj.businessName)
       ..writeString(obj.phone)
-      ..writeString(obj.address);
+      ..writeString(obj.address)
+      ..writeString(obj.logoPath)
+      ..writeString(obj.signaturePath);
   }
 }

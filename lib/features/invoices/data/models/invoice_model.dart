@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import '../../domain/entities/invoice.dart';
 
 const Object _invoiceModelPaymentLinkSentinel = Object();
+const Object _invoiceModelNotesSentinel = Object();
 
 class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
   @override
@@ -55,7 +56,9 @@ class InvoiceModel extends Invoice {
     required this.currencyCode,
     required this.taxPercent,
     required this.paymentTermsDays,
+    required this.discountAmount,
     this.paymentLink,
+    this.notes,
   }) : super(
          id: id,
          clientId: clientId,
@@ -68,7 +71,9 @@ class InvoiceModel extends Invoice {
          currencyCode: currencyCode,
          taxPercent: taxPercent,
          paymentTermsDays: paymentTermsDays,
+         discountAmount: discountAmount,
          paymentLink: paymentLink,
+         notes: notes,
        );
 
   @override
@@ -119,6 +124,14 @@ class InvoiceModel extends Invoice {
   @HiveField(11)
   final String? paymentLink;
 
+  @override
+  @HiveField(12)
+  final double discountAmount;
+
+  @override
+  @HiveField(13)
+  final String? notes;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -132,7 +145,9 @@ class InvoiceModel extends Invoice {
       currencyCode: invoice.currencyCode,
       taxPercent: invoice.taxPercent,
       paymentTermsDays: invoice.paymentTermsDays,
+      discountAmount: invoice.discountAmount,
       paymentLink: invoice.paymentLink,
+      notes: invoice.notes,
     );
   }
 
@@ -149,7 +164,9 @@ class InvoiceModel extends Invoice {
       currencyCode: json['currencyCode'] as String? ?? 'USD',
       taxPercent: (json['taxPercent'] as num?)?.toDouble() ?? 0,
       paymentTermsDays: (json['paymentTermsDays'] as num?)?.toInt() ?? 0,
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
       paymentLink: json['paymentLink'] as String?,
+      notes: json['notes'] as String?,
     );
   }
 
@@ -166,7 +183,9 @@ class InvoiceModel extends Invoice {
       'currencyCode': currencyCode,
       'taxPercent': taxPercent,
       'paymentTermsDays': paymentTermsDays,
+      'discountAmount': discountAmount,
       'paymentLink': paymentLink,
+      'notes': notes,
     };
   }
 
@@ -183,7 +202,9 @@ class InvoiceModel extends Invoice {
     String? currencyCode,
     double? taxPercent,
     int? paymentTermsDays,
+    double? discountAmount,
     Object? paymentLink = _invoiceModelPaymentLinkSentinel,
+    Object? notes = _invoiceModelNotesSentinel,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -197,9 +218,13 @@ class InvoiceModel extends Invoice {
       currencyCode: currencyCode ?? this.currencyCode,
       taxPercent: taxPercent ?? this.taxPercent,
       paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
+      discountAmount: discountAmount ?? this.discountAmount,
       paymentLink: identical(paymentLink, _invoiceModelPaymentLinkSentinel)
           ? this.paymentLink
           : paymentLink as String?,
+      notes: identical(notes, _invoiceModelNotesSentinel)
+          ? this.notes
+          : notes as String?,
     );
   }
 
@@ -242,6 +267,10 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
     final taxPercent = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final paymentTermsDays = reader.availableBytes > 0 ? reader.readInt() : 0;
     final paymentLink = reader.availableBytes > 0 ? reader.readString() : '';
+    final discountAmount = reader.availableBytes > 0
+        ? reader.readDouble()
+        : 0.0;
+    final notes = reader.availableBytes > 0 ? reader.readString() : '';
 
     return InvoiceModel(
       id: id,
@@ -255,7 +284,9 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       currencyCode: currencyCode,
       taxPercent: taxPercent,
       paymentTermsDays: paymentTermsDays,
+      discountAmount: discountAmount,
       paymentLink: paymentLink.isEmpty ? null : paymentLink,
+      notes: notes.isEmpty ? null : notes,
     );
   }
 
@@ -273,6 +304,8 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeString(obj.currencyCode)
       ..writeDouble(obj.taxPercent)
       ..writeInt(obj.paymentTermsDays)
-      ..writeString(obj.paymentLink ?? '');
+      ..writeString(obj.paymentLink ?? '')
+      ..writeDouble(obj.discountAmount)
+      ..writeString(obj.notes ?? '');
   }
 }

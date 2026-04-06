@@ -57,6 +57,7 @@ class InvoiceExportService {
     return _pdfExportService.generateInvoicePdfDocument(
       invoice,
       includeWatermark: decision.shouldWatermarkPdf,
+      isPro: decision.isPro,
       saveLocally: false,
       filename: _filenameForInvoice(invoice),
     );
@@ -101,7 +102,10 @@ class InvoiceExportService {
       '_',
     );
     final normalizedId = sanitizedId.isEmpty ? 'invoice' : sanitizedId;
-    return 'INV-$normalizedId.pdf';
+    final upperId = normalizedId.toUpperCase();
+    return upperId.startsWith('INV-')
+        ? '$normalizedId.pdf'
+        : 'INV-$normalizedId.pdf';
   }
 
   String _sanitizeFilename(String filename) {

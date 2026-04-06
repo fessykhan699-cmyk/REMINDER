@@ -30,6 +30,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   bool _didResolveLocaleCountry = false;
   String _initialCountryCode = 'US';
   String _fullPhoneNumber = '';
+  String _localPhoneDigits = '';
   String? _submissionErrorText;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
@@ -153,23 +154,27 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     });
   }
 
-  String _buildInternationalPhone({String? completeNumber, String? dialCode}) {
+  String _buildInternationalPhone({
+    String? completeNumber,
+    String? dialCode,
+    String? localDigits,
+  }) {
     if (completeNumber != null) {
       final digits = _digitsOnly(completeNumber);
       return digits.isEmpty ? '' : '+$digits';
     }
 
-    final localDigits = _digitsOnly(_phoneController.text);
-    if (localDigits.isEmpty) {
+    final normalizedLocalDigits = _digitsOnly(localDigits ?? _localPhoneDigits);
+    if (normalizedLocalDigits.isEmpty) {
       return '';
     }
 
     final normalizedDialCode = _digitsOnly(dialCode ?? '');
     if (normalizedDialCode.isEmpty) {
-      return '+$localDigits';
+      return '+$normalizedLocalDigits';
     }
 
-    return '+$normalizedDialCode$localDigits';
+    return '+$normalizedDialCode$normalizedLocalDigits';
   }
 
   String? _validateName(String? value) {
@@ -183,20 +188,37 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   String? _validateEmail(String? value) {
     final email = (value ?? '').trim();
     if (!Client.isValidEmail(email)) {
-      return 'Enter a valid email address';
+      return 'Invalid email';
     }
 
     return null;
   }
 
   String? _validatePhone(dynamic phone) {
-    final localDigits = _digitsOnly(_phoneController.text);
-    if (localDigits.isEmpty) {
-      return 'Use a phone number with country code';
+    if (_localPhoneDigits.length < 8) {
+      return 'Invalid phone';
     }
 
     if (!Client.hasValidInternationalPhone(_fullPhoneNumber)) {
-      return 'Use a phone number with country code';
+      return 'Invalid phone';
+    }
+
+    return null;
+  }
+
+  String? _submissionValidationMessage() {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+
+    if (name.isEmpty) {
+      return 'Name required';
+    }
+    if (!Client.isValidEmail(email)) {
+      return 'Invalid email';
+    }
+    if (_localPhoneDigits.length < 8 ||
+        !Client.hasValidInternationalPhone(_fullPhoneNumber)) {
+      return 'Invalid phone';
     }
 
     return null;
@@ -231,6 +253,17 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       });
     }
 
+    final validationMessage = _submissionValidationMessage();
+    if (validationMessage != null) {
+      setState(() {
+        _submissionErrorText = validationMessage;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(validationMessage)));
+      return;
+    }
+
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
       return;
@@ -243,7 +276,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     final clientsController = ref.read(clientsControllerProvider.notifier);
 
     try {
-      await clientsController.addClient(
+      final createdClient = await clientsController.addClient(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _fullPhoneNumber.trim(),
@@ -254,7 +287,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       }
 
       shouldResetSavingState = false;
-      navigator.pop();
+      navigator.pop(createdClient);
       messenger.showSnackBar(
         const SnackBar(content: Text('Client saved successfully.')),
       );
@@ -313,125 +346,139 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
           behavior: HitTestBehavior.opaque,
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 120 + bottomInset),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _autovalidateMode,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _LabeledField(
-                    label: 'Client Name',
-                    child: TextFormField(
-                      controller: _nameController,
-                      textInputAction: TextInputAction.next,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                      cursorColor: AppColors.accent,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
-                      decoration: _buildInputDecoration(
-                        theme,
-                        hintText: 'Acme Studio',
-                      ),
-                      validator: _validateName,
-                      onChanged: (_) => _clearSubmissionError(),
-                      onFieldSubmitted: (_) {
-                        _emailFocusNode.requestFocus();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _LabeledField(
-                    label: 'Email',
-                    child: TextFormField(
-                      controller: _emailController,
-                      focusNode: _emailFocusNode,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                      cursorColor: AppColors.accent,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
-                      decoration: _buildInputDecoration(
-                        theme,
-                        hintText: 'client@business.com',
-                      ),
-                      validator: _validateEmail,
-                      onChanged: (_) {
-                        _clearSubmissionError();
-                        _revalidateContactFields();
-                      },
-                      onFieldSubmitted: (_) {
-                        _phoneFocusNode.requestFocus();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _LabeledField(
-                    label: 'Phone',
-                    child: IntlPhoneField(
-                      controller: _phoneController,
-                      focusNode: _phoneFocusNode,
-                      initialCountryCode: _initialCountryCode,
-                      disableLengthCheck: true,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 120 + bottomInset),
+                  itemCount: 1,
+                  itemBuilder: (context, index) {
+                    return Form(
+                      key: _formKey,
                       autovalidateMode: _autovalidateMode,
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.done,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textPrimary,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _LabeledField(
+                            label: 'Client Name',
+                            child: TextFormField(
+                              controller: _nameController,
+                              textInputAction: TextInputAction.next,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                              cursorColor: AppColors.accent,
+                              scrollPadding: const EdgeInsets.only(bottom: 120),
+                              decoration: _buildInputDecoration(
+                                theme,
+                                hintText: 'Acme Studio',
+                              ),
+                              validator: _validateName,
+                              onChanged: (_) => _clearSubmissionError(),
+                              onFieldSubmitted: (_) {
+                                _emailFocusNode.requestFocus();
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _LabeledField(
+                            label: 'Email',
+                            child: TextFormField(
+                              controller: _emailController,
+                              focusNode: _emailFocusNode,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                              cursorColor: AppColors.accent,
+                              scrollPadding: const EdgeInsets.only(bottom: 120),
+                              decoration: _buildInputDecoration(
+                                theme,
+                                hintText: 'client@business.com',
+                              ),
+                              validator: _validateEmail,
+                              onChanged: (_) {
+                                _clearSubmissionError();
+                                _revalidateContactFields();
+                              },
+                              onFieldSubmitted: (_) {
+                                _phoneFocusNode.requestFocus();
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _LabeledField(
+                            label: 'Phone',
+                            child: IntlPhoneField(
+                              controller: _phoneController,
+                              focusNode: _phoneFocusNode,
+                              initialCountryCode: _initialCountryCode,
+                              disableLengthCheck: true,
+                              autovalidateMode: _autovalidateMode,
+                              keyboardType: TextInputType.number,
+                              textInputAction: TextInputAction.done,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                              dropdownTextStyle: theme.textTheme.bodyLarge
+                                  ?.copyWith(color: AppColors.textPrimary),
+                              cursorColor: AppColors.accent,
+                              decoration: _buildInputDecoration(
+                                theme,
+                                hintText: '555010100',
+                                counterText: '',
+                              ),
+                              onChanged: (phone) {
+                                _clearSubmissionError();
+                                _localPhoneDigits = _digitsOnly(phone.number);
+                                _fullPhoneNumber = _buildInternationalPhone(
+                                  completeNumber: phone.completeNumber,
+                                );
+                                _revalidateContactFields();
+                              },
+                              onCountryChanged: (country) {
+                                _clearSubmissionError();
+                                _fullPhoneNumber = _buildInternationalPhone(
+                                  dialCode: country.fullCountryCode,
+                                  localDigits: _localPhoneDigits,
+                                );
+                                _revalidateContactFields();
+                              },
+                              validator: _validatePhone,
+                              onSubmitted: (_) async {
+                                await _save();
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          PrimaryButton(
+                            label: 'Save Client',
+                            isLoading: _isSaving,
+                            onPressed: _save,
+                          ),
+                          if (_submissionErrorText != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _submissionErrorText!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.danger,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      dropdownTextStyle: theme.textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                      cursorColor: AppColors.accent,
-                      decoration: _buildInputDecoration(
-                        theme,
-                        hintText: '555010100',
-                        counterText: '',
-                      ),
-                      onChanged: (phone) {
-                        _clearSubmissionError();
-                        _fullPhoneNumber = _buildInternationalPhone(
-                          completeNumber: phone.completeNumber,
-                        );
-                        _revalidateContactFields();
-                      },
-                      onCountryChanged: (country) {
-                        _clearSubmissionError();
-                        _fullPhoneNumber = _buildInternationalPhone(
-                          dialCode: country.fullCountryCode,
-                        );
-                        _revalidateContactFields();
-                      },
-                      validator: _validatePhone,
-                      onSubmitted: (_) async {
-                        await _save();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    label: 'Save Client',
-                    isLoading: _isSaving,
-                    onPressed: _save,
-                  ),
-                  if (_submissionErrorText != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _submissionErrorText!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.danger,
-                      ),
-                    ),
-                  ],
-                ],
+                    );
+                  },
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

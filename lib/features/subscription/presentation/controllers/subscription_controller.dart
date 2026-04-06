@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../data/datasources/subscription_local_datasource.dart';
+import '../../data/services/play_billing_service.dart';
 import '../../domain/entities/subscription_state.dart';
 
 final subscriptionLocalDatasourceProvider =
@@ -27,15 +28,33 @@ final subscriptionGatekeeperProvider = Provider<SubscriptionGatekeeper>(
 
 class SubscriptionController extends AsyncNotifier<SubscriptionState> {
   @override
-  Future<SubscriptionState> build() {
-    return ref.read(subscriptionLocalDatasourceProvider).loadState();
+  Future<SubscriptionState> build() async {
+    final datasource = ref.read(subscriptionLocalDatasourceProvider);
+    final localState = await datasource.loadState();
+
+    try {
+      final syncedIsPro = await ref
+          .read(playBillingServiceProvider)
+          .syncOwnedProState();
+      if (syncedIsPro == null || syncedIsPro == localState.isPro) {
+        return localState;
+      }
+
+      return datasource.savePlan(isPro: syncedIsPro);
+    } catch (_) {
+      return localState;
+    }
+  }
+
+  Future<void> setPlan({required bool isPro}) async {
+    final next = await ref
+        .read(subscriptionLocalDatasourceProvider)
+        .savePlan(isPro: isPro);
+    state = AsyncValue.data(next);
   }
 
   Future<void> upgradeToPro() async {
-    final next = await ref
-        .read(subscriptionLocalDatasourceProvider)
-        .savePlan(isPro: true);
-    state = AsyncValue.data(next);
+    await setPlan(isPro: true);
   }
 }
 
@@ -62,9 +81,9 @@ class SubscriptionGatekeeper {
         return SubscriptionGateDecision.blocked(
           feature: feature,
           reason: SubscriptionGateReason.limitReached,
-          promptTitle: 'Free plan limit reached',
+          promptTitle: 'You\'ve reached your free limit',
           promptMessage:
-              'Free includes up to 5 invoices per month. Upgrade to Invoice Flow Pro for unlimited invoices, smart reminders, and watermark-free PDFs.',
+              'You\'ve used all 5 free invoices this month. Upgrade to continue without limits and unlock full access instantly.',
         );
       case SubscriptionGateFeature.addClient:
         if (subscription.isPro || !usage.hasReachedClientLimit) {
@@ -77,9 +96,9 @@ class SubscriptionGatekeeper {
         return SubscriptionGateDecision.blocked(
           feature: feature,
           reason: SubscriptionGateReason.limitReached,
-          promptTitle: 'Free plan limit reached',
+          promptTitle: 'You\'ve reached your free limit',
           promptMessage:
-              'Free includes up to 5 clients. Upgrade to Invoice Flow Pro for unlimited clients, unlimited invoices, and premium reminder tools.',
+              'You already have 5 clients on Free. Upgrade to continue without limits and keep every client in one premium workspace.',
         );
       case SubscriptionGateFeature.exportPdf:
         return SubscriptionGateDecision.allowed(
@@ -97,7 +116,7 @@ class SubscriptionGatekeeper {
           reason: SubscriptionGateReason.premiumFeature,
           promptTitle: 'Unlock Smart Reminders',
           promptMessage:
-              'Smart reminders are part of Invoice Flow Pro. Upgrade for proactive reminder prompts, unlimited clients, and unlimited invoices.',
+              'Upgrade to continue without limits and unlock smart reminder prompts, premium branding, and a more professional billing flow.',
         );
       case SubscriptionGateFeature.whatsappSharing:
         if (subscription.isPro) {
@@ -109,7 +128,31 @@ class SubscriptionGatekeeper {
           reason: SubscriptionGateReason.premiumFeature,
           promptTitle: 'Unlock WhatsApp Sharing',
           promptMessage:
-              'WhatsApp sharing is part of Invoice Flow Pro. Upgrade to send reminders on WhatsApp and remove the PDF watermark.',
+              'Unlock full access instantly with WhatsApp sharing, watermark-free PDFs, and a more polished client experience.',
+        );
+      case SubscriptionGateFeature.premiumBranding:
+        if (subscription.isPro) {
+          return SubscriptionGateDecision.allowed(feature, isPro: true);
+        }
+
+        return SubscriptionGateDecision.blocked(
+          feature: feature,
+          reason: SubscriptionGateReason.premiumFeature,
+          promptTitle: 'Remove branding and add your logo',
+          promptMessage:
+              'Upgrade to continue without limits, remove the watermark, and present every invoice with your own professional branding.',
+        );
+      case SubscriptionGateFeature.advancedTotals:
+        if (subscription.isPro) {
+          return SubscriptionGateDecision.allowed(feature, isPro: true);
+        }
+
+        return SubscriptionGateDecision.blocked(
+          feature: feature,
+          reason: SubscriptionGateReason.premiumFeature,
+          promptTitle: 'Unlock advanced invoice features',
+          promptMessage:
+              'Upgrade to unlock advanced invoice features like discounts, premium totals, signatures, and polished branded exports.',
         );
     }
   }

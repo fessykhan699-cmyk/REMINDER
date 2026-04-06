@@ -48,6 +48,8 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   intl_phone_field: ^3.2.0
+  in_app_purchase: ^3.2.3
+  in_app_purchase_android: ^0.4.0+10
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +75,7 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/images/logo.png
     - assets/images/galaxy.jpg
     - assets/noise.png
 

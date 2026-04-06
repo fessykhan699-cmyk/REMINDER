@@ -216,10 +216,10 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
       throw const ValidationException('Name required');
     }
     if (!Client.isValidEmail(normalizedEmail)) {
-      throw const ValidationException('Enter a valid email address');
+      throw const ValidationException('Invalid email');
     }
     if (!Client.hasValidInternationalPhone(normalizedPhone)) {
-      throw const ValidationException('Use a phone number with country code');
+      throw const ValidationException('Invalid phone');
     }
 
     return client.copyWith(

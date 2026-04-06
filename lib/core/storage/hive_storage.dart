@@ -12,25 +12,12 @@ class HiveStorage {
 
   static const String clientsBoxName = 'clientsBox';
   static const String invoicesBoxName = 'invoicesBox';
+  static const String settingsBoxName = 'settingsBox';
   static const String remindersBoxName = 'remindersBox';
   static const String userProfileBoxName = 'userProfileBox';
   static const String appPreferencesBoxName = 'appPreferencesBox';
 
-  static Future<void> initialize() async {
-    await Hive.initFlutter();
-    _registerAdapters();
-
-    final clientsBox = await _openBox<ClientModel>(clientsBoxName);
-    final invoicesBox = await _openBox<InvoiceModel>(invoicesBoxName);
-    await _openBox<ReminderModel>(remindersBoxName);
-    await _openBox<ProfileModel>(userProfileBoxName);
-    await _openBox<AppPreferencesModel>(appPreferencesBoxName);
-
-    await _seedClients(clientsBox);
-    await _seedInvoices(invoicesBox);
-  }
-
-  static void _registerAdapters() {
+  static void registerAdapters() {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(ClientModelAdapter());
     }
@@ -60,11 +47,17 @@ class HiveStorage {
     }
   }
 
-  static Future<Box<T>> _openBox<T>(String name) async {
-    if (Hive.isBoxOpen(name)) {
-      return Hive.box<T>(name);
-    }
-    return Hive.openBox<T>(name);
+  static Box<ClientModel> get clientsBox =>
+      Hive.box<ClientModel>(clientsBoxName);
+
+  static Box<InvoiceModel> get invoicesBox =>
+      Hive.box<InvoiceModel>(invoicesBoxName);
+
+  static Box<dynamic> get settingsBox => Hive.box<dynamic>(settingsBoxName);
+
+  static Future<void> seedDefaultsIfNeeded() async {
+    await _seedClients(clientsBox);
+    await _seedInvoices(invoicesBox);
   }
 
   static Future<void> _seedClients(Box<ClientModel> box) async {
@@ -112,6 +105,7 @@ class HiveStorage {
         currencyCode: 'USD',
         taxPercent: 0,
         paymentTermsDays: 0,
+        discountAmount: 0,
         paymentLink: 'https://pay.invoiceflow.app/inv-1',
       ),
       InvoiceModel(
@@ -126,6 +120,7 @@ class HiveStorage {
         currencyCode: 'USD',
         taxPercent: 0,
         paymentTermsDays: 0,
+        discountAmount: 0,
         paymentLink: 'https://pay.invoiceflow.app/inv-2',
       ),
     ];

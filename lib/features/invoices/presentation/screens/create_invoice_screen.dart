@@ -6,12 +6,14 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/utils/id_generator.dart';
 import '../../../../shared/components/premium_frosted_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../../clients/domain/entities/client.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../settings/domain/entities/app_preferences.dart';
+import '../../../settings/presentation/controllers/app_preferences_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
@@ -32,6 +34,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   final _dueDateFieldKey = GlobalKey<FormFieldState<DateTime?>>();
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
+  final _discountController = TextEditingController();
+  final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
   final _serviceFocusNode = FocusNode();
   final _amountFocusNode = FocusNode();
@@ -49,6 +53,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   void dispose() {
     _serviceController.dispose();
     _amountController.dispose();
+    _discountController.dispose();
+    _notesController.dispose();
     _paymentLinkController.dispose();
     _serviceFocusNode.dispose();
     _amountFocusNode.dispose();
@@ -437,10 +443,19 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   }
 
   String _compactCurrency(double value) {
+    final currencyCode =
+        ref
+            .read(appPreferencesControllerProvider)
+            .valueOrNull
+            ?.defaultCurrency ??
+        'USD';
     if (value == value.roundToDouble()) {
-      return '\$${value.toStringAsFixed(0)}';
+      return AppFormatters.currency(
+        value,
+        currencyCode: currencyCode,
+      ).replaceAll('.00', '');
     }
-    return AppFormatters.currency(value);
+    return AppFormatters.currency(value, currencyCode: currencyCode);
   }
 
   bool _sameServiceValue(String? left, String? right) {
@@ -476,10 +491,16 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   }
 
   Future<bool> _saveInvoice({
+    required String invoiceId,
     required Client selectedClient,
     required DateTime selectedDueDate,
     required String service,
     required double amount,
+    required String currencyCode,
+    required double taxPercent,
+    required int paymentTermsDays,
+    required double discountAmount,
+    required String? notes,
     required String? paymentLink,
     required DateTime now,
     required SmartInvoicePrediction intelligence,
@@ -487,7 +508,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     required InvoiceCreationLearningController learningController,
   }) async {
     final invoice = Invoice(
-      id: IdGenerator.nextId('inv'),
+      id: invoiceId,
       clientId: selectedClient.id,
       clientName: selectedClient.name,
       service: service,
@@ -495,7 +516,12 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       dueDate: selectedDueDate,
       status: InvoiceStatus.draft,
       createdAt: now,
+      currencyCode: currencyCode,
+      taxPercent: taxPercent,
+      paymentTermsDays: paymentTermsDays,
+      discountAmount: discountAmount,
       paymentLink: paymentLink,
+      notes: notes,
     );
 
     final createdInvoice = await invoicesController.createInvoice(invoice);
@@ -557,6 +583,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final selectedDueDate = _selectedDueDate;
     final service = _serviceController.text.trim();
     final amount = double.tryParse(_amountController.text.trim());
+    final discountText = _discountController.text.trim();
+    final discountAmount = discountText.isEmpty
+        ? 0.0
+        : double.tryParse(discountText);
+    final notes = _notesController.text.trim().isEmpty
+        ? null
+        : _notesController.text.trim();
     final paymentLink = _normalizedPaymentLink();
     final now = DateTime.now();
     final intelligence = ref.read(smartInvoicePredictionProvider);
@@ -569,7 +602,15 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     if (!(form?.validate() ?? false) ||
         selectedClient == null ||
         selectedDueDate == null ||
-        amount == null) {
+        amount == null ||
+        discountAmount == null) {
+      return;
+    }
+
+    if (discountAmount < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Discount must be zero or greater')),
+      );
       return;
     }
 
@@ -585,11 +626,29 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final navigator = Navigator.of(context);
 
     try {
+      final preferences =
+          ref.read(appPreferencesControllerProvider).valueOrNull ??
+          await ref.read(getAppPreferencesUseCaseProvider).call();
+      if (discountAmount > 0) {
+        await ref
+            .read(subscriptionGatekeeperProvider)
+            .ensureAllowed(SubscriptionGateFeature.advancedTotals);
+      }
+      final invoiceId = await ref
+          .read(invoicesLocalDatasourceProvider)
+          .getNextInvoiceId(prefix: preferences.invoicePrefix, now: now);
+
       final result = await _saveInvoice(
+        invoiceId: invoiceId,
         selectedClient: selectedClient,
         selectedDueDate: selectedDueDate,
         service: service,
         amount: amount,
+        currencyCode: preferences.defaultCurrency,
+        taxPercent: preferences.defaultTaxPercent,
+        paymentTermsDays: preferences.paymentTerms.days,
+        discountAmount: discountAmount,
+        notes: notes,
         paymentLink: paymentLink,
         now: now,
         intelligence: intelligence,
@@ -935,6 +994,49 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 16),
+                      _InvoiceTextField(
+                        controller: _discountController,
+                        label: 'Discount (Pro)',
+                        hintText: '0.00',
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}$'),
+                          ),
+                        ],
+                        validator: (value) {
+                          final rawValue = value?.trim() ?? '';
+                          if (rawValue.isEmpty) {
+                            return null;
+                          }
+
+                          final parsedValue = double.tryParse(rawValue);
+                          if (parsedValue == null || parsedValue < 0) {
+                            return 'Enter a valid discount.';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Free plan invoices stay basic. Add a discount to unlock Pro totals.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _InvoiceTextField(
+                        controller: _notesController,
+                        label: 'Notes',
+                        hintText: 'Payment instructions or terms',
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        maxLines: 4,
+                      ),
                       const SizedBox(height: 24),
                       PremiumPrimaryButton(
                         label: 'Save Invoice',
@@ -983,6 +1085,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
   bool _didResolveLocaleCountry = false;
   String _initialCountryCode = 'US';
   String _fullPhoneNumber = '';
+  String _localPhoneDigits = '';
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -1053,43 +1156,63 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
     }
   }
 
-  String _buildInternationalPhone({String? completeNumber, String? dialCode}) {
+  String _buildInternationalPhone({
+    String? completeNumber,
+    String? dialCode,
+    String? localDigits,
+  }) {
     if (completeNumber != null) {
       final digits = _digitsOnly(completeNumber);
       return digits.isEmpty ? '' : '+$digits';
     }
 
-    final localDigits = _digitsOnly(_phoneController.text);
-    if (localDigits.isEmpty) {
+    final normalizedLocalDigits = _digitsOnly(localDigits ?? _localPhoneDigits);
+    if (normalizedLocalDigits.isEmpty) {
       return '';
     }
 
     final normalizedDialCode = _digitsOnly(dialCode ?? '');
     if (normalizedDialCode.isEmpty) {
-      return '+$localDigits';
+      return '+$normalizedLocalDigits';
     }
 
-    return '+$normalizedDialCode$localDigits';
+    return '+$normalizedDialCode$normalizedLocalDigits';
   }
 
   String? _validateEmail(String? value) {
     final email = (value ?? '').trim();
     if (!Client.isValidEmail(email)) {
-      return 'Email invalid';
+      return 'Invalid email';
     }
 
     return null;
   }
 
   String? _validatePhone(dynamic phone) {
-    final localDigits = _digitsOnly(_phoneController.text);
-
-    if (localDigits.isEmpty) {
-      return 'Phone invalid';
+    if (_localPhoneDigits.length < 8) {
+      return 'Invalid phone';
     }
 
     if (!Client.hasValidInternationalPhone(_fullPhoneNumber)) {
-      return 'Phone invalid';
+      return 'Invalid phone';
+    }
+
+    return null;
+  }
+
+  String? _clientValidationMessage() {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+
+    if (name.isEmpty) {
+      return 'Name required';
+    }
+    if (!Client.isValidEmail(email)) {
+      return 'Invalid email';
+    }
+    if (_localPhoneDigits.length < 8 ||
+        !Client.hasValidInternationalPhone(_fullPhoneNumber)) {
+      return 'Invalid phone';
     }
 
     return null;
@@ -1107,6 +1230,14 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
     }
 
     final form = _formKey.currentState;
+    final validationMessage = _clientValidationMessage();
+    if (validationMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(validationMessage)));
+      return;
+    }
+
     if (!(form?.validate() ?? false)) {
       return;
     }
@@ -1414,6 +1545,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
                   counterText: '',
                 ),
                 onChanged: (phone) {
+                  _localPhoneDigits = _digitsOnly(phone.number);
                   _fullPhoneNumber = _buildInternationalPhone(
                     completeNumber: phone.completeNumber,
                   );
@@ -1422,6 +1554,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
                 onCountryChanged: (country) {
                   _fullPhoneNumber = _buildInternationalPhone(
                     dialCode: country.fullCountryCode,
+                    localDigits: _localPhoneDigits,
                   );
                   _revalidateContactFields();
                 },
@@ -1642,6 +1775,7 @@ class _InvoiceTextField extends FormField<String> {
     this.focusNode,
     this.keyboardType,
     this.textInputAction,
+    this.maxLines = 1,
     super.validator,
     this.onChanged,
     this.onFieldSubmitted,
@@ -1659,6 +1793,7 @@ class _InvoiceTextField extends FormField<String> {
                focusNode: widget.focusNode,
                keyboardType: widget.keyboardType,
                textInputAction: widget.textInputAction,
+               maxLines: widget.maxLines,
                inputFormatters: widget.inputFormatters,
                onChanged: widget.onChanged,
                onSubmitted: widget.onFieldSubmitted,
@@ -1690,6 +1825,7 @@ class _InvoiceTextField extends FormField<String> {
   final FocusNode? focusNode;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final int maxLines;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onFieldSubmitted;
   final List<TextInputFormatter>? inputFormatters;

@@ -5,6 +5,8 @@ import 'core/services/app_feedback_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_router.dart';
 import 'features/settings/presentation/widgets/app_lock_gate.dart';
+import 'features/subscription/presentation/controllers/play_billing_controller.dart';
+import 'features/subscription/presentation/controllers/subscription_controller.dart';
 
 class InvoiceReminderApp extends ConsumerWidget {
   const InvoiceReminderApp({
@@ -16,6 +18,9 @@ class InvoiceReminderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(subscriptionControllerProvider, (previous, next) {});
+    ref.listen(playBillingControllerProvider, (previous, next) {});
+
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(

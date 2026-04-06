@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/components/app_input_field.dart';
 import '../../../../shared/components/primary_button.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoices_controller.dart';
 
@@ -21,6 +24,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
   final _dueDateController = TextEditingController();
+  final _discountController = TextEditingController();
+  final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
 
   Invoice? _invoice;
@@ -34,6 +39,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.dispose();
     _amountController.dispose();
     _dueDateController.dispose();
+    _discountController.dispose();
+    _notesController.dispose();
     _paymentLinkController.dispose();
     super.dispose();
   }
@@ -49,6 +56,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.text = invoice.service;
     _amountController.text = invoice.amount.toStringAsFixed(2);
     _dueDateController.text = AppFormatters.shortDate(invoice.dueDate);
+    _discountController.text = invoice.discountAmount == 0
+        ? ''
+        : invoice.discountAmount.toStringAsFixed(2);
+    _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
   }
 
@@ -87,9 +98,23 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     final source = _invoice;
     final dueDate = _dueDate;
     final amount = double.tryParse(_amountController.text.trim());
+    final discountText = _discountController.text.trim();
+    final discountAmount = discountText.isEmpty
+        ? 0.0
+        : double.tryParse(discountText);
     final paymentLink = _normalizedPaymentLink();
 
-    if (source == null || dueDate == null || amount == null) {
+    if (source == null ||
+        dueDate == null ||
+        amount == null ||
+        discountAmount == null) {
+      return;
+    }
+
+    if (discountAmount < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Discount must be zero or greater')),
+      );
       return;
     }
 
@@ -106,6 +131,12 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     final navigator = Navigator.of(context);
 
     try {
+      if (discountAmount > 0) {
+        await ref
+            .read(subscriptionGatekeeperProvider)
+            .ensureAllowed(SubscriptionGateFeature.advancedTotals);
+      }
+
       final result = await _saveInvoice(
         source.copyWith(
           clientName: _clientNameController.text.trim(),
@@ -113,7 +144,11 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           amount: amount,
           dueDate: dueDate,
           status: _status,
+          discountAmount: discountAmount,
           paymentLink: paymentLink,
+          notes: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
         ),
       );
 
@@ -130,6 +165,12 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           const SnackBar(content: Text('Unable to save invoice')),
         );
       }
+    } on SubscriptionGateException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      await promptUpgradeForDecision(context, error.decision);
     } catch (_) {
       if (!mounted) {
         return;
@@ -195,6 +236,27 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                 label: 'Payment Link',
                 hint: 'https://pay.example.com/invoice',
                 keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 12),
+              AppInputField(
+                controller: _discountController,
+                label: 'Discount (Pro)',
+                hint: '0.00',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Discounted totals are a Pro feature.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              AppInputField(
+                controller: _notesController,
+                label: 'Notes',
+                hint: 'Payment instructions or terms',
+                maxLines: 4,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<InvoiceStatus>(

@@ -20,13 +20,13 @@ void main() {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(ClientModelAdapter());
     }
+
+    await Hive.openBox<ClientModel>(HiveStorage.clientsBoxName);
   });
 
   setUp(() async {
     datasource = ClientsLocalDatasource();
-    final box = await Hive.openBox<ClientModel>(HiveStorage.clientsBoxName);
-    await box.clear();
-    await box.close();
+    await Hive.box<ClientModel>(HiveStorage.clientsBoxName).clear();
   });
 
   tearDownAll(() async {

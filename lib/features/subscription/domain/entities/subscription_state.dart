@@ -6,6 +6,8 @@ enum SubscriptionGateFeature {
   exportPdf,
   smartReminders,
   whatsappSharing,
+  premiumBranding,
+  advancedTotals,
 }
 
 enum SubscriptionGateReason { limitReached, premiumFeature }

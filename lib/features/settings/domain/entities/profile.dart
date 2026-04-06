@@ -5,6 +5,8 @@ class UserProfile {
     required this.businessName,
     required this.phone,
     required this.address,
+    this.logoPath = '',
+    this.signaturePath = '',
   });
 
   const UserProfile.empty()
@@ -12,7 +14,9 @@ class UserProfile {
       email = '',
       businessName = '',
       phone = '',
-      address = '';
+      address = '',
+      logoPath = '',
+      signaturePath = '';
 
   static final RegExp _emailRegex = RegExp(
     r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
@@ -24,14 +28,20 @@ class UserProfile {
   final String businessName;
   final String phone;
   final String address;
+  final String logoPath;
+  final String signaturePath;
 
   bool get hasAddress => address.trim().isNotEmpty;
+  bool get hasCustomLogo => logoPath.trim().isNotEmpty;
+  bool get hasSignature => signaturePath.trim().isNotEmpty;
   bool get isEmpty =>
       name.trim().isEmpty &&
       email.trim().isEmpty &&
       businessName.trim().isEmpty &&
       phone.trim().isEmpty &&
-      address.trim().isEmpty;
+      address.trim().isEmpty &&
+      logoPath.trim().isEmpty &&
+      signaturePath.trim().isEmpty;
 
   bool get isComplete =>
       name.trim().isNotEmpty &&
@@ -45,6 +55,8 @@ class UserProfile {
     String? businessName,
     String? phone,
     String? address,
+    String? logoPath,
+    String? signaturePath,
   }) {
     return UserProfile(
       name: name ?? this.name,
@@ -52,6 +64,8 @@ class UserProfile {
       businessName: businessName ?? this.businessName,
       phone: phone ?? this.phone,
       address: address ?? this.address,
+      logoPath: logoPath ?? this.logoPath,
+      signaturePath: signaturePath ?? this.signaturePath,
     );
   }
 

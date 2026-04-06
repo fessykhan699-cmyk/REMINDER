@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/services/invoice_pdf_export_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../controllers/invoices_controller.dart';
 
 class InvoicePdfPreviewScreen extends ConsumerStatefulWidget {
@@ -46,6 +47,7 @@ class _InvoicePdfPreviewScreenState
         .generateInvoicePdfDocument(
           invoice,
           includeWatermark: decision.shouldWatermarkPdf,
+          isPro: decision.isPro,
           saveLocally: true,
         );
 
@@ -104,6 +106,17 @@ class _InvoicePdfPreviewScreenState
       _document = null;
       _documentFuture = _loadDocument();
     });
+  }
+
+  Future<void> _promptWatermarkUpgrade() async {
+    final decision = await ref
+        .read(subscriptionGatekeeperProvider)
+        .evaluate(SubscriptionGateFeature.premiumBranding);
+    if (!mounted || decision.isAllowed) {
+      return;
+    }
+
+    await promptUpgradeForDecision(context, decision);
   }
 
   @override
@@ -189,18 +202,30 @@ class _InvoicePdfPreviewScreenState
                       top: BorderSide(color: AppColors.glassBorder),
                     ),
                   ),
-                  child: Text(
-                    document.savedFilePath == null
-                        ? subscription.isPro
-                              ? 'Preview the PDF here and share it from the top-right action.'
-                              : 'Preview the PDF here. Free plan PDFs include the Invoice Flow footer watermark.'
-                        : subscription.isPro
-                        ? 'Saved locally for offline access. Share it from the top-right action.'
-                        : 'Saved locally for offline access. Free plan PDFs include the Invoice Flow footer watermark.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        document.savedFilePath == null
+                            ? subscription.isPro
+                                  ? 'Preview the PDF here and share it from the top-right action.'
+                                  : 'Preview the PDF here. Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.'
+                            : subscription.isPro
+                            ? 'Saved locally for offline access. Share it from the top-right action.'
+                            : 'Saved locally for offline access. Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (!subscription.isPro) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _promptWatermarkUpgrade,
+                          child: const Text('Upgrade to remove watermark'),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),

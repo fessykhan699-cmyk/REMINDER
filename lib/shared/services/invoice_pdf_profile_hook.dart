@@ -24,6 +24,8 @@ class InvoicePdfProfileHook {
       email: profile.email.trim(),
       phone: profile.phone.trim(),
       address: profile.address.trim(),
+      logoPath: profile.logoPath.trim(),
+      signaturePath: profile.signaturePath.trim(),
     );
   }
 }
@@ -35,6 +37,8 @@ class InvoicePdfSenderProfile {
     required this.email,
     required this.phone,
     required this.address,
+    required this.logoPath,
+    required this.signaturePath,
   });
 
   final String name;
@@ -42,6 +46,14 @@ class InvoicePdfSenderProfile {
   final String email;
   final String phone;
   final String address;
+  final String logoPath;
+  final String signaturePath;
+
+  bool get hasCustomLogo => logoPath.trim().isNotEmpty;
+  bool get hasSignature => signaturePath.trim().isNotEmpty;
+  String? get normalizedLogoPath => hasCustomLogo ? logoPath.trim() : null;
+  String? get normalizedSignaturePath =>
+      hasSignature ? signaturePath.trim() : null;
 
   String get displayBusinessName {
     if (businessName.trim().isNotEmpty) {
@@ -60,6 +72,8 @@ class InvoicePdfSenderProfile {
       'email': email,
       'phone': phone,
       'address': address,
+      'logoPath': logoPath,
+      'signaturePath': signaturePath,
     };
   }
 }

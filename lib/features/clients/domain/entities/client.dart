@@ -7,11 +7,6 @@ class Client {
     required this.createdAt,
   });
 
-  static final RegExp _emailRegex = RegExp(
-    r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
-    caseSensitive: false,
-  );
-
   final String id;
   final String name;
   final String email;
@@ -35,17 +30,14 @@ class Client {
   }
 
   static bool isValidEmail(String value) {
-    return _emailRegex.hasMatch(value.trim());
+    final email = value.trim();
+    return email.isNotEmpty && email.contains('@');
   }
 
   static bool hasValidInternationalPhone(String value) {
     final normalized = normalizePhone(value);
-    if (!normalized.startsWith('+')) {
-      return false;
-    }
-
     final digits = normalized.replaceAll(RegExp(r'\D'), '');
-    return digits.length >= 10 && digits.length <= 15;
+    return digits.length >= 8 && digits.length <= 15;
   }
 
   static String normalizePhone(String value) {

@@ -19,7 +19,7 @@ class AppColors {
   static const Color textMuted = Color(0xFF7A8088);
 
   // ── Accent — gold ──
-  static const Color accent = Color(0xFFC9A86A);
+  static const Color accent = Color(0xFFC8A96A);
   static const Color accentPrimary = accent;
   static const Color accentSecondary = accent;
 

@@ -7,6 +7,7 @@ class AppInputField extends StatelessWidget {
     required this.label,
     this.hint,
     this.keyboardType,
+    this.maxLines = 1,
     this.obscureText = false,
     this.readOnly = false,
     this.onTap,
@@ -16,6 +17,7 @@ class AppInputField extends StatelessWidget {
   final String label;
   final String? hint;
   final TextInputType? keyboardType;
+  final int maxLines;
   final bool obscureText;
   final bool readOnly;
   final VoidCallback? onTap;
@@ -25,6 +27,7 @@ class AppInputField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      maxLines: maxLines,
       obscureText: obscureText,
       readOnly: readOnly,
       onTap: onTap,

@@ -11,6 +11,8 @@ class ClientsLocalDatasource {
   final Map<int, List<ClientModel>> _pageCache = {};
   final Map<String, ClientModel> _clientCache = {};
 
+  Box<ClientModel> get _clientsBox => HiveStorage.clientsBox;
+
   String _normalizeEmail(String value) => value.trim().toLowerCase();
 
   String _normalizePhone(String value) {
@@ -41,14 +43,6 @@ class ClientsLocalDatasource {
     }
   }
 
-  Future<Box<ClientModel>> _ensureBoxOpen() async {
-    if (Hive.isBoxOpen(HiveStorage.clientsBoxName)) {
-      return Hive.box<ClientModel>(HiveStorage.clientsBoxName);
-    }
-
-    return Hive.openBox<ClientModel>(HiveStorage.clientsBoxName);
-  }
-
   List<ClientModel> _sortedClients(Box<ClientModel> clientsBox) {
     final clients = clientsBox.values.toList();
     clients.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -65,7 +59,7 @@ class ClientsLocalDatasource {
     }
 
     await Future<void>.delayed(const Duration(milliseconds: 220));
-    final clientsBox = await _ensureBoxOpen();
+    final clientsBox = _clientsBox;
 
     final clients = _sortedClients(clientsBox);
     final start = (page - 1) * pageSize;
@@ -88,7 +82,7 @@ class ClientsLocalDatasource {
   Future<ClientModel> addClient(ClientModel client) async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 150));
-      final clientsBox = await _ensureBoxOpen();
+      final clientsBox = _clientsBox;
       if (clientsBox.containsKey(client.id)) {
         throw const ValidationException(
           'A client with this ID already exists.',
@@ -96,9 +90,13 @@ class ClientsLocalDatasource {
       }
       _ensureUniqueClient(clientsBox, client);
       await clientsBox.put(client.id, client);
-      _clientCache[client.id] = client;
+      final persistedClient = clientsBox.get(client.id);
+      if (persistedClient == null) {
+        throw const CacheException('Failed to save client');
+      }
+      _clientCache[client.id] = persistedClient;
       _pageCache.clear();
-      return client;
+      return persistedClient;
     } on AppException {
       rethrow;
     } catch (error, stackTrace) {
@@ -111,15 +109,19 @@ class ClientsLocalDatasource {
   Future<ClientModel> updateClient(ClientModel client) async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 150));
-      final clientsBox = await _ensureBoxOpen();
+      final clientsBox = _clientsBox;
       if (!clientsBox.containsKey(client.id)) {
         throw const CacheException('Client not found.');
       }
       _ensureUniqueClient(clientsBox, client);
       await clientsBox.put(client.id, client);
-      _clientCache[client.id] = client;
+      final persistedClient = clientsBox.get(client.id);
+      if (persistedClient == null) {
+        throw const CacheException('Failed to save client');
+      }
+      _clientCache[client.id] = persistedClient;
       _pageCache.clear();
-      return client;
+      return persistedClient;
     } on AppException {
       rethrow;
     } catch (error, stackTrace) {
@@ -132,7 +134,7 @@ class ClientsLocalDatasource {
   Future<void> deleteClient(String id) async {
     try {
       await Future<void>.delayed(const Duration(milliseconds: 120));
-      final clientsBox = await _ensureBoxOpen();
+      final clientsBox = _clientsBox;
       if (!clientsBox.containsKey(id)) {
         _clientCache.remove(id);
         _pageCache.clear();
@@ -155,7 +157,7 @@ class ClientsLocalDatasource {
     }
 
     await Future<void>.delayed(const Duration(milliseconds: 80));
-    final clientsBox = await _ensureBoxOpen();
+    final clientsBox = _clientsBox;
 
     final client = clientsBox.get(id);
     if (client != null) {

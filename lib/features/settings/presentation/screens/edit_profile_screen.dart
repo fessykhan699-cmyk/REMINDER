@@ -1,9 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
+import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/profile.dart';
 import '../controllers/settings_controller.dart';
 
@@ -16,13 +23,18 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _picker = ImagePicker();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  String _logoPath = '';
+  String _signaturePath = '';
   bool _didHydrate = false;
   bool _isSaving = false;
+  bool _isPickingLogo = false;
+  bool _isPickingSignature = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -48,6 +60,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       '',
     );
     _addressController.text = profile.address;
+    _logoPath = profile.logoPath;
+    _signaturePath = profile.signaturePath;
   }
 
   String _normalizedPhoneValue([String? rawValue]) {
@@ -57,6 +71,111 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
 
     return '+${trimmed.replaceFirst(RegExp(r'^\+'), '')}';
+  }
+
+  Future<void> _pickBrandAsset({required bool isSignature}) async {
+    final decision = await ref
+        .read(subscriptionGatekeeperProvider)
+        .evaluate(SubscriptionGateFeature.premiumBranding);
+    if (!decision.isAllowed) {
+      if (!mounted) {
+        return;
+      }
+      await promptUpgradeForDecision(context, decision);
+      return;
+    }
+
+    setState(() {
+      if (isSignature) {
+        _isPickingSignature = true;
+      } else {
+        _isPickingLogo = true;
+      }
+    });
+
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
+        maxWidth: 1600,
+      );
+      if (pickedFile == null || !mounted) {
+        return;
+      }
+
+      final persistedPath = await _persistBrandAsset(
+        pickedFile,
+        baseName: isSignature ? 'signature' : 'logo',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (isSignature) {
+          _signaturePath = persistedPath;
+        } else {
+          _logoPath = persistedPath;
+        }
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open image picker right now.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          if (isSignature) {
+            _isPickingSignature = false;
+          } else {
+            _isPickingLogo = false;
+          }
+        });
+      }
+    }
+  }
+
+  Future<String> _persistBrandAsset(
+    XFile file, {
+    required String baseName,
+  }) async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final assetDirectory = Directory(
+      '${documentsDirectory.path}${Platform.pathSeparator}brand_assets',
+    );
+    if (!await assetDirectory.exists()) {
+      await assetDirectory.create(recursive: true);
+    }
+
+    final extension = _fileExtension(file.path);
+    final targetPath =
+        '${assetDirectory.path}${Platform.pathSeparator}$baseName$extension';
+    await File(file.path).copy(targetPath);
+    return targetPath;
+  }
+
+  String _fileExtension(String path) {
+    final lastDot = path.lastIndexOf('.');
+    if (lastDot < 0 || lastDot == path.length - 1) {
+      return '.png';
+    }
+
+    return path.substring(lastDot);
+  }
+
+  void _clearBrandAsset({required bool isSignature}) {
+    setState(() {
+      if (isSignature) {
+        _signaturePath = '';
+      } else {
+        _logoPath = '';
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -79,6 +198,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       businessName: _businessNameController.text.trim(),
       phone: _normalizedPhoneValue(),
       address: _addressController.text.trim(),
+      logoPath: _logoPath.trim(),
+      signaturePath: _signaturePath.trim(),
     );
     var shouldResetSavingState = true;
 
@@ -141,6 +262,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(settingsControllerProvider);
+    final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
+    final isPro = subscription?.isPro ?? false;
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final horizontalPadding = screenWidth < 380 ? 16.0 : 20.0;
@@ -264,6 +387,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      _BrandAssetField(
+                        label: 'Brand Logo',
+                        helper: isPro
+                            ? 'Used on Pro invoices. Falls back to the app logo if empty.'
+                            : 'Pro only. Upgrade to use your own logo on invoices.',
+                        assetPath: _logoPath,
+                        isLoading: _isPickingLogo,
+                        emptyLabel: 'No logo selected',
+                        onPick: () => _pickBrandAsset(isSignature: false),
+                        onClear: _logoPath.trim().isEmpty
+                            ? null
+                            : () => _clearBrandAsset(isSignature: false),
+                      ),
+                      const SizedBox(height: 16),
+                      _BrandAssetField(
+                        label: 'Authorized Signature',
+                        helper: isPro
+                            ? 'Optional signature image for Pro invoices.'
+                            : 'Pro only. Upgrade to add a signature block to invoices.',
+                        assetPath: _signaturePath,
+                        isLoading: _isPickingSignature,
+                        emptyLabel: 'No signature selected',
+                        onPick: () => _pickBrandAsset(isSignature: true),
+                        onClear: _signaturePath.trim().isEmpty
+                            ? null
+                            : () => _clearBrandAsset(isSignature: true),
+                      ),
                       const SizedBox(height: 20),
                       PrimaryButton(
                         label: 'Save Profile',
@@ -279,6 +430,108 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _BrandAssetField extends StatelessWidget {
+  const _BrandAssetField({
+    required this.label,
+    required this.helper,
+    required this.assetPath,
+    required this.isLoading,
+    required this.emptyLabel,
+    required this.onPick,
+    this.onClear,
+  });
+
+  final String label;
+  final String helper;
+  final String assetPath;
+  final bool isLoading;
+  final String emptyLabel;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final normalizedPath = assetPath.trim();
+    final file = normalizedPath.isEmpty ? null : File(normalizedPath);
+    final hasPreview = file?.existsSync() ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.glassBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasPreview)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    file!,
+                    height: 72,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                  ),
+                )
+              else
+                Text(
+                  emptyLabel,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              const SizedBox(height: 10),
+              Text(
+                helper,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: isLoading ? null : onPick,
+                      icon: isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.upload_outlined),
+                      label: Text(hasPreview ? 'Replace' : 'Upload'),
+                    ),
+                  ),
+                  if (onClear != null) ...[
+                    const SizedBox(width: 12),
+                    TextButton(onPressed: onClear, child: const Text('Clear')),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

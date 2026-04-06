@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/formatters.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/settings/data/datasources/settings_local_datasource.dart';
 import '../../features/settings/domain/entities/app_preferences.dart';
@@ -75,8 +76,8 @@ class ReminderService {
         await _notificationService.scheduleReminder(
           id: item.id,
           scheduledAt: item.scheduledAt,
-          title: 'Invoice Due',
-          body: 'Invoice ${invoice.id} is due soon',
+          title: 'Invoice Due Reminder',
+          body: _buildBody(invoice),
           payload: invoice.id,
         );
       }
@@ -105,6 +106,15 @@ class ReminderService {
     } catch (_) {
       return const AppPreferences.defaults();
     }
+  }
+
+  String _buildBody(Invoice invoice) {
+    final amount = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
+    final date = invoice.dueDate.toLocal().toString().split(' ').first;
+    return 'Invoice for ${invoice.clientName} of $amount is due on $date.';
   }
 }
 

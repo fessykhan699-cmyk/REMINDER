@@ -83,7 +83,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
 
   String? _validateEmail(String? value) {
     if (!Client.isValidEmail((value ?? '').trim())) {
-      return 'Email invalid';
+      return 'Invalid email';
     }
 
     return null;
@@ -91,7 +91,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
 
   String? _validatePhone(String? value) {
     if (!Client.hasValidInternationalPhone((value ?? '').trim())) {
-      return 'Phone invalid';
+      return 'Invalid phone';
     }
 
     return null;

@@ -42,11 +42,16 @@ class _UpgradePromptSheet extends StatelessWidget {
   final SubscriptionGateDecision decision;
 
   static const List<String> _benefits = <String>[
-    'Unlimited clients',
     'Unlimited invoices',
-    'No PDF watermark',
-    'Smart reminders',
-    'WhatsApp sharing',
+    'Remove watermark',
+    'Add your logo',
+    'Professional branding',
+  ];
+
+  static const List<String> _trustSignals = <String>[
+    'Secure payment via Google Play',
+    'Cancel anytime',
+    'Used by professionals',
   ];
 
   @override
@@ -84,16 +89,37 @@ class _UpgradePromptSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      decision.promptTitle,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          decision.promptTitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Upgrade to Pro',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+              Text(
+                'Unlock unlimited invoices and remove branding',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 decision.promptMessage,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -101,24 +127,92 @@ class _UpgradePromptSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _PricingPill(
+                        title: 'Monthly',
+                        price: r'$4.99',
+                        subtitle: 'Simple and flexible',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: _PricingPill(
+                        title: 'Yearly',
+                        price: r'$39.99',
+                        subtitle: 'BEST VALUE',
+                        highlighted: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              ..._benefits.map(
+                (benefit) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1),
+                        child: Icon(
+                          Icons.check_circle_rounded,
+                          size: 18,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          benefit,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Unlock full access instantly',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _benefits
+                spacing: 8,
+                runSpacing: 8,
+                children: _trustSignals
                     .map(
-                      (benefit) => Container(
+                      (signal) => Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: 10,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
+                          color: Colors.white.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(color: AppColors.glassBorder),
                         ),
                         child: Text(
-                          benefit,
+                          signal,
                           style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -138,12 +232,73 @@ class _UpgradePromptSheet extends StatelessWidget {
                 alignment: Alignment.center,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Maybe later'),
+                  child: const Text('Continue with Free'),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PricingPill extends StatelessWidget {
+  const _PricingPill({
+    required this.title,
+    required this.price,
+    required this.subtitle,
+    this.highlighted = false,
+  });
+
+  final String title;
+  final String price;
+  final String subtitle;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? AppColors.accent.withValues(alpha: 0.10)
+            : Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.accent.withValues(alpha: 0.30)
+              : AppColors.glassBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            price,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: highlighted ? AppColors.accent : AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -60,6 +60,7 @@ void main() {
     final document = await service.generateInvoicePdfDocument(
       invoice,
       includeWatermark: true,
+      isPro: false,
       saveLocally: true,
     );
 
@@ -77,10 +78,12 @@ void main() {
     final freeDocument = await service.generateInvoicePdfDocument(
       invoice,
       includeWatermark: true,
+      isPro: false,
     );
     final proDocument = await service.generateInvoicePdfDocument(
       invoice,
       includeWatermark: false,
+      isPro: true,
     );
 
     expect(freeDocument.bytes, isNot(equals(proDocument.bytes)));

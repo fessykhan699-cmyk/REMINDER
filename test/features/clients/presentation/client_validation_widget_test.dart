@@ -53,7 +53,7 @@ void main() {
     await tester.tap(find.text('Save Client'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter a valid email address'), findsOneWidget);
+    expect(find.text('Invalid email'), findsAtLeastNWidgets(1));
     expect(find.text('Client saved successfully.'), findsNothing);
     expect(datasource.clients, isEmpty);
     expect(tester.takeException(), isNull);
@@ -72,10 +72,7 @@ void main() {
     await tester.tap(find.text('Save Client'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Use a phone number with country code'),
-      findsAtLeastNWidgets(1),
-    );
+    expect(find.text('Invalid phone'), findsAtLeastNWidgets(1));
     expect(find.text('Client saved successfully.'), findsNothing);
     expect(datasource.clients, isEmpty);
     expect(tester.takeException(), isNull);

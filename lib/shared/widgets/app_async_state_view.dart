@@ -12,6 +12,7 @@ class AppAsyncStateView<T> extends StatelessWidget {
     this.isEmpty,
     this.emptyTitle = 'No data',
     this.emptyMessage = 'Nothing to show here yet.',
+    this.emptyAction,
     this.onRetry,
   });
 
@@ -20,6 +21,7 @@ class AppAsyncStateView<T> extends StatelessWidget {
   final bool Function(T data)? isEmpty;
   final String emptyTitle;
   final String emptyMessage;
+  final Widget? emptyAction;
   final VoidCallback? onRetry;
 
   @override
@@ -28,7 +30,11 @@ class AppAsyncStateView<T> extends StatelessWidget {
       data: (data) {
         final empty = isEmpty?.call(data) ?? false;
         if (empty) {
-          return AppEmptyState(title: emptyTitle, message: emptyMessage);
+          return AppEmptyState(
+            title: emptyTitle,
+            message: emptyMessage,
+            action: emptyAction,
+          );
         }
         return builder(data);
       },

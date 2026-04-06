@@ -112,24 +112,37 @@ class InvoicesLocalDatasource {
     return null;
   }
 
-  Future<String> getNextInvoiceId({required String prefix}) async {
+  Future<String> getNextInvoiceId({
+    required String prefix,
+    DateTime? now,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 80));
 
     final normalizedPrefix = prefix.trim().toUpperCase();
+    final currentTime = now ?? DateTime.now();
+    final currentYear = currentTime.year;
     final escapedPrefix = RegExp.escape(normalizedPrefix);
-    final pattern = RegExp('^$escapedPrefix-(\\d+)\$', caseSensitive: false);
+    final pattern = RegExp(
+      '^$escapedPrefix-(\\d{4})-(\\d{4})\$',
+      caseSensitive: false,
+    );
 
     var highestNumber = 0;
     for (final invoice in _invoicesBox.values) {
       final match = pattern.firstMatch(invoice.id.trim());
-      final number = int.tryParse(match?.group(1) ?? '');
-      if (number != null && number > highestNumber) {
+      final year = int.tryParse(match?.group(1) ?? '');
+      final number = int.tryParse(match?.group(2) ?? '');
+      if (year != currentYear || number == null) {
+        continue;
+      }
+
+      if (number > highestNumber) {
         highestNumber = number;
       }
     }
 
     final nextNumber = highestNumber + 1;
-    final paddedNumber = nextNumber.toString().padLeft(3, '0');
-    return '$normalizedPrefix-$paddedNumber';
+    final paddedNumber = nextNumber.toString().padLeft(4, '0');
+    return '$normalizedPrefix-$currentYear-$paddedNumber';
   }
 }

@@ -5,10 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/components/glass_card.dart';
@@ -67,15 +68,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   Future<void> _restoreAvatar() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedPath = prefs.getString(_avatarPathKey);
+    final storedPath = HiveStorage.settingsBox.get(_avatarPathKey) as String?;
     if (storedPath == null) {
       return;
     }
 
     final file = File(storedPath);
     if (!file.existsSync()) {
-      await prefs.remove(_avatarPathKey);
+      await HiveStorage.settingsBox.delete(_avatarPathKey);
       return;
     }
 
@@ -186,8 +186,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   Future<void> _clearAvatar() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_avatarPathKey);
+    await HiveStorage.settingsBox.delete(_avatarPathKey);
 
     if (!mounted) {
       return;
@@ -255,8 +254,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         _avatarImage = File(file.path);
       });
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_avatarPathKey, file.path);
+      await HiveStorage.settingsBox.put(_avatarPathKey, file.path);
     } on PlatformException {
       if (!mounted) {
         return;
@@ -718,6 +716,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       clientCount: clientCount,
       reminderCount: reminderCount,
     );
+    final dashboardSections = <Widget>[
+      _staggeredCard(
+        index: 0,
+        child: _HeaderSection(
+          name: profileName,
+          amount: dashboard.totals.totalUnpaid,
+          avatar: _buildAvatar(),
+        ),
+      ),
+      _buildDashboardContent(context, dashboard, subscription),
+    ];
 
     return Scaffold(
       extendBody: true,
@@ -726,40 +735,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           const Positioned.fill(child: _DashboardGalaxyBackground()),
           Positioned.fill(
             child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        spacingMD,
+                        spacingMD,
+                        spacingMD,
+                        listBottomPadding,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 16),
-                            _staggeredCard(
-                              index: 0,
-                              child: _HeaderSection(
-                                name: profileName,
-                                amount: dashboard.totals.totalUnpaid,
-                                avatar: _buildAvatar(),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            _buildDashboardContent(
-                              context,
-                              dashboard,
-                              subscription,
-                            ),
-                          ],
-                        ),
-                      ),
+                      itemCount: dashboardSections.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == dashboardSections.length - 1
+                                ? 0
+                                : spacingLG,
+                          ),
+                          child: dashboardSections[index],
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ),
