@@ -31,14 +31,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with SingleTickerProviderStateMixin {
-  static const String _avatarPathKey = 'dashboard_avatar_path';
-
-  final ImagePicker _picker = ImagePicker();
-
-  File? _avatarImage;
-  bool _avatarPressed = false;
-  bool _isPickingAvatar = false;
-
   late final AnimationController _entryCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 400),
@@ -47,7 +39,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   @override
   void initState() {
     super.initState();
-    _restoreAvatar();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final invoices = ref.read(invoicesControllerProvider).valueOrNull;
       if (invoices == null) {
@@ -65,27 +56,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   void dispose() {
     _entryCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _restoreAvatar() async {
-    final storedPath = HiveStorage.settingsBox.get(_avatarPathKey) as String?;
-    if (storedPath == null) {
-      return;
-    }
-
-    final file = File(storedPath);
-    if (!file.existsSync()) {
-      await HiveStorage.settingsBox.delete(_avatarPathKey);
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _avatarImage = file;
-    });
   }
 
   Widget _staggeredCard({required int index, required Widget child}) {
@@ -120,204 +90,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         );
         return Opacity(opacity: progress, child: stableChild);
       },
-    );
-  }
-
-  Future<void> _openProfileSheet() async {
-    if (!mounted || _isPickingAvatar) {
-      return;
-    }
-
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: AppColors.backgroundSecondary,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.account_circle_outlined),
-                  title: const Text('Profile Photo'),
-                  subtitle: Text(
-                    _avatarImage == null
-                        ? 'No photo selected'
-                        : 'Photo selected',
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.photo_camera_outlined),
-                  title: const Text('Take Photo'),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _pickAvatar(ImageSource.camera);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
-                  title: const Text('Choose from Gallery'),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _pickAvatar(ImageSource.gallery);
-                  },
-                ),
-                if (_avatarImage != null)
-                  ListTile(
-                    leading: const Icon(Icons.delete_outline),
-                    title: const Text('Remove Photo'),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      _clearAvatar();
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _clearAvatar() async {
-    await HiveStorage.settingsBox.delete(_avatarPathKey);
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _avatarImage = null;
-    });
-  }
-
-  Future<void> _pickAvatar(ImageSource source) async {
-    if (_isPickingAvatar) {
-      return;
-    }
-
-    setState(() {
-      _isPickingAvatar = true;
-    });
-
-    try {
-      PermissionStatus status;
-      if (source == ImageSource.camera) {
-        status = await Permission.camera.request();
-      } else {
-        status = await Permission.photos.request();
-        if (!status.isGranted && !status.isLimited) {
-          status = await Permission.storage.request();
-        }
-      }
-
-      final granted = status.isGranted || status.isLimited;
-      if (!granted) {
-        if (!mounted) {
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Permission is required to update your avatar.',
-            ),
-            action: status.isPermanentlyDenied || status.isRestricted
-                ? SnackBarAction(
-                    label: 'Settings',
-                    onPressed: () {
-                      openAppSettings();
-                    },
-                  )
-                : null,
-          ),
-        );
-        return;
-      }
-
-      final file = await _picker.pickImage(
-        source: source,
-        imageQuality: 88,
-        maxWidth: 1200,
-      );
-
-      if (file == null || !mounted) {
-        return;
-      }
-
-      setState(() {
-        _avatarImage = File(file.path);
-      });
-
-      await HiveStorage.settingsBox.put(_avatarPathKey, file.path);
-    } on PlatformException {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open image picker right now.')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPickingAvatar = false;
-        });
-      }
-    }
-  }
-
-  Widget _buildAvatar() {
-    return AnimatedScale(
-      scale: _avatarPressed ? 0.97 : 1,
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeInOut,
-      child: GestureDetector(
-        onTapDown: (_) {
-          if (!_avatarPressed) setState(() => _avatarPressed = true);
-        },
-        onTapUp: (_) {
-          if (_avatarPressed) setState(() => _avatarPressed = false);
-        },
-        onTapCancel: () {
-          if (_avatarPressed) setState(() => _avatarPressed = false);
-        },
-        onTap: _openProfileSheet,
-        child: Semantics(
-          button: true,
-          label: 'Open profile photo options',
-          child: Tooltip(
-            message: 'Profile photo',
-            child: CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.cardBackground,
-              child: _isPickingAvatar
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : _avatarImage == null
-                  ? const Icon(
-                      Icons.person_outline,
-                      color: AppColors.textPrimary,
-                    )
-                  : ClipOval(
-                      child: Image.file(
-                        _avatarImage!,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -722,7 +494,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         child: _HeaderSection(
           name: profileName,
           amount: dashboard.totals.totalUnpaid,
-          avatar: _buildAvatar(),
+          avatar: const DashboardAvatar(),
         ),
       ),
       _buildDashboardContent(context, dashboard, subscription),
@@ -1974,4 +1746,200 @@ int _compareRankedInvoices(_RankedInvoice a, _RankedInvoice b) {
 
 int _compareRecentActivity(Invoice a, Invoice b) {
   return b.createdAt.compareTo(a.createdAt);
+}
+
+class DashboardAvatar extends StatefulWidget {
+  const DashboardAvatar({super.key});
+
+  @override
+  State<DashboardAvatar> createState() => _DashboardAvatarState();
+}
+
+class _DashboardAvatarState extends State<DashboardAvatar> {
+  static const String _avatarPathKey = 'dashboard_avatar_path';
+  static final ImagePicker _picker = ImagePicker();
+
+  File? _avatarImage;
+  bool _avatarPressed = false;
+  bool _isPickingAvatar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreAvatar();
+  }
+
+  Future<void> _restoreAvatar() async {
+    final storedPath = HiveStorage.settingsBox.get(_avatarPathKey) as String?;
+    if (storedPath == null) return;
+    final file = File(storedPath);
+    if (!file.existsSync()) {
+      await HiveStorage.settingsBox.delete(_avatarPathKey);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _avatarImage = file);
+  }
+
+  Future<void> _openProfileSheet() async {
+    if (!mounted || _isPickingAvatar) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.backgroundSecondary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.account_circle_outlined),
+                  title: const Text('Profile Photo'),
+                  subtitle: Text(
+                    _avatarImage == null
+                        ? 'No photo selected'
+                        : 'Photo selected',
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('Take Photo'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _pickAvatar(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _pickAvatar(ImageSource.gallery);
+                  },
+                ),
+                if (_avatarImage != null)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('Remove Photo'),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _clearAvatar();
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _clearAvatar() async {
+    await HiveStorage.settingsBox.delete(_avatarPathKey);
+    if (!mounted) return;
+    setState(() => _avatarImage = null);
+  }
+
+  Future<void> _pickAvatar(ImageSource source) async {
+    if (_isPickingAvatar) return;
+    setState(() => _isPickingAvatar = true);
+    try {
+      PermissionStatus status;
+      if (source == ImageSource.camera) {
+        status = await Permission.camera.request();
+      } else {
+        status = await Permission.photos.request();
+        if (!status.isGranted && !status.isLimited) {
+          status = await Permission.storage.request();
+        }
+      }
+      final granted = status.isGranted || status.isLimited;
+      if (!granted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Permission is required to update your avatar.',
+            ),
+            action: status.isPermanentlyDenied || status.isRestricted
+                ? SnackBarAction(label: 'Settings', onPressed: openAppSettings)
+                : null,
+          ),
+        );
+        return;
+      }
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: 88,
+        maxWidth: 1200,
+      );
+      if (file == null || !mounted) return;
+      setState(() => _avatarImage = File(file.path));
+      await HiveStorage.settingsBox.put(_avatarPathKey, file.path);
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open image picker right now.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isPickingAvatar = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _avatarPressed ? 0.97 : 1,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeInOut,
+      child: GestureDetector(
+        onTapDown: (_) {
+          if (!_avatarPressed) setState(() => _avatarPressed = true);
+        },
+        onTapUp: (_) {
+          if (_avatarPressed) setState(() => _avatarPressed = false);
+        },
+        onTapCancel: () {
+          if (_avatarPressed) setState(() => _avatarPressed = false);
+        },
+        onTap: _openProfileSheet,
+        child: Semantics(
+          button: true,
+          label: 'Open profile photo options',
+          child: Tooltip(
+            message: 'Profile photo',
+            child: CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.cardBackground,
+              child: _isPickingAvatar
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : _avatarImage == null
+                  ? const Icon(
+                      Icons.person_outline,
+                      color: AppColors.textPrimary,
+                    )
+                  : ClipOval(
+                      child: Image.file(
+                        _avatarImage!,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

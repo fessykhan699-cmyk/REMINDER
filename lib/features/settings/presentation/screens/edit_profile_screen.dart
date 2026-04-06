@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
+import '../../../../shared/widgets/phone_input_field.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
@@ -31,6 +32,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _addressController = TextEditingController();
   String _logoPath = '';
   String _signaturePath = '';
+  String _fullPhoneValue = '';
   bool _didHydrate = false;
   bool _isSaving = false;
   bool _isPickingLogo = false;
@@ -48,29 +50,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   void _hydrate(UserProfile profile) {
-    if (_didHydrate) {
-      return;
-    }
+    if (_didHydrate) return;
     _didHydrate = true;
     _nameController.text = profile.name;
     _emailController.text = profile.email;
     _businessNameController.text = profile.businessName;
-    _phoneController.text = profile.phone.trim().replaceFirst(
-      RegExp(r'^\+'),
-      '',
-    );
+    _phoneController.text = profile.phone;
     _addressController.text = profile.address;
     _logoPath = profile.logoPath;
     _signaturePath = profile.signaturePath;
-  }
-
-  String _normalizedPhoneValue([String? rawValue]) {
-    final trimmed = (rawValue ?? _phoneController.text).trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-
-    return '+${trimmed.replaceFirst(RegExp(r'^\+'), '')}';
   }
 
   Future<void> _pickBrandAsset({required bool isSignature}) async {
@@ -196,7 +184,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       businessName: _businessNameController.text.trim(),
-      phone: _normalizedPhoneValue(),
+      phone: _fullPhoneValue.trim(),
       address: _addressController.text.trim(),
       logoPath: _logoPath.trim(),
       signaturePath: _signaturePath.trim(),
@@ -357,18 +345,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const SizedBox(height: 16),
                         _ProfileField(
                           label: 'Phone',
-                          child: TextFormField(
+                          child: PhoneInputField(
                             controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            textInputAction: TextInputAction.next,
-                            textAlignVertical: TextAlignVertical.center,
-                            decoration: _decoration(
-                              hintText: '1 555 123 4567',
-                              prefixText: '+ ',
-                            ),
-                            validator: (value) =>
+                            hintText: '50 123 4567',
+                            onFullPhoneChanged: (value) {
+                              _fullPhoneValue = value;
+                            },
+                            validator: (fullPhone) =>
                                 UserProfile.hasValidInternationalPhone(
-                                  _normalizedPhoneValue(value),
+                                  fullPhone ?? '',
                                 )
                                 ? null
                                 : 'Use a phone number with country code.',

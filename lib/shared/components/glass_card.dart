@@ -11,11 +11,11 @@ class GlassCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
-    this.blurSigma = 8,
+    this.blurSigma = 4,
     this.gradient,
     this.borderColor,
     this.boxShadow = const [
-      BoxShadow(color: Color(0x26000000), blurRadius: 10, offset: Offset(0, 2)),
+      BoxShadow(color: Color(0x1A000000), blurRadius: 4, offset: Offset(0, 1)),
     ],
   });
 
@@ -30,7 +30,7 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBlur = blurSigma.clamp(0.0, 8.0);
+    final effectiveBlur = blurSigma.clamp(0.0, 4.0);
     final effectiveBorder =
         borderColor ?? AppColors.accent.withValues(alpha: 0.25);
 

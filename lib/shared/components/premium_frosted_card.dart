@@ -11,7 +11,7 @@ class PremiumFrostedCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
-    this.blurSigma = 6,
+    this.blurSigma = 3,
   });
 
   final Widget child;
@@ -22,7 +22,7 @@ class PremiumFrostedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sigma = blurSigma.clamp(0, 8).toDouble();
+    final sigma = blurSigma.clamp(0, 4).toDouble();
 
     return Container(
       margin: margin,
