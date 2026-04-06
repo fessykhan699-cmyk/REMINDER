@@ -20,6 +20,7 @@ import '../widgets/app_lock_gate.dart';
 import '../widgets/pin_editor_sheet.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../../shared/services/test_notification.dart';
 import 'edit_profile_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -465,6 +466,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   (current) => current.copyWith(remindOnDueDate: value),
                 ),
                 isLast: true,
+              ),
+              const SizedBox(height: 14),
+              // TODO: Remove after verifying notifications work.
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(
+                    Icons.notifications_active_outlined,
+                    size: 18,
+                  ),
+                  label: const Text('Test notification (1 min)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    side: BorderSide(
+                      color: AppColors.accent.withValues(alpha: 0.4),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await testNotificationNow();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Notification scheduled — check in 1 minute',
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                      }
+                    }
+                  },
+                ),
               ),
             ],
           ),
