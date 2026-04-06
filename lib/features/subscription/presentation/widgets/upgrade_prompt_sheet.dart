@@ -63,179 +63,186 @@ class _UpgradePromptSheet extends StatelessWidget {
       top: false,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
-        child: PremiumFrostedCard(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          ),
+          child: PremiumFrostedCard(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.accent.withValues(alpha: 0.14),
-                      border: Border.all(
-                        color: AppColors.accent.withValues(alpha: 0.28),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.workspace_premium_outlined,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          decision.promptTitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.accent.withValues(alpha: 0.14),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.28),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Upgrade to Pro',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.workspace_premium_outlined,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              decision.promptTitle,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Upgrade to Pro',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Unlock unlimited invoices and remove branding',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    decision.promptMessage,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _PricingPill(
+                            title: 'Monthly',
+                            price: r'$4.99',
+                            subtitle: 'Simple and flexible',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: _PricingPill(
+                            title: 'Yearly',
+                            price: r'$39.99',
+                            subtitle: 'BEST VALUE',
+                            highlighted: true,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  ..._benefits.map(
+                    (benefit) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 1),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              size: 18,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              benefit,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Unlock full access instantly',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _trustSignals
+                        .map(
+                          (signal) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.03),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppColors.glassBorder),
+                            ),
+                            child: Text(
+                              signal,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 20),
+                  PremiumPrimaryButton(
+                    label: 'Upgrade Now',
+                    onPressed: () async {
+                      Navigator.of(context).pop(true);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.center,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Continue with Free'),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Unlock unlimited invoices and remove branding',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                decision.promptMessage,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.24),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _PricingPill(
-                        title: 'Monthly',
-                        price: r'$4.99',
-                        subtitle: 'Simple and flexible',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: _PricingPill(
-                        title: 'Yearly',
-                        price: r'$39.99',
-                        subtitle: 'BEST VALUE',
-                        highlighted: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              ..._benefits.map(
-                (benefit) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 1),
-                        child: Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          benefit,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Unlock full access instantly',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _trustSignals
-                    .map(
-                      (signal) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppColors.glassBorder),
-                        ),
-                        child: Text(
-                          signal,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-              const SizedBox(height: 20),
-              PremiumPrimaryButton(
-                label: 'Upgrade Now',
-                onPressed: () async {
-                  Navigator.of(context).pop(true);
-                },
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.center,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Continue with Free'),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
