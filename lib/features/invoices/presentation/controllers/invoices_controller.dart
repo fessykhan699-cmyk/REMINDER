@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/sync/sync_service.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/invoice_status_service.dart';
@@ -9,6 +10,7 @@ import '../../../../shared/services/reminder_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
+import '../../data/models/invoice_model.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/invoice_repository.dart';
@@ -147,6 +149,9 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       'schedule invoice reminders',
       () => _reminderService.scheduleInvoiceReminders(created),
     );
+    SyncService.instance.syncInvoiceToFirebase(
+      InvoiceModel.fromEntity(created),
+    );
     return created;
   }
 
@@ -161,6 +166,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoiceId));
+    SyncService.instance.deleteInvoiceFromFirebase(invoiceId);
     await ref
         .read(invoiceCreationLearningProvider.notifier)
         .rebuildFromInvoices(updatedList);
@@ -187,6 +193,9 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoice.id));
+    SyncService.instance.syncInvoiceToFirebase(
+      InvoiceModel.fromEntity(updated),
+    );
 
     final dueDateChanged =
         previousInvoice != null &&
