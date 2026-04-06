@@ -26,16 +26,12 @@ class InvoiceDetailScreen extends ConsumerStatefulWidget {
 
 class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   bool _isOpeningPdfPreview = false;
-  bool _isSavingPdf = false;
   bool _isSharingPdf = false;
   bool _isSendingWhatsApp = false;
   bool _isMarkingPaid = false;
 
   bool get _isPdfBusy =>
-      _isOpeningPdfPreview ||
-      _isSavingPdf ||
-      _isSharingPdf ||
-      _isSendingWhatsApp;
+      _isOpeningPdfPreview || _isSharingPdf || _isSendingWhatsApp;
 
   void _showSnackBar(String message) {
     final messenger = ScaffoldMessenger.of(context);
@@ -52,33 +48,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     }
 
     await promptUpgradeForDecision(context, decision);
-  }
-
-  Future<void> _saveInvoicePdf(Invoice invoice) async {
-    if (_isPdfBusy) {
-      return;
-    }
-
-    setState(() => _isSavingPdf = true);
-
-    try {
-      await ref.read(invoiceExportServiceProvider).saveInvoicePdf(invoice);
-      if (!mounted) {
-        return;
-      }
-
-      _showSnackBar('Saved to Downloads/InvoiceFlow');
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      _showSnackBar('Failed to save invoice');
-    } finally {
-      if (mounted) {
-        setState(() => _isSavingPdf = false);
-      }
-    }
   }
 
   Future<void> _shareInvoicePdf(Invoice invoice) async {
@@ -306,8 +275,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                         : 'Send via WhatsApp',
                     icon: Icons.chat_bubble_outline_rounded,
                     isLoading: _isSendingWhatsApp,
-                    onPressed:
-                        _isSharingPdf || _isSavingPdf || _isOpeningPdfPreview
+                    onPressed: _isPdfBusy
                         ? null
                         : () => _sendViaWhatsApp(invoice),
                   ),
