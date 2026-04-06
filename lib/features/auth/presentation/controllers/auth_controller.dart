@@ -129,6 +129,28 @@ class AuthController extends Notifier<AuthViewState> {
     }
   }
 
+  Future<void> loginWithGoogle() async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+
+    try {
+      final datasource = ref.read(authLocalDatasourceProvider);
+      final session = await datasource.loginWithGoogle();
+
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        session: session,
+        isSubmitting: false,
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isSubmitting: false,
+        errorMessage: error.toString(),
+      );
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isSubmitting: true, clearError: true);
 

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../features/auth/firebase_auth_service.dart';
 import '../../features/clients/data/models/client_model.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
 
@@ -9,8 +9,7 @@ class SyncService {
   static final SyncService instance = SyncService._();
 
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
-
-  String? get _uid => FirebaseAuthService.instance.getCurrentUserId();
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   Future<void> syncClientToFirebase(ClientModel client) async {
     try {

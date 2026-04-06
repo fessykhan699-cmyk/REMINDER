@@ -28,7 +28,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController(text: 'password123');
 
   bool _isSubmitting = false;
-  bool _isGoogleSubmitting = false;
 
   static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
@@ -102,22 +101,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submitGoogle() async {
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isGoogleSubmitting = true;
-    });
+    await ref.read(authControllerProvider.notifier).loginWithGoogle();
 
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    await ref
-        .read(authControllerProvider.notifier)
-        .login(email: 'google.user@studio.com', password: 'google-auth');
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _isGoogleSubmitting = false;
-    });
+    if (!mounted) return;
 
     final state = ref.read(authControllerProvider);
     if (state.status == AuthStatus.authenticated) {
@@ -268,7 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               const SizedBox(height: 24),
                               PremiumPrimaryButton(
                                 label: 'Login',
-                                isLoading: _isSubmitting || isAuthSubmitting,
+                                isLoading: _isSubmitting,
                                 onPressed: _isFormValid && !_isSubmitting
                                     ? _submitLogin
                                     : null,
@@ -277,8 +263,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               PremiumPrimaryButton(
                                 label: 'Continue with Google',
                                 variant: PremiumButtonVariant.secondary,
-                                isLoading: _isGoogleSubmitting,
-                                onPressed: _isGoogleSubmitting
+                                isLoading: isAuthSubmitting,
+                                onPressed: isAuthSubmitting
                                     ? null
                                     : _submitGoogle,
                                 leading: Container(

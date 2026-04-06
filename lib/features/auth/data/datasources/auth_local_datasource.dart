@@ -1,46 +1,101 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/auth_session_model.dart';
 
 class AuthLocalDatasource {
-  AuthSessionModel? _session;
-  bool _onboardingCompleted = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<AuthSessionModel?> currentSession() async {
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-    return _session;
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    return AuthSessionModel(
+      userId: user.uid,
+      email: user.email ?? '',
+      token: 'firebase-user',
+      createdAt: user.metadata.creationTime ?? DateTime.now(),
+    );
   }
 
   Future<AuthSessionModel> login({
     required String email,
     required String password,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 420));
-
     final normalizedEmail = email.trim();
-    if (normalizedEmail.isEmpty || password.trim().isEmpty) {
-      throw Exception('Email and password are required.');
+    final trimmedPassword = password.trim();
+    if (normalizedEmail.isEmpty) {
+      throw Exception('Email is required.');
+    }
+    if (trimmedPassword.length < 6) {
+      throw Exception('Password must be at least 6 characters.');
     }
 
-    _session = AuthSessionModel(
-      userId: 'user-1',
-      email: normalizedEmail,
-      token: 'local-dev-token',
-      createdAt: DateTime.now(),
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: normalizedEmail,
+        password: trimmedPassword,
+      );
+      return _sessionFromUser(credential.user!, normalizedEmail);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        try {
+          final credential = await _auth.createUserWithEmailAndPassword(
+            email: normalizedEmail,
+            password: trimmedPassword,
+          );
+          return _sessionFromUser(credential.user!, normalizedEmail);
+        } on FirebaseAuthException catch (e2) {
+          throw Exception(
+            'Unable to create account: ${e2.message ?? 'Unknown error.'}',
+          );
+        }
+      }
+
+      final message = switch (e.code) {
+        'wrong-password' => 'Incorrect password.',
+        'invalid-email' => 'Invalid email address.',
+        'user-disabled' => 'This account has been disabled.',
+        'too-many-requests' => 'Too many failed attempts. Try again later.',
+        _ => 'Login failed: ${e.message ?? 'Unknown error.'}',
+      };
+      throw Exception(message);
+    }
+  }
+
+  AuthSessionModel _sessionFromUser(User user, String fallbackEmail) {
+    return AuthSessionModel(
+      userId: user.uid,
+      email: user.email ?? fallbackEmail,
+      token: 'firebase-user',
+      createdAt: user.metadata.creationTime ?? DateTime.now(),
     );
-    return _session!;
+  }
+
+  Future<AuthSessionModel> loginWithGoogle() async {
+    final googleUser = await GoogleSignIn.instance.authenticate();
+    final auth = googleUser.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) {
+      throw Exception('Google sign-in failed: no ID token.');
+    }
+
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    final userCredential = await _auth.signInWithCredential(credential);
+    if (userCredential.user == null) {
+      throw Exception('Google sign-in failed: no user returned.');
+    }
+
+    return _sessionFromUser(userCredential.user!, googleUser.email);
   }
 
   Future<void> logout() async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    _session = null;
+    await GoogleSignIn.instance.signOut();
+    await _auth.signOut();
   }
 
   Future<bool> isOnboardingCompleted() async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    return _onboardingCompleted;
+    return false;
   }
 
-  Future<void> markOnboardingComplete() async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    _onboardingCompleted = true;
-  }
+  Future<void> markOnboardingComplete() async {}
 }

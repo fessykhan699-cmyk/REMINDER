@@ -10,11 +10,6 @@ class FirebaseService {
 
   String? get userId => _auth.currentUser?.uid;
 
-  Future<void> signInAnonymously() async {
-    if (_auth.currentUser != null) return;
-    await _auth.signInAnonymously();
-  }
-
   Future<void> signOut() async {
     await _auth.signOut();
   }
@@ -48,7 +43,6 @@ class FirebaseService {
     return _firestore
         .collection('reminders')
         .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
