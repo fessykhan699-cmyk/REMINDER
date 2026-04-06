@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'firebase_options.dart';
 import 'features/auth/firebase_auth_service.dart';
 
 import 'features/clients/data/models/client_model.dart';
@@ -38,10 +39,8 @@ Future<void> main() async {
 
   await HiveStorage.seedDefaultsIfNeeded();
   await NotificationService.instance.initialize();
-  try {
-    await Firebase.initializeApp();
-    await FirebaseAuthService.instance.signInAnonymously();
-  } catch (_) {}
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FirebaseAuthService.instance.signInAnonymously();
   runApp(
     const ProviderScope(
       child: InvoiceReminderApp(scaffoldBackgroundColor: _rootBackground),

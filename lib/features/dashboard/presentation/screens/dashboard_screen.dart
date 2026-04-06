@@ -17,6 +17,7 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../../reminders/presentation/controllers/reminders_controller.dart';
+import '../../../reminders/presentation/screens/firestore_reminders_list.dart';
 import '../../../settings/presentation/controllers/settings_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -367,6 +368,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
+        addSection('firestore', const FirestoreRemindersList());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.dueSoon:
@@ -388,6 +390,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
+        addSection('firestore', const FirestoreRemindersList());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
@@ -422,6 +425,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           }
           addSection('stats', _StatsSection(totals: model.totals));
         }
+        addSection('firestore', const FirestoreRemindersList());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
     }
