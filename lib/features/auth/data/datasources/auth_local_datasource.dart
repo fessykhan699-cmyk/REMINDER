@@ -4,6 +4,11 @@ import '../models/auth_session_model.dart';
 
 class AuthLocalDatasource {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId:
+        "276742242102-72vd1njot3c71hoobfpv146cajs3d7u7.apps.googleusercontent.com",
+  );
 
   Future<AuthSessionModel?> currentSession() async {
     final user = _auth.currentUser;
@@ -72,8 +77,11 @@ class AuthLocalDatasource {
   }
 
   Future<AuthSessionModel> loginWithGoogle() async {
-    final googleUser = await GoogleSignIn.instance.authenticate();
-    final auth = googleUser.authentication;
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Google sign-in cancelled by user.');
+    }
+    final auth = await googleUser.authentication;
     final idToken = auth.idToken;
     if (idToken == null) {
       throw Exception('Google sign-in failed: no ID token.');
@@ -89,7 +97,7 @@ class AuthLocalDatasource {
   }
 
   Future<void> logout() async {
-    await GoogleSignIn.instance.signOut();
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
