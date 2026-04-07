@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../../core/storage/hive_storage.dart';
@@ -8,17 +9,18 @@ import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../data/models/invoice_model.dart';
 import '../../domain/entities/invoice.dart';
+import '../controllers/invoices_controller.dart';
 
-class EditInvoiceScreen extends StatefulWidget {
+class EditInvoiceScreen extends ConsumerStatefulWidget {
   const EditInvoiceScreen({super.key, required this.invoiceId});
 
   final String invoiceId;
 
   @override
-  State<EditInvoiceScreen> createState() => _EditInvoiceScreenState();
+  ConsumerState<EditInvoiceScreen> createState() => _EditInvoiceScreenState();
 }
 
-class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
+class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   static const InvoiceStatusService _statusService = InvoiceStatusService();
 
   final _clientNameController = TextEditingController();
@@ -134,14 +136,11 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    // Hive key IS the invoice.id, put directly
     try {
-      final box = HiveStorage.invoicesBox;
-      debugPrint("HIVE SAVE: trying box.put('${invoice.id}', updatedInvoice)");
-      debugPrint("HIVE SAVE: box has ${box.length} invoices before put");
-      await box.put(invoice.id, resolved);
-      debugPrint("HIVE SAVE SUCCESS for key: ${invoice.id}");
-      debugPrint("HIVE SAVE: box has ${box.length} invoices after put");
+      // Call controller update — this updates controller state so the list screen rebuilds
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .updateInvoice(resolved);
 
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
@@ -163,7 +162,12 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
   }
 
   Future<void> _handleDelete() async {
-    if (_isDeleting) return;
+    if (_isDeleting) {
+      debugPrint("🟡 _handleDelete BLOCKED by _isDeleting guard");
+      return;
+    }
+
+    debugPrint("🟡 [A] _handleDelete ENTERED");
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -183,48 +187,31 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
       ),
     );
 
+    debugPrint("🟡 [B] Dialog result: confirm=$confirm, mounted=$mounted");
+
     if (confirm != true || !mounted) return;
 
+    debugPrint(
+      "🟡 [C] Calling controller.deleteInvoice('${widget.invoiceId}')",
+    );
     setState(() => _isDeleting = true);
 
     try {
-      debugPrint("DELETE START: target ID='${widget.invoiceId}'");
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .deleteInvoice(widget.invoiceId);
 
-      final box = HiveStorage.invoicesBox;
-      debugPrint("HIVE: box has ${box.length} invoices");
-      debugPrint("HIVE: box keys: ${box.keys.toList()}");
-      debugPrint("HIVE: value IDs: ${box.values.map((e) => e.id).toList()}");
-      debugPrint(
-        "HIVE: containsKey('${widget.invoiceId}'): ${box.containsKey(widget.invoiceId)}",
-      );
+      debugPrint("🟡 [D] controller.deleteInvoice RETURNED successfully");
 
-      // Delete using key-matching (handles any key/id mismatch)
-      final keys = box.keys.toList();
-      bool deleted = false;
-
-      for (final key in keys) {
-        final item = box.get(key);
-        if (item != null && item.id == widget.invoiceId) {
-          await box.delete(key);
-          debugPrint("HIVE: 🔥 DELETED USING KEY: $key");
-          deleted = true;
-          break;
-        }
+      if (!mounted) {
+        debugPrint("🟡 [E] Widget unmounted after delete — skipping pop");
+        return;
       }
 
-      debugPrint("HIVE AFTER DELETE COUNT: ${box.length}");
-
-      if (deleted) {
-        debugPrint("HIVE DELETE SUCCESS");
-      } else {
-        debugPrint("HIVE: ❌ DELETE FAILED — ID NOT FOUND");
-      }
-
-      if (!mounted) return;
-
+      debugPrint("🟡 [F] Calling Navigator.pop(true)");
       Navigator.of(context).pop(true);
     } catch (e, st) {
-      debugPrint("DELETE FAILED: $e");
+      debugPrint("🟡 [ERR] DELETE CAUGHT: $e");
       debugPrintStack(stackTrace: st);
 
       if (mounted) {
@@ -234,6 +221,7 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
       }
     } finally {
       if (mounted) {
+        debugPrint("🟡 [FINALLY] Resetting _isDeleting");
         setState(() => _isDeleting = false);
       }
     }
@@ -490,6 +478,9 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
         final invoice = box.get(widget.invoiceId);
 
         if (invoice == null) {
+          debugPrint(
+            "🔵 ValueListenableBuilder: invoice is NULL for ID='${widget.invoiceId}' — scheduling pop",
+          );
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) Navigator.of(context).pop();
           });

@@ -217,12 +217,18 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           ),
           IconButton(
             onPressed: () async {
-              debugPrint("DETAIL → OPEN EDIT: ID = '${widget.invoiceId}'");
+              debugPrint("🟢 DETAIL → OPEN EDIT: ID = '${widget.invoiceId}'");
               final result = await EditInvoiceRoute(
                 widget.invoiceId,
               ).push<bool>(context);
+              debugPrint(
+                "🟢 DETAIL ← EDIT returned: result=$result, mounted=$context.mounted",
+              );
               if (!context.mounted) return;
               if (result == true) {
+                debugPrint(
+                  "🟢 DETAIL: Popping self + showing 'deleted' snackbar",
+                );
                 final navigator = Navigator.of(context);
                 final messenger = ScaffoldMessenger.of(context);
                 navigator.pop();
@@ -230,6 +236,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   const SnackBar(content: Text('Invoice deleted')),
                 );
               } else {
+                debugPrint(
+                  "🟢 DETAIL: Invalidating detail provider (result was not true)",
+                );
                 ref.invalidate(invoiceDetailProvider(widget.invoiceId));
               }
             },

@@ -528,17 +528,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 );
               }
 
-              // CLEAR SEED FLAG (so seed doesn't re-run on next launch)
+              // CLEAR DEMO CLEANUP FLAG (so one-time migration can re-run if needed)
               if (Hive.isBoxOpen(HiveStorage.settingsBoxName)) {
                 final settingsBox = HiveStorage.settingsBox;
-                settingsBox.delete(HiveStorage.seededFlag);
-                debugPrint("🔥 SEED FLAG CLEARED");
+                settingsBox.delete('_demoCleanupDone');
+                debugPrint("🔥 DEMO CLEANUP FLAG CLEARED");
               }
-
-              // FIREBASE DELETE SKIPPED (permission-denied)
-              debugPrint(
-                "FIREBASE: delete skipped (permission-denied, fix rules later)",
-              );
 
               debugPrint("🔥 FULL RESET COMPLETE");
               if (!context.mounted) return;

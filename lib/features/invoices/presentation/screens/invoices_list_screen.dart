@@ -4,21 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/services/invoice_status_service.dart';
-import '../../../../shared/widgets/app_async_state_view.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/load_more_button.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../subscription/presentation/widgets/usage_limit_nudge_card.dart';
 import '../../data/models/invoice_model.dart';
 import '../../domain/entities/invoice.dart';
-import '../controllers/invoices_controller.dart';
 import '../widgets/invoice_tile.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
@@ -31,7 +27,7 @@ class InvoicesListScreen extends ConsumerStatefulWidget {
 class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
   static const InvoiceStatusService _statusService = InvoiceStatusService();
 
-  int _visibleItemCount = AppConstants.defaultPageSize;
+  int _visibleItemCount = 20;
 
   Widget _buildInvoicesList({
     required List<Invoice> invoices,
@@ -65,7 +61,12 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         if (hasMore && dataIndex == invoices.length) {
           return Padding(
             padding: appCardPadding,
-            child: Center(child: LoadMoreButton(onPressed: onLoadMore)),
+            child: Center(
+              child: TextButton(
+                onPressed: onLoadMore,
+                child: const Text('Load more'),
+              ),
+            ),
           );
         }
 
@@ -118,22 +119,16 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
 
   void _loadMoreInvoices(int totalCount) {
     setState(() {
-      _visibleItemCount = math.min(
-        totalCount,
-        _visibleItemCount + AppConstants.defaultPageSize,
-      );
+      _visibleItemCount = math.min(totalCount, _visibleItemCount + 20);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final controllerState = ref.watch(invoicesControllerProvider);
-    final controller = ref.read(invoicesControllerProvider.notifier);
     final subscription =
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
     final usage = ref.watch(subscriptionUsageProvider);
-    final hasInvoicesBox = Hive.isBoxOpen(HiveStorage.invoicesBoxName);
 
     return Scaffold(
       appBar: AppBar(
@@ -147,68 +142,45 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: hasInvoicesBox
-                  ? ValueListenableBuilder<Box<InvoiceModel>>(
-                      valueListenable: HiveStorage.invoicesBox.listenable(),
-                      builder: (context, box, _) {
-                        debugPrint(
-                          "InvoicesListScreen: ValueListenableBuilder triggered, box has ${box.length} invoices",
-                        );
-                        final invoices = _sortedInvoices(box);
-                        if (invoices.isEmpty) {
-                          return AppEmptyState(
-                            title: 'No invoices yet',
-                            message: 'Create your first invoice in seconds.',
-                            action: FilledButton.icon(
-                              onPressed: _openCreateInvoice,
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Create Invoice'),
-                            ),
-                          );
-                        }
+        child: ValueListenableBuilder<Box<InvoiceModel>>(
+          valueListenable: HiveStorage.invoicesBox.listenable(),
+          builder: (context, box, _) {
+            debugPrint(
+              "InvoicesListScreen: ValueListenableBuilder — box has ${box.length} invoices",
+            );
+            final invoices = _sortedInvoices(box);
 
-                        final visibleCount = math.min(
-                          invoices.length,
-                          _visibleItemCount,
-                        );
-                        final visibleInvoices = invoices
-                            .take(visibleCount)
-                            .toList(growable: false);
-                        return _buildInvoicesList(
-                          invoices: visibleInvoices,
-                          subscription: subscription,
-                          usage: usage,
-                          hasMore: invoices.length > visibleCount,
-                          onLoadMore: () => _loadMoreInvoices(invoices.length),
-                        );
-                      },
-                    )
-                  : AppAsyncStateView<List<Invoice>>(
-                      state: controllerState,
-                      onRetry: controller.loadInitial,
-                      emptyTitle: 'No invoices yet',
-                      emptyMessage: 'Create your first invoice in seconds.',
-                      emptyAction: FilledButton.icon(
-                        onPressed: _openCreateInvoice,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Create Invoice'),
-                      ),
-                      isEmpty: (data) => data.isEmpty,
-                      builder: (invoices) {
-                        return _buildInvoicesList(
-                          invoices: invoices,
-                          subscription: subscription,
-                          usage: usage,
-                          hasMore: controller.hasMore,
-                          onLoadMore: controller.loadMore,
-                        );
-                      },
-                    ),
-            ),
-          ],
+            if (invoices.isEmpty) {
+              return AppEmptyState(
+                title: 'No invoices yet',
+                message: 'Create your first invoice in seconds.',
+                action: FilledButton.icon(
+                  onPressed: _openCreateInvoice,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Create Invoice'),
+                ),
+              );
+            }
+
+            final visibleCount = math.min(invoices.length, _visibleItemCount);
+            final visibleInvoices = invoices
+                .take(visibleCount)
+                .toList(growable: false);
+
+            return Column(
+              children: [
+                Expanded(
+                  child: _buildInvoicesList(
+                    invoices: visibleInvoices,
+                    subscription: subscription,
+                    usage: usage,
+                    hasMore: invoices.length > visibleCount,
+                    onLoadMore: () => _loadMoreInvoices(invoices.length),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

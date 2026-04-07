@@ -26,9 +26,11 @@ Future<Box<T>> _openBoxSafe<T>(String name) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Hive.initFlutter();
   HiveStorage.registerAdapters();
 
+  // ✅ Open all boxes
   await _openBoxSafe<ClientModel>(HiveStorage.clientsBoxName);
   await _openBoxSafe<InvoiceModel>(HiveStorage.invoicesBoxName);
   await _openBoxSafe<dynamic>(HiveStorage.settingsBoxName);
@@ -36,8 +38,11 @@ Future<void> main() async {
   await _openBoxSafe<ProfileModel>(HiveStorage.userProfileBoxName);
   await _openBoxSafe<AppPreferencesModel>(HiveStorage.appPreferencesBoxName);
 
-  await HiveStorage.seedDefaultsIfNeeded();
+  // 🔥 One-time cleanup: remove any leftover demo/seed data from previous versions
+  await HiveStorage.purgeDemoDataOnce();
+
   await NotificationService.instance.initialize();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(

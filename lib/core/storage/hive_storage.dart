@@ -3,10 +3,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../features/clients/data/models/client_model.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
-import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/app_preferences_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
+
+/// Known demo/seed data identifiers that must be purged.
+const _demoClientIds = {'client-1', 'client-2'};
+const _demoInvoiceIds = {'inv-1', 'inv-2'};
 
 class HiveStorage {
   HiveStorage._();
@@ -17,10 +20,8 @@ class HiveStorage {
   static const String remindersBoxName = 'remindersBox';
   static const String userProfileBoxName = 'userProfileBox';
   static const String appPreferencesBoxName = 'appPreferencesBox';
-  static const String _seededFlag = '_hasBeenSeeded';
 
-  /// Exposed for reset button access
-  static String get seededFlag => _seededFlag;
+  static const String _demoCleanupFlag = '_demoCleanupDone';
 
   static void registerAdapters() {
     if (!Hive.isAdapterRegistered(0)) {
@@ -60,86 +61,49 @@ class HiveStorage {
 
   static Box<dynamic> get settingsBox => Hive.box<dynamic>(settingsBoxName);
 
-  static Future<void> seedDefaultsIfNeeded() async {
-    // Check if seeding has ever been done (persistent across restarts)
+  /// One-time migration: removes any leftover demo/seed data from previous app versions.
+  /// Runs once and never again.
+  static Future<void> purgeDemoDataOnce() async {
     final settingsBox = Hive.isBoxOpen(settingsBoxName)
         ? Hive.box<dynamic>(settingsBoxName)
         : null;
-    final hasBeenSeeded = settingsBox?.get(_seededFlag) ?? false;
-
-    if (!hasBeenSeeded) {
-      debugPrint("🔥 SEEDING initial data (first launch only)");
-      await _seedClients(clientsBox);
-      await _seedInvoices(invoicesBox);
-      settingsBox?.put(_seededFlag, true);
-    } else {
-      debugPrint("✅ SKIPPING seed — already seeded previously");
+    final alreadyCleaned = settingsBox?.get(_demoCleanupFlag) ?? false;
+    if (alreadyCleaned) {
+      debugPrint("✅ Demo cleanup already done — skipping");
+      return;
     }
-  }
 
-  static Future<void> _seedClients(Box<ClientModel> box) async {
-    if (box.isEmpty) {
-      debugPrint("🔥 SEEDING initial clients data");
-      final now = DateTime.now();
-      final clients = <ClientModel>[
-        ClientModel(
-          id: 'client-1',
-          name: 'Northwind Studio',
-          email: 'billing@northwind.com',
-          phone: '+1 555 103 882',
-          createdAt: now.subtract(const Duration(days: 20)),
-        ),
-        ClientModel(
-          id: 'client-2',
-          name: 'Acme Retail',
-          email: 'finance@acme.co',
-          phone: '+1 555 912 100',
-          createdAt: now.subtract(const Duration(days: 12)),
-        ),
-      ];
+    debugPrint("🔥 Running one-time demo data cleanup…");
+    var removedClients = 0;
+    var removedInvoices = 0;
 
-      await box.putAll({for (final client in clients) client.id: client});
+    // Remove demo clients
+    if (Hive.isBoxOpen(clientsBoxName)) {
+      final clientBox = clientsBox;
+      for (final id in _demoClientIds) {
+        if (clientBox.containsKey(id)) {
+          await clientBox.delete(id);
+          removedClients++;
+        }
+      }
     }
-  }
 
-  static Future<void> _seedInvoices(Box<InvoiceModel> box) async {
-    if (box.isEmpty) {
-      debugPrint("🔥 SEEDING initial invoices data");
-      final now = DateTime.now();
-      final invoices = <InvoiceModel>[
-        InvoiceModel(
-          id: 'inv-1',
-          clientId: 'client-1',
-          clientName: 'Northwind Studio',
-          service: 'Brand identity package',
-          amount: 1850,
-          dueDate: now.subtract(const Duration(days: 4)),
-          status: InvoiceStatus.draft,
-          createdAt: now.subtract(const Duration(days: 21)),
-          currencyCode: 'USD',
-          taxPercent: 0,
-          paymentTermsDays: 0,
-          discountAmount: 0,
-          paymentLink: 'https://pay.invoiceflow.app/inv-1',
-        ),
-        InvoiceModel(
-          id: 'inv-2',
-          clientId: 'client-2',
-          clientName: 'Acme Retail',
-          service: 'Monthly analytics report',
-          amount: 920,
-          dueDate: now.add(const Duration(days: 6)),
-          status: InvoiceStatus.draft,
-          createdAt: now.subtract(const Duration(days: 9)),
-          currencyCode: 'USD',
-          taxPercent: 0,
-          paymentTermsDays: 0,
-          discountAmount: 0,
-          paymentLink: 'https://pay.invoiceflow.app/inv-2',
-        ),
-      ];
-
-      await box.putAll({for (final invoice in invoices) invoice.id: invoice});
+    // Remove demo invoices
+    if (Hive.isBoxOpen(invoicesBoxName)) {
+      final invoiceBox = invoicesBox;
+      for (final id in _demoInvoiceIds) {
+        if (invoiceBox.containsKey(id)) {
+          await invoiceBox.delete(id);
+          removedInvoices++;
+        }
+      }
     }
+
+    debugPrint(
+      "🔥 Demo cleanup complete: removed $removedClients clients, $removedInvoices invoices",
+    );
+
+    // Mark as done so it never runs again
+    settingsBox?.put(_demoCleanupFlag, true);
   }
 }
