@@ -151,6 +151,9 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
                   ? ValueListenableBuilder<Box<InvoiceModel>>(
                       valueListenable: HiveStorage.invoicesBox.listenable(),
                       builder: (context, box, _) {
+                        debugPrint(
+                          "InvoicesListScreen: ValueListenableBuilder triggered, box has ${box.length} invoices",
+                        );
                         final invoices = _sortedInvoices(box);
                         if (invoices.isEmpty) {
                           return AppEmptyState(

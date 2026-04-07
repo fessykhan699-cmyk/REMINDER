@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 
 import '../../../../core/storage/hive_storage.dart';
@@ -85,13 +86,25 @@ class InvoicesLocalDatasource {
   Future<void> deleteInvoice(String id) async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
+    debugPrint("InvoicesLocalDatasource: deleteInvoice called for $id");
+    debugPrint(
+      "InvoicesLocalDatasource: box contains ${_invoicesBox.length} invoices",
+    );
+
     if (!_invoicesBox.containsKey(id)) {
+      debugPrint("InvoicesLocalDatasource: Invoice NOT found in Hive: $id");
+      debugPrint(
+        "InvoicesLocalDatasource: Available keys: ${_invoicesBox.keys.toList()}",
+      );
       throw Exception('Invoice not found.');
     }
 
     await _invoicesBox.delete(id);
     _invoiceCache.remove(id);
     _pageCache.clear();
+    debugPrint(
+      "InvoicesLocalDatasource: Deleted from Hive, remaining: ${_invoicesBox.length}",
+    );
   }
 
   Future<InvoiceModel?> getInvoiceById(String id) async {

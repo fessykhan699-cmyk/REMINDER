@@ -156,24 +156,34 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    final current = state.valueOrNull ?? const <Invoice>[];
-    final updatedList = current
+    debugPrint("Controller: deleteInvoice called with ID: $invoiceId");
+
+    try {
+      await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
+      await _reminderService.cancelInvoiceReminders(invoiceId);
+      SyncService.instance.deleteInvoiceFromFirebase(invoiceId);
+    } catch (e, st) {
+      debugPrint("ERROR during delete: $e");
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
+
+    final updatedList = (state.valueOrNull ?? const <Invoice>[])
         .where((item) => item.id != invoiceId)
         .toList(growable: false);
-
-    await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
-    await _reminderService.cancelInvoiceReminders(invoiceId);
+    debugPrint("Controller: remaining invoices: ${updatedList.length}");
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoiceId));
-    SyncService.instance.deleteInvoiceFromFirebase(invoiceId);
     await ref
         .read(invoiceCreationLearningProvider.notifier)
         .rebuildFromInvoices(updatedList);
   }
 
   Future<void> updateInvoice(Invoice invoice) async {
+    debugPrint("Controller: updateInvoice called for ID: ${invoice.id}");
     final current = state.valueOrNull ?? const <Invoice>[];
+    debugPrint("Controller: current state has ${current.length} invoices");
     Invoice? previousInvoice;
     for (final item in current) {
       if (item.id == invoice.id) {
@@ -186,6 +196,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     final updated = await ref
         .read(updateInvoiceUseCaseProvider)
         .call(normalizedInvoice);
+    debugPrint("Controller: update completed, ID: ${updated.id}");
 
     final updatedList = current
         .map((item) => item.id == updated.id ? updated : item)
@@ -226,12 +237,14 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<Invoice> markInvoiceSent(Invoice invoice) async {
+    debugPrint("Controller: markInvoiceSent for ID: ${invoice.id}");
     final next = _invoiceStatusService.markSent(invoice);
     await updateInvoice(next);
     return next;
   }
 
   Future<Invoice> markInvoicePaid(Invoice invoice) async {
+    debugPrint("Controller: markInvoicePaid for ID: ${invoice.id}");
     final next = _invoiceStatusService.markPaid(invoice);
     await updateInvoice(next);
     return next;

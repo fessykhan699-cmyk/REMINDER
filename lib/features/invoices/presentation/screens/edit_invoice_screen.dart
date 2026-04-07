@@ -58,6 +58,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         : invoice.discountAmount.toStringAsFixed(2);
     _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
+    debugPrint("Edit screen hydrated invoice: ${invoice.id}");
   }
 
   String? _normalizedPaymentLink() {
@@ -82,7 +83,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   }
 
   Future<void> _save() async {
-    final source = _invoice;
     final dueDate = _dueDate;
     final amount = double.tryParse(_amountController.text.trim());
     final discountText = _discountController.text.trim();
@@ -91,10 +91,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         : double.tryParse(discountText);
     final paymentLink = _normalizedPaymentLink();
 
-    if (source == null ||
-        dueDate == null ||
-        amount == null ||
-        discountAmount == null) {
+    if (dueDate == null || amount == null || discountAmount == null) {
       return;
     }
 
@@ -112,6 +109,21 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       return;
     }
 
+    final freshInvoice = ref
+        .read(invoiceDetailProvider(widget.invoiceId))
+        .valueOrNull;
+    if (freshInvoice == null) {
+      debugPrint(
+        "EditInvoiceScreen: freshInvoice is null for ${widget.invoiceId}",
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invoice not found')));
+      return;
+    }
+
+    debugPrint("EditInvoiceScreen: _save called for ${freshInvoice.id}");
+
     setState(() => _isSaving = true);
     var shouldResetSavingState = true;
     final messenger = ScaffoldMessenger.of(context);
@@ -124,10 +136,11 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
             .ensureAllowed(SubscriptionGateFeature.advancedTotals);
       }
 
+      debugPrint("Edit screen: saving invoice ID: ${freshInvoice.id}");
       await ref
           .read(invoicesControllerProvider.notifier)
           .updateInvoice(
-            source.copyWith(
+            freshInvoice.copyWith(
               clientName: _clientNameController.text.trim(),
               service: _serviceController.text.trim(),
               amount: amount,
@@ -163,6 +176,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   Future<void> _handleDelete() async {
     if (_isDeleting) return;
 
+    debugPrint(
+      "EditInvoiceScreen: _handleDelete called for ${widget.invoiceId}",
+    );
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -181,17 +198,23 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       ),
     );
 
+    debugPrint("EditInvoiceScreen: confirm = $confirm");
+
     if (confirm == true && mounted) {
+      debugPrint("EditInvoiceScreen: Starting delete for ${widget.invoiceId}");
       setState(() => _isDeleting = true);
       Navigator.pop(context);
       try {
-        await ref
-            .read(invoicesControllerProvider.notifier)
-            .deleteInvoice(widget.invoiceId);
+        debugPrint("EditInvoiceScreen: Calling controller.deleteInvoice");
+        final notifier = ref.read(invoicesControllerProvider.notifier);
+        await notifier.deleteInvoice(widget.invoiceId);
+        debugPrint("EditInvoiceScreen: controller.deleteInvoice completed");
         if (mounted) {
           Navigator.pop(context, true);
         }
-      } catch (_) {
+      } catch (e, st) {
+        debugPrint("EditInvoiceScreen: Delete FAILED: $e");
+        debugPrintStack(stackTrace: st);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to delete invoice')),

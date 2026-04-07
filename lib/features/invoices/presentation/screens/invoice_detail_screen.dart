@@ -116,6 +116,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isMarkingPaid = true);
 
     try {
+      debugPrint("Detail screen: marking invoice paid for ID: ${invoice.id}");
       await ref
           .read(invoicesControllerProvider.notifier)
           .markInvoicePaid(invoice);
