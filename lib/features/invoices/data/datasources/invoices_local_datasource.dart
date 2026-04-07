@@ -91,15 +91,26 @@ class InvoicesLocalDatasource {
       "InvoicesLocalDatasource: box contains ${_invoicesBox.length} invoices",
     );
 
-    if (!_invoicesBox.containsKey(id)) {
-      debugPrint("InvoicesLocalDatasource: Invoice NOT found in Hive: $id");
+    dynamic keyToDelete;
+    for (final key in _invoicesBox.keys) {
+      final item = _invoicesBox.get(key);
+      if (item != null && item.id == id) {
+        keyToDelete = key;
+        break;
+      }
+    }
+
+    if (keyToDelete == null) {
+      debugPrint("InvoicesLocalDatasource: Invoice NOT found for id: $id");
       debugPrint(
         "InvoicesLocalDatasource: Available keys: ${_invoicesBox.keys.toList()}",
       );
       throw Exception('Invoice not found.');
     }
 
-    await _invoicesBox.delete(id);
+    debugPrint("InvoicesLocalDatasource: Deleting key: $keyToDelete");
+
+    await _invoicesBox.delete(keyToDelete);
     _invoiceCache.remove(id);
     _pageCache.clear();
     debugPrint(

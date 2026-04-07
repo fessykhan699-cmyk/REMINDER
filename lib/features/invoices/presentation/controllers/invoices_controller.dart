@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/sync/sync_service.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
@@ -156,28 +159,75 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    debugPrint("Controller: deleteInvoice called with ID: $invoiceId");
+    debugPrint("DELETE START: $invoiceId");
 
+    // 🔥 FORCE DELETE FROM HIVE
     try {
-      await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
-      await _reminderService.cancelInvoiceReminders(invoiceId);
-      SyncService.instance.deleteInvoiceFromFirebase(invoiceId);
+      debugPrint("HIVE: Attempting direct delete from invoices box");
+      final box = HiveStorage.invoicesBox;
+      debugPrint("HIVE: Box contains ${box.length} invoices");
+      debugPrint("HIVE: All keys: ${box.keys.toList()}");
+
+      dynamic keyToDelete;
+      for (final key in box.keys) {
+        final item = box.get(key);
+        if (item != null && item.id == invoiceId) {
+          keyToDelete = key;
+          debugPrint(
+            "HIVE: Found matching key: $keyToDelete for id: $invoiceId",
+          );
+          break;
+        }
+      }
+
+      if (keyToDelete != null) {
+        await box.delete(keyToDelete);
+        debugPrint("HIVE DELETE SUCCESS");
+      } else {
+        debugPrint("HIVE: ID NOT FOUND in box");
+      }
+
+      final updated = box.values.toList();
+      debugPrint("HIVE COUNT AFTER DELETE: ${updated.length}");
+
+      // Update controller state
+      state = AsyncValue.data(updated);
+      ref.invalidate(invoiceDetailProvider(invoiceId));
     } catch (e, st) {
-      debugPrint("ERROR during delete: $e");
+      debugPrint("HIVE ERROR: $e");
       debugPrintStack(stackTrace: st);
-      rethrow;
     }
 
-    final updatedList = (state.valueOrNull ?? const <Invoice>[])
-        .where((item) => item.id != invoiceId)
-        .toList(growable: false);
-    debugPrint("Controller: remaining invoices: ${updatedList.length}");
+    // 🔥 ALSO DELETE FROM FIREBASE (safety net)
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('invoices')
+            .doc(invoiceId)
+            .delete();
+        debugPrint("FIREBASE DELETE SUCCESS");
+      } else {
+        debugPrint("FIREBASE: No user logged in, skipping");
+      }
+    } catch (e) {
+      debugPrint("FIREBASE DELETE ERROR: $e");
+    }
 
-    state = AsyncValue.data(updatedList);
-    ref.invalidate(invoiceDetailProvider(invoiceId));
+    // 🔥 Cancel reminders
+    try {
+      await _reminderService.cancelInvoiceReminders(invoiceId);
+    } catch (e) {
+      debugPrint("REMINDER CANCEL ERROR: $e");
+    }
+
+    debugPrint("FINAL STATE LENGTH: ${state.value?.length ?? 0}");
+
     await ref
         .read(invoiceCreationLearningProvider.notifier)
-        .rebuildFromInvoices(updatedList);
+        .rebuildFromInvoices(state.value ?? []);
   }
 
   Future<void> updateInvoice(Invoice invoice) async {

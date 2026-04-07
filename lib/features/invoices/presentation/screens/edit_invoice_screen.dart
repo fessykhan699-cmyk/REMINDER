@@ -110,8 +110,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     }
 
     final freshInvoice = ref
-        .read(invoiceDetailProvider(widget.invoiceId))
-        .valueOrNull;
+        .read(invoicesControllerProvider)
+        .value
+        ?.where((i) => i.id == widget.invoiceId)
+        .firstOrNull;
     if (freshInvoice == null) {
       debugPrint(
         "EditInvoiceScreen: freshInvoice is null for ${widget.invoiceId}",
@@ -176,10 +178,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   Future<void> _handleDelete() async {
     if (_isDeleting) return;
 
-    debugPrint(
-      "EditInvoiceScreen: _handleDelete called for ${widget.invoiceId}",
-    );
-
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -198,32 +196,34 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       ),
     );
 
-    debugPrint("EditInvoiceScreen: confirm = $confirm");
+    if (confirm != true || !mounted) return;
 
-    if (confirm == true && mounted) {
-      debugPrint("EditInvoiceScreen: Starting delete for ${widget.invoiceId}");
-      setState(() => _isDeleting = true);
-      Navigator.pop(context);
-      try {
-        debugPrint("EditInvoiceScreen: Calling controller.deleteInvoice");
-        final notifier = ref.read(invoicesControllerProvider.notifier);
-        await notifier.deleteInvoice(widget.invoiceId);
-        debugPrint("EditInvoiceScreen: controller.deleteInvoice completed");
-        if (mounted) {
-          Navigator.pop(context, true);
-        }
-      } catch (e, st) {
-        debugPrint("EditInvoiceScreen: Delete FAILED: $e");
-        debugPrintStack(stackTrace: st);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to delete invoice')),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isDeleting = false);
-        }
+    setState(() => _isDeleting = true);
+
+    try {
+      debugPrint("DELETE START: ${widget.invoiceId}");
+
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .deleteInvoice(widget.invoiceId);
+
+      debugPrint("DELETE SUCCESS");
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+    } catch (e, st) {
+      debugPrint("DELETE FAILED: $e");
+      debugPrintStack(stackTrace: st);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete invoice')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
       }
     }
   }
@@ -270,22 +270,25 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(invoiceDetailProvider(widget.invoiceId));
+    final invoicesState = ref.watch(invoicesControllerProvider);
+    final invoice = invoicesState.value
+        ?.where((i) => i.id == widget.invoiceId)
+        .firstOrNull;
     final theme = Theme.of(context);
+
+    if (invoice == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.of(context).pop();
+      });
+      return const SizedBox.shrink();
+    }
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Edit Invoice')),
-      body: state.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text(error.toString())),
-        data: (invoice) {
-          if (invoice == null) {
-            return const Center(child: Text('Invoice not found'));
-          }
-
+      body: Builder(
+        builder: (context) {
           _hydrate(invoice);
-
           return SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
