@@ -72,7 +72,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         final invoice = invoices[dataIndex];
         return InvoiceTile(
           invoice: invoice,
-          onTap: () => InvoiceDetailRoute(invoice.id).push(context),
+          onTap: () {
+            debugPrint("LIST → OPEN DETAIL: ID = '${invoice.id}'");
+            InvoiceDetailRoute(invoice.id).push(context);
+          },
         );
       },
     );

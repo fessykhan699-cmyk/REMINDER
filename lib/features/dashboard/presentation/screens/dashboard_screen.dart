@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -17,7 +18,6 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../../reminders/presentation/controllers/reminders_controller.dart';
-import '../../../reminders/presentation/screens/firestore_reminders_list.dart';
 import '../../../settings/presentation/controllers/settings_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -368,7 +368,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
-        addSection('firestore', const FirestoreRemindersList());
+        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.dueSoon:
@@ -390,7 +390,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
-        addSection('firestore', const FirestoreRemindersList());
+        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
@@ -425,7 +425,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           }
           addSection('stats', _StatsSection(totals: model.totals));
         }
-        addSection('firestore', const FirestoreRemindersList());
+        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
     }
@@ -502,6 +502,63 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ),
       ),
       _buildDashboardContent(context, dashboard, subscription),
+      // 🔥 TEMPORARY DEBUG RESET BUTTON — REMOVE BEFORE SHIPPING
+      _staggeredCard(
+        index: 2,
+        child: ElevatedButton(
+          onPressed: () async {
+            try {
+              // CLEAR HIVE INVOICES
+              if (Hive.isBoxOpen(HiveStorage.invoicesBoxName)) {
+                final invoiceBox = HiveStorage.invoicesBox;
+                final countBefore = invoiceBox.length;
+                await invoiceBox.clear();
+                debugPrint(
+                  "🔥 HIVE INVOICES CLEARED: $countBefore → ${invoiceBox.length}",
+                );
+              }
+
+              // CLEAR HIVE CLIENTS
+              if (Hive.isBoxOpen(HiveStorage.clientsBoxName)) {
+                final clientBox = HiveStorage.clientsBox;
+                final countBefore = clientBox.length;
+                await clientBox.clear();
+                debugPrint(
+                  "🔥 HIVE CLIENTS CLEARED: $countBefore → ${clientBox.length}",
+                );
+              }
+
+              // CLEAR SEED FLAG (so seed doesn't re-run on next launch)
+              if (Hive.isBoxOpen(HiveStorage.settingsBoxName)) {
+                final settingsBox = HiveStorage.settingsBox;
+                settingsBox.delete(HiveStorage.seededFlag);
+                debugPrint("🔥 SEED FLAG CLEARED");
+              }
+
+              // FIREBASE DELETE SKIPPED (permission-denied)
+              debugPrint(
+                "FIREBASE: delete skipped (permission-denied, fix rules later)",
+              );
+
+              debugPrint("🔥 FULL RESET COMPLETE");
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('App data reset complete')),
+              );
+            } catch (e) {
+              debugPrint("RESET ERROR: $e");
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red.withValues(alpha: 0.15),
+            foregroundColor: Colors.red,
+          ),
+          child: const Text(
+            '🔧 RESET ALL APP DATA',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
     ];
 
     return Scaffold(
@@ -1943,6 +2000,31 @@ class _DashboardAvatarState extends State<DashboardAvatar> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Temporary placeholder for reminders section.
+/// Firebase Firestore was removed due to permission-denied errors.
+/// Use local notification-based reminders instead.
+class _LocalRemindersPlaceholder extends StatelessWidget {
+  const _LocalRemindersPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GlassCard(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Reminders',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          SizedBox(height: 8),
+          Text('Local reminders are coming soon.'),
+        ],
       ),
     );
   }

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -161,30 +159,29 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   Future<void> deleteInvoice(String invoiceId) async {
     debugPrint("DELETE START: $invoiceId");
 
-    // 🔥 FORCE DELETE FROM HIVE
+    // Delete from Hive using key-matching (handles any key/id mismatch)
     try {
-      debugPrint("HIVE: Attempting direct delete from invoices box");
       final box = HiveStorage.invoicesBox;
-      debugPrint("HIVE: Box contains ${box.length} invoices");
-      debugPrint("HIVE: All keys: ${box.keys.toList()}");
+      debugPrint("HIVE: box keys: ${box.keys.toList()}");
+      debugPrint("HIVE: value IDs: ${box.values.map((e) => e.id).toList()}");
 
-      dynamic keyToDelete;
-      for (final key in box.keys) {
+      final keys = box.keys.toList();
+      bool deleted = false;
+
+      for (final key in keys) {
         final item = box.get(key);
         if (item != null && item.id == invoiceId) {
-          keyToDelete = key;
-          debugPrint(
-            "HIVE: Found matching key: $keyToDelete for id: $invoiceId",
-          );
+          await box.delete(key);
+          debugPrint("HIVE: 🔥 DELETED USING KEY: $key");
+          deleted = true;
           break;
         }
       }
 
-      if (keyToDelete != null) {
-        await box.delete(keyToDelete);
-        debugPrint("HIVE DELETE SUCCESS");
-      } else {
-        debugPrint("HIVE: ID NOT FOUND in box");
+      debugPrint("HIVE AFTER DELETE COUNT: ${box.length}");
+
+      if (!deleted) {
+        debugPrint("HIVE: ❌ DELETE FAILED — ID NOT FOUND");
       }
 
       final updated = box.values.toList();
@@ -198,25 +195,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       debugPrintStack(stackTrace: st);
     }
 
-    // 🔥 ALSO DELETE FROM FIREBASE (safety net)
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('invoices')
-            .doc(invoiceId)
-            .delete();
-        debugPrint("FIREBASE DELETE SUCCESS");
-      } else {
-        debugPrint("FIREBASE: No user logged in, skipping");
-      }
-    } catch (e) {
-      debugPrint("FIREBASE DELETE ERROR: $e");
-    }
+    // Firebase delete disabled (permission-denied) - temporarily skipped
+    debugPrint("FIREBASE: delete skipped (permission-denied)");
 
-    // 🔥 Cancel reminders
+    // Cancel reminders
     try {
       await _reminderService.cancelInvoiceReminders(invoiceId);
     } catch (e) {

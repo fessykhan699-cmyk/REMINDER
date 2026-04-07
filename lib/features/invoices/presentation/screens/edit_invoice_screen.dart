@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../shared/services/invoice_status_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
-import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+import '../../data/models/invoice_model.dart';
 import '../../domain/entities/invoice.dart';
-import '../controllers/invoices_controller.dart';
 
-class EditInvoiceScreen extends ConsumerStatefulWidget {
+class EditInvoiceScreen extends StatefulWidget {
   const EditInvoiceScreen({super.key, required this.invoiceId});
 
   final String invoiceId;
 
   @override
-  ConsumerState<EditInvoiceScreen> createState() => _EditInvoiceScreenState();
+  State<EditInvoiceScreen> createState() => _EditInvoiceScreenState();
 }
 
-class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
+class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
+  static const InvoiceStatusService _statusService = InvoiceStatusService();
+
   final _clientNameController = TextEditingController();
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
@@ -26,11 +29,16 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
 
-  Invoice? _invoice;
   DateTime? _dueDate;
   InvoiceStatus _status = InvoiceStatus.draft;
   bool _isSaving = false;
   bool _isDeleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint("EDIT SCREEN RECEIVED ID: '${widget.invoiceId}'");
+  }
 
   @override
   void dispose() {
@@ -44,9 +52,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     super.dispose();
   }
 
-  void _hydrate(Invoice invoice) {
-    if (_invoice != null) return;
-    _invoice = invoice;
+  void _hydrate(InvoiceModel invoice) {
     _dueDate = invoice.dueDate;
     _status = invoice.status;
     _clientNameController.text = invoice.clientName;
@@ -58,7 +64,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         : invoice.discountAmount.toStringAsFixed(2);
     _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
-    debugPrint("Edit screen hydrated invoice: ${invoice.id}");
   }
 
   String? _normalizedPaymentLink() {
@@ -82,7 +87,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _dueDateController.text = AppFormatters.shortDate(picked);
   }
 
-  Future<void> _save() async {
+  Future<void> _save(InvoiceModel invoice) async {
     final dueDate = _dueDate;
     final amount = double.tryParse(_amountController.text.trim());
     final discountText = _discountController.text.trim();
@@ -109,52 +114,34 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       return;
     }
 
-    final freshInvoice = ref
-        .read(invoicesControllerProvider)
-        .value
-        ?.where((i) => i.id == widget.invoiceId)
-        .firstOrNull;
-    if (freshInvoice == null) {
-      debugPrint(
-        "EditInvoiceScreen: freshInvoice is null for ${widget.invoiceId}",
-      );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Invoice not found')));
-      return;
-    }
-
-    debugPrint("EditInvoiceScreen: _save called for ${freshInvoice.id}");
+    final updated = invoice.copyWith(
+      clientName: _clientNameController.text.trim(),
+      service: _serviceController.text.trim(),
+      amount: amount,
+      dueDate: dueDate,
+      status: _status,
+      discountAmount: discountAmount,
+      paymentLink: paymentLink,
+      notes: _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim(),
+    );
+    final resolvedEntity = _statusService.prepareForUpdate(updated);
+    final resolved = InvoiceModel.fromEntity(resolvedEntity);
 
     setState(() => _isSaving = true);
     var shouldResetSavingState = true;
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
+    // Hive key IS the invoice.id, put directly
     try {
-      if (discountAmount > 0) {
-        await ref
-            .read(subscriptionGatekeeperProvider)
-            .ensureAllowed(SubscriptionGateFeature.advancedTotals);
-      }
-
-      debugPrint("Edit screen: saving invoice ID: ${freshInvoice.id}");
-      await ref
-          .read(invoicesControllerProvider.notifier)
-          .updateInvoice(
-            freshInvoice.copyWith(
-              clientName: _clientNameController.text.trim(),
-              service: _serviceController.text.trim(),
-              amount: amount,
-              dueDate: dueDate,
-              status: _status,
-              discountAmount: discountAmount,
-              paymentLink: paymentLink,
-              notes: _notesController.text.trim().isEmpty
-                  ? null
-                  : _notesController.text.trim(),
-            ),
-          );
+      final box = HiveStorage.invoicesBox;
+      debugPrint("HIVE SAVE: trying box.put('${invoice.id}', updatedInvoice)");
+      debugPrint("HIVE SAVE: box has ${box.length} invoices before put");
+      await box.put(invoice.id, resolved);
+      debugPrint("HIVE SAVE SUCCESS for key: ${invoice.id}");
+      debugPrint("HIVE SAVE: box has ${box.length} invoices after put");
 
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
@@ -201,13 +188,37 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     setState(() => _isDeleting = true);
 
     try {
-      debugPrint("DELETE START: ${widget.invoiceId}");
+      debugPrint("DELETE START: target ID='${widget.invoiceId}'");
 
-      await ref
-          .read(invoicesControllerProvider.notifier)
-          .deleteInvoice(widget.invoiceId);
+      final box = HiveStorage.invoicesBox;
+      debugPrint("HIVE: box has ${box.length} invoices");
+      debugPrint("HIVE: box keys: ${box.keys.toList()}");
+      debugPrint("HIVE: value IDs: ${box.values.map((e) => e.id).toList()}");
+      debugPrint(
+        "HIVE: containsKey('${widget.invoiceId}'): ${box.containsKey(widget.invoiceId)}",
+      );
 
-      debugPrint("DELETE SUCCESS");
+      // Delete using key-matching (handles any key/id mismatch)
+      final keys = box.keys.toList();
+      bool deleted = false;
+
+      for (final key in keys) {
+        final item = box.get(key);
+        if (item != null && item.id == widget.invoiceId) {
+          await box.delete(key);
+          debugPrint("HIVE: 🔥 DELETED USING KEY: $key");
+          deleted = true;
+          break;
+        }
+      }
+
+      debugPrint("HIVE AFTER DELETE COUNT: ${box.length}");
+
+      if (deleted) {
+        debugPrint("HIVE DELETE SUCCESS");
+      } else {
+        debugPrint("HIVE: ❌ DELETE FAILED — ID NOT FOUND");
+      }
 
       if (!mounted) return;
 
@@ -268,234 +279,229 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final invoicesState = ref.watch(invoicesControllerProvider);
-    final invoice = invoicesState.value
-        ?.where((i) => i.id == widget.invoiceId)
-        .firstOrNull;
+  Widget _buildBody(InvoiceModel invoice, BuildContext context) {
+    _hydrate(invoice);
     final theme = Theme.of(context);
 
-    if (invoice == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) Navigator.of(context).pop();
-      });
-      return const SizedBox.shrink();
-    }
-
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text('Edit Invoice')),
-      body: Builder(
-        builder: (context) {
-          _hydrate(invoice);
-          return SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.08,
+                          ),
+                        ),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ── Form Card ──
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: theme.colorScheme.outline.withValues(
-                                  alpha: 0.08,
-                                ),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Invoice Details',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _clientNameController,
-                                  decoration: _inputDecoration(
-                                    label: 'Client Name',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _serviceController,
-                                  decoration: _inputDecoration(
-                                    label: 'Service',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _amountController,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  decoration: _inputDecoration(label: 'Amount'),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _dueDateController,
-                                  readOnly: true,
-                                  onTap: _pickDueDate,
-                                  decoration: _inputDecoration(
-                                    label: 'Due Date',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _paymentLinkController,
-                                  keyboardType: TextInputType.url,
-                                  decoration: _inputDecoration(
-                                    label: 'Payment Link',
-                                    hint: 'https://pay.example.com/invoice',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _discountController,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  decoration: _inputDecoration(
-                                    label: 'Discount (Pro)',
-                                    hint: '0.00',
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Discounted totals are a Pro feature.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _notesController,
-                                  minLines: 3,
-                                  maxLines: 5,
-                                  decoration: _inputDecoration(
-                                    label: 'Notes',
-                                    hint: 'Payment instructions or terms',
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<InvoiceStatus>(
-                                  initialValue: _status,
-                                  decoration: _inputDecoration(label: 'Status'),
-                                  items: InvoiceStatus.values
-                                      .map(
-                                        (status) => DropdownMenuItem(
-                                          value: status,
-                                          child: Text(status.label),
-                                        ),
-                                      )
-                                      .toList(growable: false),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => _status = value);
-                                    }
-                                  },
-                                ),
-                              ],
+                          Text(
+                            'Invoice Details',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          // ── Actions ──
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton.icon(
-                              onPressed: _isDeleting ? null : _handleDelete,
-                              icon: _isDeleting
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.red,
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.delete_outline,
-                                      color: theme.colorScheme.error,
-                                      size: 20,
-                                    ),
-                              label: Text(
-                                'Delete Invoice',
-                                style: TextStyle(
-                                  color: theme.colorScheme.error,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: theme.colorScheme.error.withValues(
-                                    alpha: 0.35,
-                                  ),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _clientNameController,
+                            decoration: _inputDecoration(label: 'Client Name'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _serviceController,
+                            decoration: _inputDecoration(label: 'Service'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _amountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: _inputDecoration(label: 'Amount'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _dueDateController,
+                            readOnly: true,
+                            onTap: _pickDueDate,
+                            decoration: _inputDecoration(label: 'Due Date'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _paymentLinkController,
+                            keyboardType: TextInputType.url,
+                            decoration: _inputDecoration(
+                              label: 'Payment Link',
+                              hint: 'https://pay.example.com/invoice',
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: FilledButton(
-                              onPressed: _isSaving ? null : _save,
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 2,
-                              ),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Save Changes',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 16,
-                                      ),
-                                    ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _discountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
+                            decoration: _inputDecoration(
+                              label: 'Discount (Pro)',
+                              hint: '0.00',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Discounted totals are a Pro feature.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _notesController,
+                            minLines: 3,
+                            maxLines: 5,
+                            decoration: _inputDecoration(
+                              label: 'Notes',
+                              hint: 'Payment instructions or terms',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<InvoiceStatus>(
+                            initialValue: _status,
+                            decoration: _inputDecoration(label: 'Status'),
+                            items: InvoiceStatus.values
+                                .map(
+                                  (status) => DropdownMenuItem(
+                                    value: status,
+                                    child: Text(status.label),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _status = value);
+                              }
+                            },
                           ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: _isDeleting ? null : () => _handleDelete(),
+                        icon: _isDeleting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.red,
+                                ),
+                              )
+                            : Icon(
+                                Icons.delete_outline,
+                                color: theme.colorScheme.error,
+                                size: 20,
+                              ),
+                        label: Text(
+                          'Delete Invoice',
+                          style: TextStyle(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: theme.colorScheme.error.withValues(
+                              alpha: 0.35,
+                            ),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: _isSaving ? null : () => _save(invoice),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         },
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Box<InvoiceModel>>(
+      valueListenable: HiveStorage.invoicesBox.listenable(),
+      builder: (context, box, _) {
+        debugPrint("HIVE KEYS: ${box.keys.toList()}");
+        debugPrint("HIVE IDS: ${box.values.map((e) => e.id).toList()}");
+        debugPrint("DELETE USING ID: '${widget.invoiceId}'");
+        // Hive key IS the invoice.id, so get directly
+        final invoice = box.get(widget.invoiceId);
+
+        if (invoice == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) Navigator.of(context).pop();
+          });
+          return const SizedBox.shrink();
+        }
+
+        return Scaffold(
+          resizeToAvoidBottomInset: true,
+          appBar: AppBar(title: const Text('Edit Invoice')),
+          body: _buildBody(invoice, context),
+        );
+      },
     );
   }
 }

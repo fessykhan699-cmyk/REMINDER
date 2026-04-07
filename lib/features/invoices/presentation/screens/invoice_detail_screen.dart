@@ -217,6 +217,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           ),
           IconButton(
             onPressed: () async {
+              debugPrint("DETAIL → OPEN EDIT: ID = '${widget.invoiceId}'");
               final result = await EditInvoiceRoute(
                 widget.invoiceId,
               ).push<bool>(context);
