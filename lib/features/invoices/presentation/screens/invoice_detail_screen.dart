@@ -215,7 +215,22 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 : const Icon(Icons.share_outlined),
           ),
           IconButton(
-            onPressed: () => EditInvoiceRoute(widget.invoiceId).push(context),
+            onPressed: () async {
+              final result = await EditInvoiceRoute(
+                widget.invoiceId,
+              ).push<bool>(context);
+              if (!context.mounted) return;
+              if (result == true) {
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Invoice deleted')),
+                );
+              } else {
+                ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+              }
+            },
             icon: const Icon(Icons.edit_outlined),
           ),
         ],

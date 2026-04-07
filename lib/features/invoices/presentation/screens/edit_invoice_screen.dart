@@ -46,9 +46,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   }
 
   void _hydrate(Invoice invoice) {
-    if (_invoice != null) {
-      return;
-    }
+    if (_invoice != null) return;
     _invoice = invoice;
     _dueDate = invoice.dueDate;
     _status = invoice.status;
@@ -65,15 +63,9 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   String? _normalizedPaymentLink() {
     final trimmed = _paymentLinkController.text.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-
+    if (trimmed.isEmpty) return null;
     final uri = Uri.tryParse(trimmed);
-    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-      return null;
-    }
-
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return null;
     return trimmed;
   }
 
@@ -85,11 +77,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       lastDate: DateTime.now().add(const Duration(days: 3650)),
       initialDate: initial,
     );
-
-    if (!mounted || picked == null) {
-      return;
-    }
-
+    if (!mounted || picked == null) return;
     setState(() => _dueDate = picked);
     _dueDateController.text = AppFormatters.shortDate(picked);
   }
@@ -137,7 +125,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
             .ensureAllowed(SubscriptionGateFeature.advancedTotals);
       }
 
-      final result = await _saveInvoice(
+      await _saveInvoice(
         source.copyWith(
           clientName: _clientNameController.text.trim(),
           service: _serviceController.text.trim(),
@@ -152,29 +140,15 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         ),
       );
 
-      if (!mounted) {
-        return;
-      }
-
-      if (result == true) {
-        messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
-        shouldResetSavingState = false;
-        navigator.pop();
-      } else {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Unable to save invoice')),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
+      shouldResetSavingState = false;
+      navigator.pop();
     } on SubscriptionGateException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       await promptUpgradeForDecision(context, error.decision);
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(content: Text('Unable to save invoice')),
       );
@@ -185,9 +159,43 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     }
   }
 
-  Future<bool> _saveInvoice(Invoice updated) async {
+  Future<void> _saveInvoice(Invoice updated) async {
     await ref.read(invoicesControllerProvider.notifier).updateInvoice(updated);
-    return true;
+  }
+
+  Future<void> _deleteInvoice() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Invoice'),
+        content: const Text('Are you sure you want to delete this invoice?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .deleteInvoice(widget.invoiceId);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to delete invoice')),
+        );
+      }
+    }
   }
 
   @override
@@ -195,6 +203,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     final state = ref.watch(invoiceDetailProvider(widget.invoiceId));
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Edit Invoice')),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -207,88 +216,131 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           _hydrate(invoice);
 
           return SafeArea(
-            child: ListView(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).padding.bottom + 80,
-              ),
-              children: [
-                AppInputField(
-                  controller: _clientNameController,
-                  label: 'Client Name',
-                ),
-                const SizedBox(height: 12),
-                AppInputField(controller: _serviceController, label: 'Service'),
-                const SizedBox(height: 12),
-                AppInputField(
-                  controller: _amountController,
-                  label: 'Amount',
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                AppInputField(
-                  controller: _dueDateController,
-                  label: 'Due Date',
-                  readOnly: true,
-                  onTap: _pickDueDate,
-                ),
-                const SizedBox(height: 12),
-                AppInputField(
-                  controller: _paymentLinkController,
-                  label: 'Payment Link',
-                  hint: 'https://pay.example.com/invoice',
-                  keyboardType: TextInputType.url,
-                ),
-                const SizedBox(height: 12),
-                AppInputField(
-                  controller: _discountController,
-                  label: 'Discount (Pro)',
-                  hint: '0.00',
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Discounted totals are a Pro feature.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                AppInputField(
-                  controller: _notesController,
-                  label: 'Notes',
-                  hint: 'Payment instructions or terms',
-                  maxLines: 4,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<InvoiceStatus>(
-                  initialValue: _status,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: InvoiceStatus.values
-                      .map(
-                        (status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(status.label),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 140,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 16),
+                        AppInputField(
+                          controller: _clientNameController,
+                          label: 'Client Name',
                         ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _status = value);
-                    }
-                  },
-                ),
-                const SizedBox(height: 18),
-                PrimaryButton(
-                  label: 'Save Changes',
-                  isLoading: _isSaving,
-                  onPressed: _save,
-                ),
-              ],
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _serviceController,
+                          label: 'Service',
+                        ),
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _amountController,
+                          label: 'Amount',
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _dueDateController,
+                          label: 'Due Date',
+                          readOnly: true,
+                          onTap: _pickDueDate,
+                        ),
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _paymentLinkController,
+                          label: 'Payment Link',
+                          hint: 'https://pay.example.com/invoice',
+                          keyboardType: TextInputType.url,
+                        ),
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _discountController,
+                          label: 'Discount (Pro)',
+                          hint: '0.00',
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Discounted totals are a Pro feature.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        AppInputField(
+                          controller: _notesController,
+                          label: 'Notes',
+                          hint: 'Payment instructions or terms',
+                          maxLines: 4,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<InvoiceStatus>(
+                          initialValue: _status,
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                          ),
+                          items: InvoiceStatus.values
+                              .map(
+                                (status) => DropdownMenuItem(
+                                  value: status,
+                                  child: Text(status.label),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _status = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _deleteInvoice,
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
+                            label: const Text(
+                              'Delete Invoice',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Colors.red,
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        PrimaryButton(
+                          label: 'Save Changes',
+                          isLoading: _isSaving,
+                          onPressed: _save,
+                        ),
+                        const SizedBox(height: 140),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           );
         },

@@ -63,4 +63,23 @@ class FirebaseService {
 
     await _firestore.collection('reminders').doc(id).delete();
   }
+
+  // Temporary: delete all reminders for the current user
+  Future<void> deleteAllReminders() async {
+    final uid = userId;
+    if (uid == null) return;
+
+    final snapshot = await _firestore
+        .collection('reminders')
+        .where('userId', isEqualTo: uid)
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
 }
