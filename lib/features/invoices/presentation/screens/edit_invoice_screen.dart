@@ -1,9 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/formatters.dart';
-import '../../../../shared/components/app_input_field.dart';
-import '../../../../shared/components/primary_button.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
@@ -125,20 +124,22 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
             .ensureAllowed(SubscriptionGateFeature.advancedTotals);
       }
 
-      await _saveInvoice(
-        source.copyWith(
-          clientName: _clientNameController.text.trim(),
-          service: _serviceController.text.trim(),
-          amount: amount,
-          dueDate: dueDate,
-          status: _status,
-          discountAmount: discountAmount,
-          paymentLink: paymentLink,
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
-        ),
-      );
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .updateInvoice(
+            source.copyWith(
+              clientName: _clientNameController.text.trim(),
+              service: _serviceController.text.trim(),
+              amount: amount,
+              dueDate: dueDate,
+              status: _status,
+              discountAmount: discountAmount,
+              paymentLink: paymentLink,
+              notes: _notesController.text.trim().isEmpty
+                  ? null
+                  : _notesController.text.trim(),
+            ),
+          );
 
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
@@ -159,48 +160,79 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     }
   }
 
-  Future<void> _saveInvoice(Invoice updated) async {
-    await ref.read(invoicesControllerProvider.notifier).updateInvoice(updated);
-  }
-
-  Future<void> _deleteInvoice() async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _handleDelete() async {
+    final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (_) => AlertDialog(
         title: const Text('Delete Invoice'),
-        content: const Text('Are you sure you want to delete this invoice?'),
+        content: const Text('Are you sure?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('invoices')
+          .doc(widget.invoiceId)
+          .delete();
 
-    try {
-      await ref
-          .read(invoicesControllerProvider.notifier)
-          .deleteInvoice(widget.invoiceId);
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to delete invoice')),
-        );
-      }
+      if (mounted) Navigator.pop(context, true);
     }
+  }
+
+  InputDecoration _inputDecoration({required String label, String? hint}) {
+    final theme = Theme.of(context);
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      labelStyle: theme.textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w500,
+      ),
+      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.textTheme.bodySmall?.color,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(
+          color: theme.colorScheme.outline.withValues(alpha: 0.15),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: theme.colorScheme.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(invoiceDetailProvider(widget.invoiceId));
+    final theme = Theme.of(context);
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -220,123 +252,191 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 140,
+                      minHeight: constraints.maxHeight,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 16),
-                        AppInputField(
-                          controller: _clientNameController,
-                          label: 'Client Name',
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _serviceController,
-                          label: 'Service',
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _amountController,
-                          label: 'Amount',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _dueDateController,
-                          label: 'Due Date',
-                          readOnly: true,
-                          onTap: _pickDueDate,
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _paymentLinkController,
-                          label: 'Payment Link',
-                          hint: 'https://pay.example.com/invoice',
-                          keyboardType: TextInputType.url,
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _discountController,
-                          label: 'Discount (Pro)',
-                          hint: '0.00',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Discounted totals are a Pro feature.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        AppInputField(
-                          controller: _notesController,
-                          label: 'Notes',
-                          hint: 'Payment instructions or terms',
-                          maxLines: 4,
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<InvoiceStatus>(
-                          initialValue: _status,
-                          decoration: const InputDecoration(
-                            labelText: 'Status',
-                          ),
-                          items: InvoiceStatus.values
-                              .map(
-                                (status) => DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status.label),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Form Card ──
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: theme.colorScheme.outline.withValues(
+                                  alpha: 0.08,
                                 ),
-                              )
-                              .toList(growable: false),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _status = value);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _deleteInvoice,
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            label: const Text(
-                              'Delete Invoice',
-                              style: TextStyle(color: Colors.red),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: Colors.red,
-                                width: 1.5,
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Invoice Details',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _clientNameController,
+                                  decoration: _inputDecoration(
+                                    label: 'Client Name',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _serviceController,
+                                  decoration: _inputDecoration(
+                                    label: 'Service',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _amountController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: _inputDecoration(label: 'Amount'),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _dueDateController,
+                                  readOnly: true,
+                                  onTap: _pickDueDate,
+                                  decoration: _inputDecoration(
+                                    label: 'Due Date',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _paymentLinkController,
+                                  keyboardType: TextInputType.url,
+                                  decoration: _inputDecoration(
+                                    label: 'Payment Link',
+                                    hint: 'https://pay.example.com/invoice',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _discountController,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: _inputDecoration(
+                                    label: 'Discount (Pro)',
+                                    hint: '0.00',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Discounted totals are a Pro feature.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _notesController,
+                                  minLines: 3,
+                                  maxLines: 5,
+                                  decoration: _inputDecoration(
+                                    label: 'Notes',
+                                    hint: 'Payment instructions or terms',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                DropdownButtonFormField<InvoiceStatus>(
+                                  initialValue: _status,
+                                  decoration: _inputDecoration(label: 'Status'),
+                                  items: InvoiceStatus.values
+                                      .map(
+                                        (status) => DropdownMenuItem(
+                                          value: status,
+                                          child: Text(status.label),
+                                        ),
+                                      )
+                                      .toList(growable: false),
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() => _status = value);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // ── Actions ──
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton.icon(
+                              onPressed: _handleDelete,
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: theme.colorScheme.error,
+                                size: 20,
+                              ),
+                              label: Text(
+                                'Delete Invoice',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: theme.colorScheme.error.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        PrimaryButton(
-                          label: 'Save Changes',
-                          isLoading: _isSaving,
-                          onPressed: _save,
-                        ),
-                        const SizedBox(height: 140),
-                      ],
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: FilledButton(
+                              onPressed: _isSaving ? null : _save,
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Save Changes',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +41,24 @@ Future<void> main() async {
   await HiveStorage.seedDefaultsIfNeeded();
   await NotificationService.instance.initialize();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ── Firebase Connection Debug ──
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    // ignore: avoid_print
+    print('[Firebase] Current user: ${user?.uid ?? 'none'}');
+
+    await FirebaseFirestore.instance.collection('test').add({
+      'status': 'connected',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    // ignore: avoid_print
+    print('[Firebase] Firestore write successful → test doc created');
+  } catch (e) {
+    // ignore: avoid_print
+    print('[Firebase] Connection failed: $e');
+  }
+
   runApp(
     const ProviderScope(
       child: InvoiceReminderApp(scaffoldBackgroundColor: _rootBackground),
