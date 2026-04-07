@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,6 +30,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   DateTime? _dueDate;
   InvoiceStatus _status = InvoiceStatus.draft;
   bool _isSaving = false;
+  bool _isDeleting = false;
 
   @override
   void dispose() {
@@ -161,6 +161,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   }
 
   Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -179,13 +181,27 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       ),
     );
 
-    if (confirm == true) {
-      await FirebaseFirestore.instance
-          .collection('invoices')
-          .doc(widget.invoiceId)
-          .delete();
-
-      if (mounted) Navigator.pop(context, true);
+    if (confirm == true && mounted) {
+      setState(() => _isDeleting = true);
+      Navigator.pop(context);
+      try {
+        await ref
+            .read(invoicesControllerProvider.notifier)
+            .deleteInvoice(widget.invoiceId);
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to delete invoice')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isDeleting = false);
+        }
+      }
     }
   }
 
@@ -380,12 +396,21 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                             width: double.infinity,
                             height: 52,
                             child: OutlinedButton.icon(
-                              onPressed: _handleDelete,
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: theme.colorScheme.error,
-                                size: 20,
-                              ),
+                              onPressed: _isDeleting ? null : _handleDelete,
+                              icon: _isDeleting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.red,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.delete_outline,
+                                      color: theme.colorScheme.error,
+                                      size: 20,
+                                    ),
                               label: Text(
                                 'Delete Invoice',
                                 style: TextStyle(

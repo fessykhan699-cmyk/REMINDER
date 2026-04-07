@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_session_model.dart';
 
 class AuthLocalDatasource {
@@ -102,8 +103,12 @@ class AuthLocalDatasource {
   }
 
   Future<bool> isOnboardingCompleted() async {
-    return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('onboarding_completed') ?? false;
   }
 
-  Future<void> markOnboardingComplete() async {}
+  Future<void> markOnboardingComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_completed', true);
+  }
 }

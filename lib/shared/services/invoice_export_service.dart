@@ -97,12 +97,19 @@ class InvoiceExportService {
   }
 
   Future<bool> _requestStoragePermission() async {
-    if (await Permission.storage.isGranted) {
+    if (Platform.isAndroid) {
+      if (await Permission.storage.isGranted) {
+        return true;
+      }
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        // On Android 13+, storage permission is deprecated and not required
+        // for app-specific storage. Allow continue without it.
+        return true;
+      }
       return true;
     }
-
-    final status = await Permission.storage.request();
-    return status.isGranted;
+    return true;
   }
 
   String _filenameForInvoice(Invoice invoice) {
