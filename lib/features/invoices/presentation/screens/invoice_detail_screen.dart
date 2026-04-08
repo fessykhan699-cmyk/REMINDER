@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/utils/formatters.dart';
@@ -230,7 +231,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   "🟢 DETAIL: Popping self with true → list screen will rebuild",
                 );
                 // Pop with true so list screen receives the delete signal
-                Navigator.of(context).pop(true);
+                context.pop(true);
               } else {
                 debugPrint(
                   "🟢 DETAIL: Invalidating detail provider (result was not true)",

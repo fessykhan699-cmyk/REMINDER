@@ -96,7 +96,9 @@ class InvoicesLocalDatasource {
       throw Exception('Invoice not found.');
     }
 
+    debugPrint("🔥 DELETE BEFORE: ${_invoicesBox.keys.toList()}");
     await _invoicesBox.delete(id);
+    debugPrint("🔥 DELETE AFTER: ${_invoicesBox.keys.toList()}");
     _invoiceCache.remove(id);
     _pageCache.clear();
     debugPrint(

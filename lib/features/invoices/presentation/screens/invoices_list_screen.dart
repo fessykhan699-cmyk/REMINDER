@@ -81,13 +81,14 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
           invoice: invoice,
           onTap: () async {
             debugPrint("LIST → OPEN DETAIL: ID = '${invoice.id}'");
-            final result = await InvoiceDetailRoute(
-              invoice.id,
-            ).push<bool>(context);
-            debugPrint("LIST ← DETAIL returned: result=$result");
-            if (result == true && mounted) {
-              // Force rebuild from Hive after delete
-              debugPrint("LIST → Forcing rebuild after delete");
+            await InvoiceDetailRoute(invoice.id).push<bool>(context);
+            // Always rebuild on return. The ValueListenableBuilder fires
+            // automatically when Hive changes, but if the BoxListenable
+            // instance was swapped for a new one mid-flight (due to a
+            // concurrent parent rebuild), this setState guarantees the
+            // builder re-runs with the latest Hive state.
+            if (mounted) {
+              debugPrint("LIST → Rebuilding after returning from detail");
               setState(() {});
             }
           },

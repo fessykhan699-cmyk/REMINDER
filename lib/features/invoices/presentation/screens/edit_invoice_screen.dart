@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../../core/storage/hive_storage.dart';
@@ -226,9 +227,12 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     }
 
     // FORCE EXIT — always, regardless of errors
+    // Use context.pop(true) (GoRouter) so the push<bool> future in the
+    // caller resolves with true — Navigator.of(context).pop() pops the
+    // widget but does NOT complete GoRouter's push future with the result.
     if (mounted) {
-      debugPrint("🟡 [F] Calling Navigator.pop(true)");
-      Navigator.of(context).pop(true);
+      debugPrint("🟡 [F] Calling context.pop(true)");
+      context.pop(true);
     }
   }
 
@@ -483,11 +487,19 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
         if (invoice == null) {
           debugPrint(
-            "🔵 ValueListenableBuilder: invoice is NULL for ID='${widget.invoiceId}' — scheduling pop",
+            "🔵 ValueListenableBuilder: invoice is NULL for ID='${widget.invoiceId}' — _isDeleting=$_isDeleting",
           );
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) Navigator.of(context).pop();
-          });
+          // Only auto-pop if WE didn't initiate the delete.
+          // When _handleDelete is running (_isDeleting = true), it owns the pop
+          // via pop(true). Scheduling a second pop here fires an extra
+          // Navigator.pop() (without a return value) that disrupts the
+          // result=true chain — Detail never gets to pop(true), List never
+          // calls setState, and the deleted item stays visible.
+          if (!_isDeleting) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) context.pop();
+            });
+          }
           return const SizedBox.shrink();
         }
 
