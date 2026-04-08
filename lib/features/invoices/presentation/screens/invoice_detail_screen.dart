@@ -117,7 +117,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isMarkingPaid = true);
 
     try {
-      debugPrint("Detail screen: marking invoice paid for ID: ${invoice.id}");
       await ref
           .read(invoicesControllerProvider.notifier)
           .markInvoicePaid(invoice);
@@ -218,24 +217,14 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           ),
           IconButton(
             onPressed: () async {
-              debugPrint("🟢 DETAIL → OPEN EDIT: ID = '${widget.invoiceId}'");
               final result = await EditInvoiceRoute(
                 widget.invoiceId,
               ).push<bool>(context);
-              debugPrint(
-                "🟢 DETAIL ← EDIT returned: result=$result, mounted=$context.mounted",
-              );
               if (!context.mounted) return;
               if (result == true) {
-                debugPrint(
-                  "🟢 DETAIL: Popping self with true → list screen will rebuild",
-                );
                 // Pop with true so list screen receives the delete signal
                 context.pop(true);
               } else {
-                debugPrint(
-                  "🟢 DETAIL: Invalidating detail provider (result was not true)",
-                );
                 ref.invalidate(invoiceDetailProvider(widget.invoiceId));
               }
             },

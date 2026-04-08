@@ -41,8 +41,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint("EDIT SCREEN RECEIVED ID: '${widget.invoiceId}'");
-
     // Hydrate form fields AFTER the first frame to avoid mutating controllers during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _didHydrate) return;
@@ -182,11 +180,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   Future<void> _handleDelete() async {
     if (_isDeleting) {
-      debugPrint("🟡 _handleDelete BLOCKED by _isDeleting guard");
       return;
     }
-
-    debugPrint("🟡 [A] _handleDelete ENTERED");
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -206,32 +201,22 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       ),
     );
 
-    debugPrint("🟡 [B] Dialog result: confirm=$confirm, mounted=$mounted");
-
     if (confirm != true || !mounted) return;
 
     setState(() => _isDeleting = true);
 
     // Always delete — errors must NOT block navigation
     try {
-      debugPrint(
-        "🟡 [C] Calling controller.deleteInvoice('${widget.invoiceId}')",
-      );
       await ref
           .read(invoicesControllerProvider.notifier)
           .deleteInvoice(widget.invoiceId);
-      debugPrint("🟡 [D] controller.deleteInvoice RETURNED successfully");
-    } catch (e, st) {
-      debugPrint("🟡 [ERR] DELETE CAUGHT: $e");
-      debugPrintStack(stackTrace: st);
-    }
+    } catch (_) {}
 
     // FORCE EXIT — always, regardless of errors
     // Use context.pop(true) (GoRouter) so the push<bool> future in the
     // caller resolves with true — Navigator.of(context).pop() pops the
     // widget but does NOT complete GoRouter's push future with the result.
     if (mounted) {
-      debugPrint("🟡 [F] Calling context.pop(true)");
       context.pop(true);
     }
   }
@@ -479,16 +464,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     return ValueListenableBuilder<Box<InvoiceModel>>(
       valueListenable: HiveStorage.invoicesBox.listenable(),
       builder: (context, box, _) {
-        debugPrint("HIVE KEYS: ${box.keys.toList()}");
-        debugPrint("HIVE IDS: ${box.values.map((e) => e.id).toList()}");
-        debugPrint("DELETE USING ID: '${widget.invoiceId}'");
         // Hive key IS the invoice.id, so get directly
         final invoice = box.get(widget.invoiceId);
 
         if (invoice == null) {
-          debugPrint(
-            "🔵 ValueListenableBuilder: invoice is NULL for ID='${widget.invoiceId}' — _isDeleting=$_isDeleting",
-          );
           // Only auto-pop if WE didn't initiate the delete.
           // When _handleDelete is running (_isDeleting = true), it owns the pop
           // via pop(true). Scheduling a second pop here fires an extra

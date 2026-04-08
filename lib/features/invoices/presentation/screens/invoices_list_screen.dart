@@ -73,14 +73,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         }
 
         final invoice = invoices[dataIndex];
-        debugPrint(
-          "🧪 [UI RENDER] index=$dataIndex rendering invoice='${invoice.id}'",
-        );
         return InvoiceTile(
           key: ValueKey(invoice.id),
           invoice: invoice,
           onTap: () async {
-            debugPrint("LIST → OPEN DETAIL: ID = '${invoice.id}'");
             await InvoiceDetailRoute(invoice.id).push<bool>(context);
             // Always rebuild on return. The ValueListenableBuilder fires
             // automatically when Hive changes, but if the BoxListenable
@@ -88,7 +84,6 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
             // concurrent parent rebuild), this setState guarantees the
             // builder re-runs with the latest Hive state.
             if (mounted) {
-              debugPrint("LIST → Rebuilding after returning from detail");
               setState(() {});
             }
           },
@@ -159,12 +154,6 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         child: ValueListenableBuilder<Box<InvoiceModel>>(
           valueListenable: HiveStorage.invoicesBox.listenable(),
           builder: (context, box, _) {
-            debugPrint("🧪 [UI-FIRE] ValueListenableBuilder REBUILD TRIGGERED");
-            debugPrint("🧪 [UI] BOX HASH: ${box.hashCode}");
-            debugPrint("🧪 [UI] BOX NAME: ${box.name}");
-            debugPrint("🧪 [UI] KEYS: ${box.keys.toList()}");
-            debugPrint("🧪 [UI] IDS: ${box.values.map((e) => e.id).toList()}");
-            debugPrint("🧪 [UI] COUNT: ${box.length}");
             final invoices = _sortedInvoices(box);
 
             if (invoices.isEmpty) {
