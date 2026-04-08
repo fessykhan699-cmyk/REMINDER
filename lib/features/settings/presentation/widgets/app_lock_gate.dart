@@ -39,9 +39,7 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused) {
       if (_lastKnownPreferences.appLockEnabled &&
           _lastKnownPreferences.hasPin) {
         ref.read(appLockSessionProvider.notifier).state = false;
