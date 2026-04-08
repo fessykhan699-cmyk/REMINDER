@@ -87,38 +87,16 @@ class InvoicesLocalDatasource {
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
     debugPrint("InvoicesLocalDatasource: deleteInvoice called for $id");
-    debugPrint(
-      "InvoicesLocalDatasource: box contains ${_invoicesBox.length} invoices",
-    );
-    debugPrint(
-      "InvoicesLocalDatasource: box keys: ${_invoicesBox.keys.toList()}",
-    );
-    debugPrint(
-      "InvoicesLocalDatasource: value IDs: ${_invoicesBox.values.map((e) => e.id).toList()}",
-    );
 
-    final keys = _invoicesBox.keys.toList();
-    bool deleted = false;
-
-    for (final key in keys) {
-      final item = _invoicesBox.get(key);
-      if (item != null && item.id == id) {
-        await _invoicesBox.delete(key);
-        debugPrint("InvoicesLocalDatasource: 🔥 DELETED USING KEY: $key");
-        deleted = true;
-        break;
-      }
-    }
-
-    debugPrint(
-      "InvoicesLocalDatasource: HIVE AFTER DELETE COUNT: ${_invoicesBox.length}",
-    );
-
-    if (!deleted) {
-      debugPrint("InvoicesLocalDatasource: ❌ DELETE FAILED — ID NOT FOUND");
+    // Direct delete by ID — createInvoice uses box.put(invoice.id, invoice) so key == id
+    if (!_invoicesBox.containsKey(id)) {
+      debugPrint(
+        "InvoicesLocalDatasource: box keys: ${_invoicesBox.keys.toList()}",
+      );
       throw Exception('Invoice not found.');
     }
 
+    await _invoicesBox.delete(id);
     _invoiceCache.remove(id);
     _pageCache.clear();
     debugPrint(

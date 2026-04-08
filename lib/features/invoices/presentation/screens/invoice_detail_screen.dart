@@ -227,14 +227,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               if (!context.mounted) return;
               if (result == true) {
                 debugPrint(
-                  "🟢 DETAIL: Popping self + showing 'deleted' snackbar",
+                  "🟢 DETAIL: Popping self with true → list screen will rebuild",
                 );
-                final navigator = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                navigator.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Invoice deleted')),
-                );
+                // Pop with true so list screen receives the delete signal
+                Navigator.of(context).pop(true);
               } else {
                 debugPrint(
                   "🟢 DETAIL: Invalidating detail provider (result was not true)",

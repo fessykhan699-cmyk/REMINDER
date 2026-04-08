@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -32,31 +34,46 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  Completer<void>? _initCompleter;
 
   Future<void> initialize() async {
     if (_initialized) {
       return;
     }
 
-    tz.initializeTimeZones();
-    await _configureLocalTimezone();
+    // If already initializing, wait for that to complete
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-    const darwinSettings = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: darwinSettings,
-      macOS: darwinSettings,
-    );
+    _initCompleter = Completer<void>();
 
-    await _plugin.initialize(settings: settings);
-    _initialized = true;
+    try {
+      tz.initializeTimeZones();
+      await _configureLocalTimezone();
+
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
+      const darwinSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      const settings = InitializationSettings(
+        android: androidSettings,
+        iOS: darwinSettings,
+        macOS: darwinSettings,
+      );
+
+      await _plugin.initialize(settings: settings);
+      _initialized = true;
+      _initCompleter!.complete();
+    } catch (e) {
+      if (!_initCompleter!.isCompleted) {
+        _initCompleter!.completeError(e);
+      }
+    }
   }
 
   Future<bool> requestPermissionsIfNeeded() async {

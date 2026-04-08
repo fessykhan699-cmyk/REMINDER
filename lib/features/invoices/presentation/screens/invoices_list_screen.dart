@@ -30,6 +30,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
   int _visibleItemCount = 20;
 
   Widget _buildInvoicesList({
+    Key? key,
     required List<Invoice> invoices,
     required SubscriptionState subscription,
     required SubscriptionUsage usage,
@@ -40,8 +41,9 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
     final itemCount = invoices.length + (showNudge ? 1 : 0) + (hasMore ? 1 : 0);
 
     return ListView.builder(
+      key: key,
       physics: const BouncingScrollPhysics(),
-      cacheExtent: 2,
+      cacheExtent: 0,
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).padding.bottom + 80,
       ),
@@ -71,11 +73,23 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         }
 
         final invoice = invoices[dataIndex];
+        debugPrint(
+          "🧪 [UI RENDER] index=$dataIndex rendering invoice='${invoice.id}'",
+        );
         return InvoiceTile(
+          key: ValueKey(invoice.id),
           invoice: invoice,
-          onTap: () {
+          onTap: () async {
             debugPrint("LIST → OPEN DETAIL: ID = '${invoice.id}'");
-            InvoiceDetailRoute(invoice.id).push(context);
+            final result = await InvoiceDetailRoute(
+              invoice.id,
+            ).push<bool>(context);
+            debugPrint("LIST ← DETAIL returned: result=$result");
+            if (result == true && mounted) {
+              // Force rebuild from Hive after delete
+              debugPrint("LIST → Forcing rebuild after delete");
+              setState(() {});
+            }
           },
         );
       },
@@ -84,9 +98,8 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
 
   List<Invoice> _sortedInvoices(Box<InvoiceModel> box) {
     final now = DateTime.now();
-    final invoices = box.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
+    final invoices = box.values.toList();
+    invoices.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return invoices
         .map(
           (invoice) => invoice.copyWith(
@@ -145,9 +158,12 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
         child: ValueListenableBuilder<Box<InvoiceModel>>(
           valueListenable: HiveStorage.invoicesBox.listenable(),
           builder: (context, box, _) {
-            debugPrint(
-              "InvoicesListScreen: ValueListenableBuilder — box has ${box.length} invoices",
-            );
+            debugPrint("🧪 [UI-FIRE] ValueListenableBuilder REBUILD TRIGGERED");
+            debugPrint("🧪 [UI] BOX HASH: ${box.hashCode}");
+            debugPrint("🧪 [UI] BOX NAME: ${box.name}");
+            debugPrint("🧪 [UI] KEYS: ${box.keys.toList()}");
+            debugPrint("🧪 [UI] IDS: ${box.values.map((e) => e.id).toList()}");
+            debugPrint("🧪 [UI] COUNT: ${box.length}");
             final invoices = _sortedInvoices(box);
 
             if (invoices.isEmpty) {
@@ -171,6 +187,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen> {
               children: [
                 Expanded(
                   child: _buildInvoicesList(
+                    key: ValueKey(box.values.map((e) => e.id).toList()),
                     invoices: visibleInvoices,
                     subscription: subscription,
                     usage: usage,

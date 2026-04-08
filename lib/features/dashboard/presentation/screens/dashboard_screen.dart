@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -368,7 +367,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
-        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.dueSoon:
@@ -390,7 +388,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
-        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
@@ -425,7 +422,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           }
           addSection('stats', _StatsSection(totals: model.totals));
         }
-        addSection('reminders', const _LocalRemindersPlaceholder());
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
     }
@@ -502,58 +498,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ),
       ),
       _buildDashboardContent(context, dashboard, subscription),
-      // 🔥 TEMPORARY DEBUG RESET BUTTON — REMOVE BEFORE SHIPPING
-      _staggeredCard(
-        index: 2,
-        child: ElevatedButton(
-          onPressed: () async {
-            try {
-              // CLEAR HIVE INVOICES
-              if (Hive.isBoxOpen(HiveStorage.invoicesBoxName)) {
-                final invoiceBox = HiveStorage.invoicesBox;
-                final countBefore = invoiceBox.length;
-                await invoiceBox.clear();
-                debugPrint(
-                  "🔥 HIVE INVOICES CLEARED: $countBefore → ${invoiceBox.length}",
-                );
-              }
-
-              // CLEAR HIVE CLIENTS
-              if (Hive.isBoxOpen(HiveStorage.clientsBoxName)) {
-                final clientBox = HiveStorage.clientsBox;
-                final countBefore = clientBox.length;
-                await clientBox.clear();
-                debugPrint(
-                  "🔥 HIVE CLIENTS CLEARED: $countBefore → ${clientBox.length}",
-                );
-              }
-
-              // CLEAR DEMO CLEANUP FLAG (so one-time migration can re-run if needed)
-              if (Hive.isBoxOpen(HiveStorage.settingsBoxName)) {
-                final settingsBox = HiveStorage.settingsBox;
-                settingsBox.delete('_demoCleanupDone');
-                debugPrint("🔥 DEMO CLEANUP FLAG CLEARED");
-              }
-
-              debugPrint("🔥 FULL RESET COMPLETE");
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('App data reset complete')),
-              );
-            } catch (e) {
-              debugPrint("RESET ERROR: $e");
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.withValues(alpha: 0.15),
-            foregroundColor: Colors.red,
-          ),
-          child: const Text(
-            '🔧 RESET ALL APP DATA',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
     ];
 
     return Scaffold(
@@ -1995,31 +1939,6 @@ class _DashboardAvatarState extends State<DashboardAvatar> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Temporary placeholder for reminders section.
-/// Firebase Firestore was removed due to permission-denied errors.
-/// Use local notification-based reminders instead.
-class _LocalRemindersPlaceholder extends StatelessWidget {
-  const _LocalRemindersPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const GlassCard(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Reminders',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          SizedBox(height: 8),
-          Text('Local reminders are coming soon.'),
-        ],
       ),
     );
   }

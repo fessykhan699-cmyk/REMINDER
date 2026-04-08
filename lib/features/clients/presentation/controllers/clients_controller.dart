@@ -67,12 +67,16 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  bool _didLoad = false;
 
   bool get hasMore => _hasMore;
 
   @override
   AsyncValue<List<Client>> build() {
-    Future<void>(loadInitial);
+    if (!_didLoad) {
+      _didLoad = true;
+      Future(() => loadInitial());
+    }
     return const AsyncValue.loading();
   }
 

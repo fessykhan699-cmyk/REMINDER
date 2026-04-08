@@ -53,12 +53,12 @@ class ReminderService {
       final scheduleItems = <_ReminderScheduleItem>[
         if (preferences.remind24HoursBefore)
           _ReminderScheduleItem(
-            id: Object.hash(invoice.id, '24h') & 0x7fffffff,
+            id: Object.hash(invoice.id, 'day-before') & 0x7fffffff,
             scheduledAt: dueDate.subtract(const Duration(hours: 24)),
           ),
         if (preferences.remind3HoursBefore)
           _ReminderScheduleItem(
-            id: Object.hash(invoice.id, '3h') & 0x7fffffff,
+            id: Object.hash(invoice.id, 'three-hours') & 0x7fffffff,
             scheduledAt: dueDate.subtract(const Duration(hours: 3)),
           ),
         if (preferences.remindOnDueDate)

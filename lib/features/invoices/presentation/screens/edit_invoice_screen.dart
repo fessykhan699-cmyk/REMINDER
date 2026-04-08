@@ -35,11 +35,26 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   InvoiceStatus _status = InvoiceStatus.draft;
   bool _isSaving = false;
   bool _isDeleting = false;
+  bool _didHydrate = false;
 
   @override
   void initState() {
     super.initState();
     debugPrint("EDIT SCREEN RECEIVED ID: '${widget.invoiceId}'");
+
+    // Hydrate form fields AFTER the first frame to avoid mutating controllers during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _didHydrate) return;
+      final invoice = ref
+          .read(invoicesControllerProvider)
+          .value
+          ?.where((i) => i.id == widget.invoiceId)
+          .firstOrNull;
+      if (invoice != null) {
+        _hydrate(InvoiceModel.fromEntity(invoice));
+        _didHydrate = true;
+      }
+    });
   }
 
   @override
@@ -142,6 +157,9 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           .read(invoicesControllerProvider.notifier)
           .updateInvoice(resolved);
 
+      // Invalidate detail provider so detail screen shows fresh data
+      ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
       shouldResetSavingState = false;
@@ -191,39 +209,26 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
     if (confirm != true || !mounted) return;
 
-    debugPrint(
-      "🟡 [C] Calling controller.deleteInvoice('${widget.invoiceId}')",
-    );
     setState(() => _isDeleting = true);
 
+    // Always delete — errors must NOT block navigation
     try {
+      debugPrint(
+        "🟡 [C] Calling controller.deleteInvoice('${widget.invoiceId}')",
+      );
       await ref
           .read(invoicesControllerProvider.notifier)
           .deleteInvoice(widget.invoiceId);
-
       debugPrint("🟡 [D] controller.deleteInvoice RETURNED successfully");
-
-      if (!mounted) {
-        debugPrint("🟡 [E] Widget unmounted after delete — skipping pop");
-        return;
-      }
-
-      debugPrint("🟡 [F] Calling Navigator.pop(true)");
-      Navigator.of(context).pop(true);
     } catch (e, st) {
       debugPrint("🟡 [ERR] DELETE CAUGHT: $e");
       debugPrintStack(stackTrace: st);
+    }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete invoice')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        debugPrint("🟡 [FINALLY] Resetting _isDeleting");
-        setState(() => _isDeleting = false);
-      }
+    // FORCE EXIT — always, regardless of errors
+    if (mounted) {
+      debugPrint("🟡 [F] Calling Navigator.pop(true)");
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -268,7 +273,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   }
 
   Widget _buildBody(InvoiceModel invoice, BuildContext context) {
-    _hydrate(invoice);
     final theme = Theme.of(context);
 
     return SafeArea(

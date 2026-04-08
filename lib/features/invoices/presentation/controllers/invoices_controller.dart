@@ -61,6 +61,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  bool _didLoad = false;
   late final ReminderService _reminderService = ref.read(
     reminderServiceProvider,
   );
@@ -74,7 +75,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
   @override
   AsyncValue<List<Invoice>> build() {
-    Future<void>(loadInitial);
+    if (!_didLoad) {
+      _didLoad = true;
+      Future(() => loadInitial());
+    }
     return const AsyncValue.loading();
   }
 
@@ -157,73 +161,27 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    debugPrint("🔴 [1/7] deleteInvoice ENTERED: $invoiceId");
+    debugPrint("🔴 deleteInvoice ENTERED: '$invoiceId'");
 
-    // Delete from Hive using key-matching (handles any key/id mismatch)
-    try {
-      final box = HiveStorage.invoicesBox;
-      debugPrint("🔴 [2/7] Hive box keys: ${box.keys.toList()}");
-      debugPrint(
-        "🔴 [2/7] Hive value IDs: ${box.values.map((e) => e.id).toList()}",
-      );
+    // Use the use case (which calls the repository/datasource) for proper architecture
+    await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
 
-      final keys = box.keys.toList();
-      bool deleted = false;
+    // Update controller state from fresh Hive data
+    final box = HiveStorage.invoicesBox;
+    final updated = box.values.toList();
+    state = AsyncValue.data(updated);
+    ref.invalidate(invoiceDetailProvider(invoiceId));
 
-      for (final key in keys) {
-        final item = box.get(key);
-        debugPrint(
-          "🔴 [3/7] Checking key='$key' → item.id='${item?.id}' vs target='$invoiceId'",
-        );
-        if (item != null && item.id == invoiceId) {
-          debugPrint("🔴 [4/7] MATCH found — deleting key='$key'");
-          await box.delete(key);
-          debugPrint(
-            "🔴 [5/7] box.delete COMPLETED. Box now has ${box.length} invoices",
-          );
-          deleted = true;
-          break;
-        }
-      }
-
-      if (!deleted) {
-        debugPrint(
-          "🔴 [5/7] NO MATCH — invoiceId '$invoiceId' not found in any key",
-        );
-      }
-
-      final updated = box.values.toList();
-      debugPrint(
-        "🔴 [6/7] Updating controller state with ${updated.length} invoices",
-      );
-
-      // Update controller state
-      state = AsyncValue.data(updated);
-      ref.invalidate(invoiceDetailProvider(invoiceId));
-    } catch (e, st) {
-      debugPrint("🔴 HIVE ERROR: $e");
-      debugPrintStack(stackTrace: st);
-      rethrow;
-    }
-
-    // Firebase delete disabled (permission-denied) - temporarily skipped
-    debugPrint("🔴 FIREBASE: delete skipped (permission-denied)");
-
-    // Cancel reminders
-    try {
-      debugPrint("🔴 [7/7] Cancelling reminders for $invoiceId");
-      await _reminderService.cancelInvoiceReminders(invoiceId);
-    } catch (e) {
-      debugPrint("REMINDER CANCEL ERROR: $e");
-    }
-
-    debugPrint(
-      "🔴 [DONE] deleteInvoice RETURNING. Final state length: ${state.value?.length ?? 0}",
+    await _runBestEffortSideEffect(
+      'cancel invoice reminders',
+      () => _reminderService.cancelInvoiceReminders(invoiceId),
     );
-
-    await ref
-        .read(invoiceCreationLearningProvider.notifier)
-        .rebuildFromInvoices(state.value ?? []);
+    await _runBestEffortSideEffect(
+      'rebuild invoice learning',
+      () => ref
+          .read(invoiceCreationLearningProvider.notifier)
+          .rebuildFromInvoices(updated),
+    );
   }
 
   Future<void> updateInvoice(Invoice invoice) async {
