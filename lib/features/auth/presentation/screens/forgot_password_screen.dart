@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -57,20 +58,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     }
 
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isSubmitting = true;
-    });
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _isSubmitting = false;
-    });
+    setState(() => _isSubmitting = true);
 
-    await Navigator.of(context).pushReplacement(
-      buildAuthRoute(EmailSentScreen(email: _emailController.text.trim())),
-    );
+    final email = _emailController.text.trim();
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      debugPrint('sendPasswordResetEmail sent to: $email');
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        buildAuthRoute(EmailSentScreen(email: email)),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      debugPrint('sendPasswordResetEmail failed [${e.code}]: ${e.message}');
+      final message = switch (e.code) {
+        'user-not-found' =>
+          'No password account found. If you signed up with Google, use Google Sign-In.',
+        'invalid-email' => 'Invalid email address.',
+        'network-request-failed' => 'Network error. Check your connection.',
+        _ => 'Something went wrong. Please try again.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   void _openReset() {
