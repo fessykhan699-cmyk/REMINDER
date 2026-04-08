@@ -22,7 +22,7 @@ class AppPreferencesController
     extends Notifier<AsyncValue<AppPreferences>> {
   @override
   AsyncValue<AppPreferences> build() {
-    Future<void>(load);
+    Future(() => load());
     return const AsyncValue.loading();
   }
 

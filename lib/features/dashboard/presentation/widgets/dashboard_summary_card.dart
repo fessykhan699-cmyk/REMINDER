@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/components/glass_card.dart';
 
@@ -52,17 +51,20 @@ class _MetricPill extends StatelessWidget {
   final String label;
   final String value;
 
+  // AppColors.accentPrimary = 0xFFC8A96A
+  static const _pillFill = Color(0x29C8A96A); // alpha 0.16 ≈ 0x29
+  static const _pillBorder = Color(0x3DC8A96A); // alpha 0.24 ≈ 0x3D
+  static const _pillDecoration = BoxDecoration(
+    color: _pillFill,
+    border: Border.fromBorderSide(BorderSide(color: _pillBorder)),
+    borderRadius: BorderRadius.all(Radius.circular(18)),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.accentPrimary.withValues(alpha: 0.16),
-        border: Border.all(
-          color: AppColors.accentPrimary.withValues(alpha: 0.24),
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
+      decoration: _pillDecoration,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

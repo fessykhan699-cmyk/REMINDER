@@ -29,6 +29,16 @@ class AppShellScaffold extends ConsumerStatefulWidget {
 
 class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   int? _lastTrackedBranchIndex;
+  List<AdaptiveTabKey>? _cachedTabOrder;
+  List<_AdaptiveNavItem>? _cachedNavItems;
+
+  static final _clientIdRegExp = RegExp(r'^/clients/([^/]+)$');
+  static const _navBorderDecoration = BoxDecoration(
+    color: AppColors.backgroundPrimary,
+    border: Border(
+      top: BorderSide(color: Color(0x1FC8A96A)), // AppColors.accent (0xFFC8A96A) at alpha 0.12
+    ),
+  );
 
   @override
   void initState() {
@@ -114,7 +124,23 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   }
 
   List<_AdaptiveNavItem> _buildNavigationItems(AdaptiveSystemState state) {
-    return state.orderedTabs.map(_navigationItemForTab).toList(growable: false);
+    final tabs = state.orderedTabs;
+    if (_cachedTabOrder != null &&
+        _cachedNavItems != null &&
+        _listsEqual(_cachedTabOrder!, tabs)) {
+      return _cachedNavItems!;
+    }
+    _cachedTabOrder = tabs;
+    _cachedNavItems = tabs.map(_navigationItemForTab).toList(growable: false);
+    return _cachedNavItems!;
+  }
+
+  static bool _listsEqual(List<AdaptiveTabKey> a, List<AdaptiveTabKey> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   _AdaptiveNavItem _navigationItemForTab(AdaptiveTabKey tab) {
@@ -163,7 +189,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   }
 
   String? _extractViewedClientId(String location) {
-    final match = RegExp(r'^/clients/([^/]+)$').firstMatch(location);
+    final match = _clientIdRegExp.firstMatch(location);
     final clientId = match?.group(1);
     if (clientId == null || clientId == 'add') {
       return null;
@@ -354,12 +380,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.backgroundPrimary,
-            border: Border(
-              top: BorderSide(color: AppColors.accent.withValues(alpha: 0.12)),
-            ),
-          ),
+          decoration: _navBorderDecoration,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             switchInCurve: Curves.easeOut,

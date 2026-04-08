@@ -3,13 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/app_exception.dart';
-import '../../../../core/sync/sync_service.dart';
 import '../../../../core/utils/id_generator.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/clients_local_datasource.dart';
-import '../../data/models/client_model.dart';
 import '../../data/repositories/client_repository_impl.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/repositories/client_repository.dart';
@@ -148,9 +146,6 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
       await ref
           .read(adaptiveSystemProvider.notifier)
           .recordAction(AdaptiveActionKey.addClient);
-      SyncService.instance.syncClientToFirebase(
-        ClientModel.fromEntity(created),
-      );
       return created;
     } catch (error, stackTrace) {
       if (error is AppException) {
@@ -173,9 +168,6 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
       final current = state.valueOrNull ?? const <Client>[];
       state = AsyncValue.data(_mergeClients(current, updated));
       ref.invalidate(clientDetailProvider(updated.id));
-      SyncService.instance.syncClientToFirebase(
-        ClientModel.fromEntity(updated),
-      );
       return updated;
     } catch (error, stackTrace) {
       if (error is AppException) {
@@ -196,7 +188,6 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
         current.where((item) => item.id != clientId).toList(growable: false),
       );
       ref.invalidate(clientDetailProvider(clientId));
-      SyncService.instance.deleteClientFromFirebase(clientId);
     } catch (error, stackTrace) {
       if (error is AppException) {
         rethrow;

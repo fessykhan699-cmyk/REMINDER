@@ -31,7 +31,7 @@ final settingsControllerProvider =
 class SettingsController extends AutoDisposeNotifier<AsyncValue<UserProfile>> {
   @override
   AsyncValue<UserProfile> build() {
-    Future<void>(load);
+    Future(() => load());
     return const AsyncValue.loading();
   }
 

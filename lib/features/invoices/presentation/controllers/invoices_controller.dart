@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/storage/hive_storage.dart';
-import '../../../../core/sync/sync_service.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/invoice_status_service.dart';
@@ -11,7 +9,6 @@ import '../../../../shared/services/reminder_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
-import '../../data/models/invoice_model.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/invoice_repository.dart';
@@ -154,16 +151,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       'schedule invoice reminders',
       () => _reminderService.scheduleInvoiceReminders(created),
     );
-    SyncService.instance.syncInvoiceToFirebase(
-      InvoiceModel.fromEntity(created),
-    );
     return created;
   }
 
   Future<void> deleteInvoice(String invoiceId) async {
-    debugPrint("🔴 deleteInvoice ENTERED: '$invoiceId'");
-
-    // Use the use case (which calls the repository/datasource) for proper architecture
     await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
 
     // Update controller state from fresh Hive data
@@ -185,9 +176,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<void> updateInvoice(Invoice invoice) async {
-    debugPrint("Controller: updateInvoice called for ID: ${invoice.id}");
     final current = state.valueOrNull ?? const <Invoice>[];
-    debugPrint("Controller: current state has ${current.length} invoices");
     Invoice? previousInvoice;
     for (final item in current) {
       if (item.id == invoice.id) {
@@ -200,18 +189,12 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     final updated = await ref
         .read(updateInvoiceUseCaseProvider)
         .call(normalizedInvoice);
-    debugPrint("Controller: update completed, ID: ${updated.id}");
-
     final updatedList = current
         .map((item) => item.id == updated.id ? updated : item)
         .toList(growable: false);
 
     state = AsyncValue.data(updatedList);
     ref.invalidate(invoiceDetailProvider(invoice.id));
-    SyncService.instance.syncInvoiceToFirebase(
-      InvoiceModel.fromEntity(updated),
-    );
-
     final dueDateChanged =
         previousInvoice != null &&
         !previousInvoice.dueDate.isAtSameMomentAs(updated.dueDate);
@@ -241,14 +224,12 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<Invoice> markInvoiceSent(Invoice invoice) async {
-    debugPrint("Controller: markInvoiceSent for ID: ${invoice.id}");
     final next = _invoiceStatusService.markSent(invoice);
     await updateInvoice(next);
     return next;
   }
 
   Future<Invoice> markInvoicePaid(Invoice invoice) async {
-    debugPrint("Controller: markInvoicePaid for ID: ${invoice.id}");
     final next = _invoiceStatusService.markPaid(invoice);
     await updateInvoice(next);
     return next;
@@ -260,9 +241,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   ) async {
     try {
       await task();
-    } catch (error, stackTrace) {
-      debugPrint('Invoice side effect failed for $label: $error');
-      debugPrintStack(stackTrace: stackTrace);
+    } catch (_) {
     }
   }
 }

@@ -32,7 +32,7 @@ class DashboardController
     extends AutoDisposeNotifier<AsyncValue<DashboardSummary>> {
   @override
   AsyncValue<DashboardSummary> build() {
-    Future<void>(load);
+    Future(() => load());
     return const AsyncValue.loading();
   }
 
