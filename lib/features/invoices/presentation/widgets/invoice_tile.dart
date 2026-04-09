@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../shared/components/glass_card.dart';
 import '../../domain/entities/invoice.dart';
 import 'invoice_status_badge.dart';
 
@@ -14,66 +15,91 @@ class InvoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: appCardMargin,
-      decoration: BoxDecoration(
-        color: AppColors.glassFill,
-        borderRadius: BorderRadius.circular(cardRadius),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(cardRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: appCardPadding,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        invoice.clientName,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: appCardMargin,
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onTap,
+            child: Padding(
+              padding: appCardPadding,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Avatar circle — matches dashboard _PriorityInvoiceRow
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.accent.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.30),
                       ),
-                      const SizedBox(height: spacingXS),
-                      Text(
-                        invoice.service,
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: spacingSM),
-                      Text(
-                        'Due ${AppFormatters.shortDate(invoice.dueDate)}',
-                        style: const TextStyle(color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: spacingMD),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      AppFormatters.currency(
-                        invoice.amount,
-                        currencyCode: invoice.currencyCode,
-                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      invoice.clientName.isEmpty
+                          ? '?'
+                          : invoice.clientName.characters.first.toUpperCase(),
                       style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: spacingSM),
-                    InvoiceStatusBadge(status: invoice.status),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          invoice.clientName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          invoice.service,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Due ${AppFormatters.shortDate(invoice.dueDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: spacingMD),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        AppFormatters.currency(
+                          invoice.amount,
+                          currencyCode: invoice.currencyCode,
+                        ),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: spacingSM),
+                      InvoiceStatusBadge(status: invoice.status),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

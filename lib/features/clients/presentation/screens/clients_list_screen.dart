@@ -8,15 +8,15 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/storage/hive_storage.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../shared/widgets/app_async_state_view.dart';
+import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/load_more_button.dart';
+import '../../../invoices/data/models/invoice_model.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../subscription/presentation/widgets/usage_limit_nudge_card.dart';
-import '../../../invoices/data/models/invoice_model.dart';
 import '../../data/models/client_model.dart';
 import '../../domain/entities/client.dart';
 import '../controllers/clients_controller.dart';
@@ -29,52 +29,36 @@ class ClientsListScreen extends ConsumerStatefulWidget {
   ConsumerState<ClientsListScreen> createState() => _ClientsListScreenState();
 }
 
-class _ClientsListScreenState extends ConsumerState<ClientsListScreen> {
+class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
+    with SingleTickerProviderStateMixin {
   int _visibleItemCount = AppConstants.defaultPageSize;
 
-  Widget _buildClientsList({
-    required List<Client> clients,
-    required SubscriptionState subscription,
-    required SubscriptionUsage usage,
-    required bool hasMore,
-    required VoidCallback onLoadMore,
-  }) {
-    final showNudge = !subscription.isPro;
-    final itemCount = clients.length + (showNudge ? 1 : 0) + (hasMore ? 1 : 0);
+  late final AnimationController _entryCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  )..forward();
 
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      cacheExtent: 2,
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).padding.bottom + 80,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (showNudge && index == 0) {
-          return UsageLimitNudgeCard(
-            usage: usage,
-            focus: UsageLimitFocus.clients,
-            onUpgrade: () {
-              const UpgradeToProRoute().push(context);
-            },
-          );
-        }
+  @override
+  void dispose() {
+    _entryCtrl.dispose();
+    super.dispose();
+  }
 
-        final dataIndex = index - (showNudge ? 1 : 0);
-        if (hasMore && dataIndex == clients.length) {
-          return Padding(
-            padding: appCardPadding,
-            child: Center(child: LoadMoreButton(onPressed: onLoadMore)),
-          );
-        }
-
-        final client = clients[dataIndex];
-        return ClientTile(
-          client: client,
-          onTap: () => ClientDetailRoute(client.id).push(context),
-          onLongPress: () async {
-            await _deleteClient(client);
-          },
+  Widget _staggeredItem({required int index, required Widget child}) {
+    final begin = (index * 0.10).clamp(0.0, 0.80);
+    return AnimatedBuilder(
+      animation: _entryCtrl,
+      child: child,
+      builder: (context, stableChild) {
+        final progress = Curves.easeOut.transform(
+          Interval(begin, 1.0).transform(_entryCtrl.value),
+        );
+        return Opacity(
+          opacity: progress,
+          child: Transform.translate(
+            offset: Offset(0, (1 - progress) * 8),
+            child: stableChild,
+          ),
         );
       },
     );
@@ -91,18 +75,11 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen> {
         .read(subscriptionGatekeeperProvider)
         .evaluate(SubscriptionGateFeature.addClient);
     if (!decision.isAllowed) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final upgraded = await promptUpgradeForDecision(context, decision);
-      if (!upgraded || !mounted) {
-        return;
-      }
+      if (!upgraded || !mounted) return;
     }
-
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     await const AddClientRoute().push(context);
   }
 
@@ -136,34 +113,27 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen> {
       },
     );
 
-    if (confirmed != true || !mounted) {
-      return;
-    }
+    if (confirmed != true || !mounted) return;
 
     try {
       await ref
           .read(clientsControllerProvider.notifier)
           .deleteClient(client.id);
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${client.name} deleted.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${client.name} deleted.')),
+      );
     } on AppException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controllerState = ref.watch(clientsControllerProvider);
-    final controller = ref.read(clientsControllerProvider.notifier);
+    final theme = Theme.of(context);
     final subscription =
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
@@ -171,82 +141,144 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen> {
     final invoiceCount = Hive.isBoxOpen(HiveStorage.invoicesBoxName)
         ? Hive.box<InvoiceModel>(HiveStorage.invoicesBoxName).length
         : 0;
-    final hasClientsBox = Hive.isBoxOpen(HiveStorage.clientsBoxName);
     final emptyMessage = invoiceCount > 0
         ? 'Add a client to keep your future invoices organized.'
         : 'Add your first client to start invoicing faster.';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Clients'),
-        actions: [
-          IconButton(
-            tooltip: 'New Client',
-            onPressed: _openAddClient,
-            icon: const Icon(Icons.person_add_alt_1_outlined),
-          ),
-        ],
-      ),
+    return AppScaffold(
+      extendBody: true,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: hasClientsBox
-                  ? ValueListenableBuilder<Box<ClientModel>>(
-                      valueListenable: HiveStorage.clientsBox.listenable(),
-                      builder: (context, box, _) {
-                        final clients = _sortedClients(box);
-                        if (clients.isEmpty) {
-                          return AppEmptyState(
-                            title: 'No clients yet',
-                            message: emptyMessage,
-                            action: FilledButton.icon(
-                              onPressed: _openAddClient,
-                              icon: const Icon(Icons.person_add_alt_1_rounded),
-                              label: const Text('Add Client'),
-                            ),
-                          );
-                        }
+        child: ValueListenableBuilder<Box<ClientModel>>(
+          valueListenable: HiveStorage.clientsBox.listenable(),
+          builder: (context, box, _) {
+            final clients = _sortedClients(box);
+            final visibleCount = math.min(clients.length, _visibleItemCount);
+            final visibleClients = clients.take(visibleCount).toList(growable: false);
+            final showNudge = !subscription.isPro;
+            final hasMore = clients.length > visibleCount;
 
-                        final visibleCount = math.min(
-                          clients.length,
-                          _visibleItemCount,
-                        );
-                        final visibleClients = clients
-                            .take(visibleCount)
-                            .toList(growable: false);
-                        return _buildClientsList(
-                          clients: visibleClients,
-                          subscription: subscription,
-                          usage: usage,
-                          hasMore: clients.length > visibleCount,
-                          onLoadMore: () => _loadMoreClients(clients.length),
-                        );
-                      },
-                    )
-                  : AppAsyncStateView<List<Client>>(
-                      state: controllerState,
-                      onRetry: controller.loadInitial,
-                      emptyTitle: 'No clients yet',
-                      emptyMessage: emptyMessage,
-                      emptyAction: FilledButton.icon(
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ── Header ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      spacingMD,
+                      spacingMD,
+                      spacingMD,
+                      spacingLG,
+                    ),
+                    child: _staggeredItem(
+                      index: 0,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Clients',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'New Client',
+                            onPressed: _openAddClient,
+                            style: IconButton.styleFrom(
+                              backgroundColor:
+                                  AppColors.accent.withValues(alpha: 0.14),
+                              foregroundColor: AppColors.textPrimary,
+                              shape: const CircleBorder(),
+                            ),
+                            icon: const Icon(
+                              Icons.person_add_alt_1_outlined,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                if (clients.isEmpty)
+                  SliverFillRemaining(
+                    child: AppEmptyState(
+                      title: 'No clients yet',
+                      message: emptyMessage,
+                      action: FilledButton.icon(
                         onPressed: _openAddClient,
                         icon: const Icon(Icons.person_add_alt_1_rounded),
                         label: const Text('Add Client'),
                       ),
-                      isEmpty: (data) => data.isEmpty,
-                      builder: (clients) {
-                        return _buildClientsList(
-                          clients: clients,
-                          subscription: subscription,
-                          usage: usage,
-                          hasMore: controller.hasMore,
-                          onLoadMore: controller.loadMore,
+                    ),
+                  )
+                else ...[
+                  // ── Usage nudge ──
+                  if (showNudge)
+                    SliverToBoxAdapter(
+                      child: _staggeredItem(
+                        index: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: spacingMD,
+                          ),
+                          child: UsageLimitNudgeCard(
+                            usage: usage,
+                            focus: UsageLimitFocus.clients,
+                            onUpgrade: () {
+                              const UpgradeToProRoute().push(context);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // ── Client list ──
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final client = visibleClients[index];
+                        return _staggeredItem(
+                          index: index + (showNudge ? 2 : 1),
+                          child: ClientTile(
+                            client: client,
+                            onTap: () => ClientDetailRoute(client.id).push(context),
+                            onLongPress: () async {
+                              await _deleteClient(client);
+                            },
+                          ),
                         );
                       },
+                      childCount: visibleClients.length,
                     ),
-            ),
-          ],
+                  ),
+
+                  // ── Load more ──
+                  if (hasMore)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: appCardPadding,
+                        child: Center(
+                          child: TextButton(
+                            onPressed: () => _loadMoreClients(clients.length),
+                            child: const Text('Load more'),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // ── Bottom padding ──
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.bottom + 100,
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );

@@ -189,20 +189,70 @@ class AppTheme {
       ),
       dividerColor: AppColors.glassBorder,
       textTheme: const TextTheme(
+        // Display
+        displayLarge: TextStyle(
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1.0,
+          color: AppColors.textPrimary,
+        ),
+        displayMedium: TextStyle(
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.5,
+          color: AppColors.textPrimary,
+        ),
+        displaySmall: TextStyle(
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+          color: AppColors.textPrimary,
+        ),
+        // Headline
+        headlineLarge: TextStyle(
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.4,
+          color: AppColors.textPrimary,
+        ),
         headlineMedium: TextStyle(
           fontWeight: FontWeight.w700,
           letterSpacing: -0.2,
           color: AppColors.textPrimary,
         ),
+        headlineSmall: TextStyle(
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: AppColors.textPrimary,
+        ),
+        // Title
         titleLarge: TextStyle(
           fontWeight: FontWeight.w600,
           letterSpacing: -0.1,
           color: AppColors.textPrimary,
         ),
-        titleMedium: TextStyle(color: AppColors.textPrimary),
+        titleMedium: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.textPrimary,
+        ),
+        titleSmall: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
+        // Body
         bodyLarge: TextStyle(height: 1.35, color: AppColors.textPrimary),
-        bodyMedium: TextStyle(color: AppColors.textSecondary),
-        bodySmall: TextStyle(color: AppColors.textMuted),
+        bodyMedium: TextStyle(height: 1.4, color: AppColors.textSecondary),
+        bodySmall: TextStyle(height: 1.4, color: AppColors.textMuted),
+        // Label
+        labelLarge: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        labelMedium: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
+        labelSmall: TextStyle(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+          color: AppColors.textMuted,
+        ),
       ),
     );
 

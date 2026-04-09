@@ -119,8 +119,8 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                                 ),
                               ),
                               child: Text(
-                                'UNLOCK SMART REMINDERS',
-                                style: theme.textTheme.bodySmall?.copyWith(
+                                'UPGRADE TO PRO',
+                                style: theme.textTheme.labelSmall?.copyWith(
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 0.5,

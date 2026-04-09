@@ -62,18 +62,37 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
     final email = _emailController.text.trim();
     try {
+      // If there is a currently signed-in user, check their providers before
+      // sending a reset link. Google-only accounts have no password to reset.
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final isGoogleOnly = currentUser != null &&
+          currentUser.providerData.any((p) => p.providerId == 'google.com') &&
+          !currentUser.providerData.any((p) => p.providerId == 'password');
+
+      if (isGoogleOnly) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your account uses Google Sign-In and has no password. Use "Sign in with Google" instead.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      debugPrint('sendPasswordResetEmail sent to: $email');
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         buildAuthRoute(EmailSentScreen(email: email)),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      debugPrint('sendPasswordResetEmail failed [${e.code}]: ${e.message}');
       final message = switch (e.code) {
         'user-not-found' =>
-          'No password account found. If you signed up with Google, use Google Sign-In.',
+          'No account found for this email. Check the address or sign up.',
         'invalid-email' => 'Invalid email address.',
         'network-request-failed' => 'Network error. Check your connection.',
         _ => 'Something went wrong. Please try again.',

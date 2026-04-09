@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../shared/components/primary_button.dart';
+import '../../../../shared/components/app_scaffold.dart';
+import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/whatsapp_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
@@ -198,7 +201,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('Invoice Detail'),
         actions: [
@@ -242,118 +245,159 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
           return SafeArea(
             child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).padding.bottom + 80,
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                spacingMD,
+                spacingMD,
+                spacingMD,
+                MediaQuery.of(context).padding.bottom + 100,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── Header ──
                   Text(
                     invoice.clientName,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     invoice.service,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: InvoiceStatusBadge(status: invoice.status),
-                  ),
-                  const SizedBox(height: 16),
-                  _InfoRow(
-                    label: 'Amount',
-                    value: AppFormatters.currency(
-                      invoice.amount,
-                      currencyCode: invoice.currencyCode,
+                  const SizedBox(height: spacingMD),
+
+                  // ── Details card ──
+                  GlassCard(
+                    padding: const EdgeInsets.all(spacingMD),
+                    child: Column(
+                      children: [
+                        _InfoRow(
+                          label: 'Status',
+                          value: InvoiceStatusBadge(status: invoice.status),
+                        ),
+                        const SizedBox(height: spacingSM),
+                        _InfoRow(
+                          label: 'Amount',
+                          value: Text(
+                            AppFormatters.currency(
+                              invoice.amount,
+                              currencyCode: invoice.currencyCode,
+                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: spacingSM),
+                        _InfoRow(
+                          label: 'Due Date',
+                          value: Text(
+                            AppFormatters.shortDate(invoice.dueDate),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        if (invoice.hasPaymentLink) ...[
+                          const SizedBox(height: spacingSM),
+                          _InfoRow(
+                            label: 'Payment',
+                            value: Text(
+                              'Link attached',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  _InfoRow(
-                    label: 'Due Date',
-                    value: AppFormatters.shortDate(invoice.dueDate),
-                  ),
-                  _InfoRow(label: 'Status', value: invoice.status.label),
-                  if (invoice.hasPaymentLink)
-                    _InfoRow(label: 'Payment', value: 'Link attached'),
-                  const SizedBox(height: 20),
-                  PrimaryButton(
-                    label: _isSendingWhatsApp
-                        ? 'Opening WhatsApp...'
-                        : 'Send via WhatsApp',
-                    icon: Icons.chat_bubble_outline_rounded,
-                    isLoading: _isSendingWhatsApp,
-                    onPressed: _isPdfBusy
-                        ? null
-                        : () => _sendViaWhatsApp(invoice),
-                  ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: _isPdfBusy
-                        ? null
-                        : () => _shareInvoicePdf(invoice),
-                    icon: _isSharingPdf
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.share_outlined),
-                    label: Text(_isSharingPdf ? 'Sharing PDF...' : 'Share PDF'),
-                  ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        ReminderFlowRoute(invoice.id).push(context),
-                    icon: const Icon(Icons.notifications_active_outlined),
-                    label: const Text('Advanced Reminder Flow'),
-                  ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: _isPdfBusy
-                        ? null
-                        : () => _openPdfPreview(invoice),
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    label: Text(
-                      _isOpeningPdfPreview ? 'Opening PDF...' : 'Open PDF',
+
+                  const SizedBox(height: spacingMD),
+
+                  // ── Actions card ──
+                  GlassCard(
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        _ActionRow(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          label: _isSendingWhatsApp
+                              ? 'Opening WhatsApp...'
+                              : 'Send via WhatsApp',
+                          isLoading: _isSendingWhatsApp,
+                          onTap: _isPdfBusy
+                              ? null
+                              : () => _sendViaWhatsApp(invoice),
+                        ),
+                        _ActionRow(
+                          icon: Icons.share_outlined,
+                          label: _isSharingPdf ? 'Sharing PDF...' : 'Share PDF',
+                          isLoading: _isSharingPdf,
+                          onTap: _isPdfBusy
+                              ? null
+                              : () => _shareInvoicePdf(invoice),
+                          showTopBorder: true,
+                        ),
+                        _ActionRow(
+                          icon: Icons.picture_as_pdf_outlined,
+                          label: _isOpeningPdfPreview
+                              ? 'Opening PDF...'
+                              : 'Open PDF',
+                          isLoading: _isOpeningPdfPreview,
+                          onTap: _isPdfBusy
+                              ? null
+                              : () => _openPdfPreview(invoice),
+                          showTopBorder: true,
+                        ),
+                        _ActionRow(
+                          icon: Icons.notifications_active_outlined,
+                          label: 'Advanced Reminder Flow',
+                          onTap: () =>
+                              ReminderFlowRoute(invoice.id).push(context),
+                          showTopBorder: true,
+                        ),
+                        _ActionRow(
+                          icon: Icons.check_circle_outline,
+                          label: _isMarkingPaid
+                              ? 'Marking Paid...'
+                              : 'Mark as Paid',
+                          isLoading: _isMarkingPaid,
+                          onTap: invoice.status == InvoiceStatus.paid ||
+                                  _isMarkingPaid
+                              ? null
+                              : () => _markInvoicePaid(invoice),
+                          accent: invoice.status != InvoiceStatus.paid,
+                          showTopBorder: true,
+                        ),
+                      ],
                     ),
                   ),
+
+                  // ── Watermark note for free users ──
                   if (!subscription.isPro) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      'Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: _promptWatermarkUpgrade,
-                        child: const Text('Upgrade to remove watermark'),
+                    const SizedBox(height: spacingMD),
+                    GlassCard(
+                      padding: const EdgeInsets.all(spacingMD),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Free plan PDFs include a faint Invoice Flow watermark.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: spacingXS),
+                          TextButton(
+                            onPressed: _promptWatermarkUpgrade,
+                            child: const Text('Upgrade to remove watermark'),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed:
-                        invoice.status == InvoiceStatus.paid || _isMarkingPaid
-                        ? null
-                        : () => _markInvoicePaid(invoice),
-                    icon: _isMarkingPaid
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_circle_outline),
-                    label: Text(
-                      _isMarkingPaid ? 'Marking Paid...' : 'Mark as Paid',
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -373,7 +417,7 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow({required this.label, required this.value});
 
   final String label;
-  final String value;
+  final Widget value;
 
   @override
   Widget build(BuildContext context) {
@@ -382,8 +426,86 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          Text(value),
+          value,
         ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.isLoading = false,
+    this.accent = false,
+    this.showTopBorder = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool isLoading;
+  final bool accent;
+  final bool showTopBorder;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = onTap == null
+        ? theme.disabledColor
+        : accent
+            ? AppColors.accent
+            : AppColors.textPrimary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: showTopBorder
+            ? Border(
+                top: BorderSide(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  width: 0.5,
+                ),
+              )
+            : const Border(),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: spacingMD,
+            vertical: 14,
+          ),
+          child: Row(
+            children: [
+              isLoading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: color,
+                      ),
+                    )
+                  : Icon(icon, size: 20, color: color),
+              const SizedBox(width: spacingMD),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: color),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: onTap == null
+                    ? theme.disabledColor
+                    : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

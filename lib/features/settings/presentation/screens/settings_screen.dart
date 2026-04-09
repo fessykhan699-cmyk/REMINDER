@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../shared/components/app_scaffold.dart';
 import '../../../../core/services/app_feedback_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
@@ -357,7 +358,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final profileError = profileState.asError;
     final preferencesError = preferencesState.asError;
     if (profileError != null || preferencesError != null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('Settings')),
         body: AppFailureState(
           message:
@@ -376,7 +377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final preferences = preferencesState.valueOrNull;
 
     if (profile == null || preferences == null) {
-      return Scaffold(
+      return AppScaffold(
         appBar: AppBar(title: const Text('Settings')),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -387,8 +388,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final bottomPadding =
         MediaQuery.paddingOf(context).bottom + kBottomNavigationBarHeight + 80;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+    return AppScaffold(
+      extendBody: true,
       body: SafeArea(
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -399,6 +400,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             bottomPadding,
           ),
           children: [
+            // ── Header ──
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Text(
+                'Settings',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
             _ProfileSectionCard(profile: profile, onEdit: _openProfileEditor),
             const SizedBox(height: 20),
             _PlanSectionCard(
