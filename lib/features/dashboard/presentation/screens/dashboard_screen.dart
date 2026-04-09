@@ -246,7 +246,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Suggestions',
+          'Next Actions',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.titleLarge,
@@ -592,7 +592,7 @@ class _HeaderSection extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Unpaid Balance',
+                'You are owed',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -606,7 +606,7 @@ class _HeaderSection extends StatelessWidget {
                   AppFormatters.currency(amount),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -639,11 +639,16 @@ class _StatsSection extends StatelessWidget {
           child: _StatsCard(
             value: totals.overdueCount.toString(),
             label: 'Overdue',
+            valueColor: AppColors.danger,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _StatsCard(value: totals.paidCount.toString(), label: 'Paid'),
+          child: _StatsCard(
+            value: totals.paidCount.toString(),
+            label: 'Paid',
+            valueColor: AppColors.success,
+          ),
         ),
       ],
     );
@@ -651,10 +656,15 @@ class _StatsSection extends StatelessWidget {
 }
 
 class _StatsCard extends StatelessWidget {
-  const _StatsCard({required this.value, required this.label});
+  const _StatsCard({
+    required this.value,
+    required this.label,
+    this.valueColor,
+  });
 
   final String value;
   final String label;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -668,9 +678,10 @@ class _StatsCard extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
@@ -823,7 +834,13 @@ class _PriorityInvoiceRow extends StatelessWidget {
                 invoice.dueLabel,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: invoice.isOverdue
+                      ? AppColors.danger
+                      : invoice.invoice.status == InvoiceStatus.paid
+                          ? AppColors.success
+                          : AppColors.warning,
+                ),
               ),
             ],
           ),
@@ -841,7 +858,10 @@ class _PriorityInvoiceRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: invoice.isOverdue ? AppColors.danger : null,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -1019,7 +1039,13 @@ class _RecentActivityRow extends StatelessWidget {
                     invoice.status.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: switch (invoice.status) {
+                        InvoiceStatus.overdue => AppColors.danger,
+                        InvoiceStatus.paid => AppColors.success,
+                        _ => AppColors.warning,
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -1037,7 +1063,12 @@ class _RecentActivityRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: invoice.status == InvoiceStatus.overdue
+                        ? AppColors.danger
+                        : null,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -1424,8 +1455,8 @@ class _PrioritySectionData {
       summary: summary,
       invoices: invoices,
       ctaLabel: ignoredReminderCount >= 2
-          ? 'Send Reminder Now'
-          : 'Send Reminder',
+          ? 'Send WhatsApp Reminder Now'
+          : 'Send WhatsApp Reminder',
       ctaInvoiceId: invoices.isEmpty ? null : invoices.first.invoice.id,
       icon: Icons.priority_high_rounded,
       tint: AppColors.danger,
@@ -1460,7 +1491,7 @@ class _PrioritySectionData {
       title: 'Due Soon',
       summary: summary,
       invoices: invoices,
-      ctaLabel: 'Send Reminder',
+      ctaLabel: 'Send WhatsApp Reminder',
       ctaInvoiceId: invoices.isEmpty ? null : invoices.first.invoice.id,
       icon: Icons.schedule_rounded,
       tint: AppColors.warning,
