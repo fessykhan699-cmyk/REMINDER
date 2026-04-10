@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/storage/hive_storage.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/invoice_status_service.dart';
@@ -77,6 +76,15 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
   @override
   AsyncValue<List<Invoice>> build() {
+    // When client data changes (rename, delete), clear invoice cache so
+    // clientName resolves to the new value on next fetch.
+    ref.listen(clientsControllerProvider, (previous, next) {
+      if (previous?.valueOrNull != null && next.valueOrNull != null) {
+        ref.read(invoicesLocalDatasourceProvider).clearCache();
+        if (_didLoad) loadInitial();
+      }
+    });
+
     if (!_didLoad) {
       _didLoad = true;
       Future(() => loadInitial());
@@ -162,10 +170,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   Future<void> deleteInvoice(String invoiceId) async {
     await ref.read(deleteInvoiceUseCaseProvider).call(invoiceId);
 
-    // Update controller state from fresh Hive data
-    final box = HiveStorage.invoicesBox;
-    final updated = box.values.toList();
-    state = AsyncValue.data(updated);
+    await loadInitial();
     ref.invalidate(invoiceDetailProvider(invoiceId));
 
     await _runBestEffortSideEffect(
@@ -176,7 +181,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       'rebuild invoice learning',
       () => ref
           .read(invoiceCreationLearningProvider.notifier)
-          .rebuildFromInvoices(updated),
+          .rebuildFromInvoices(state.valueOrNull ?? const []),
     );
   }
 
