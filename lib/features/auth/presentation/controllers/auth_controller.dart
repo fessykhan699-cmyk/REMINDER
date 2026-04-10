@@ -75,32 +75,26 @@ final authControllerProvider = NotifierProvider<AuthController, AuthViewState>(
 );
 
 class AuthController extends Notifier<AuthViewState> {
-  bool _isBootstrapped = false;
-  StreamSubscription<User?>? _authStateSubscription;
-
   @override
   AuthViewState build() {
-    if (!_isBootstrapped) {
-      _isBootstrapped = true;
-      Future<void>(initialize);
-      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen(
-        _onFirebaseAuthStateChanged,
-        onError: (Object error) {
-          debugPrint('Firebase auth stream error: $error');
-        },
-      );
-      ref.onDispose(() {
-        _authStateSubscription?.cancel();
-        _authStateSubscription = null;
-      });
-    }
+    final subscription = FirebaseAuth.instance.authStateChanges().listen(
+      _onFirebaseAuthStateChanged,
+      onError: (Object error) {
+        debugPrint('Firebase auth stream error: $error');
+      },
+    );
+    ref.onDispose(subscription.cancel);
+    Future.microtask(initialize);
     return AuthViewState.initial();
   }
 
-  void _onFirebaseAuthStateChanged(User? user) {
+  void _onFirebaseAuthStateChanged(User? user) async {
     final current = state;
 
-    // Ignore during startup and active auth operations — those flows manage state themselves
+    // Local persistence is authoritative during startup. The first Firebase stream
+    // event is intentionally ignored while initializing — initialize() reads the
+    // persisted session and sets final state. After that, this stream monitors
+    // for mid-session changes only.
     if (current.status == AuthStatus.initializing || current.isSubmitting) {
       return;
     }
@@ -117,12 +111,13 @@ class AuthController extends Notifier<AuthViewState> {
 
     if (user != null && current.status == AuthStatus.unauthenticated) {
       // Session silently restored (e.g. token refresh edge case)
+      final idToken = await user.getIdToken() ?? 'firebase-user';
       state = state.copyWith(
         status: AuthStatus.authenticated,
         session: AuthSession(
           userId: user.uid,
           email: user.email ?? '',
-          token: 'firebase-user',
+          token: idToken,
           createdAt: user.metadata.creationTime ?? DateTime.now(),
         ),
         clearError: true,
