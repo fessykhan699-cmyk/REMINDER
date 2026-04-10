@@ -75,15 +75,21 @@ final authControllerProvider = NotifierProvider<AuthController, AuthViewState>(
 );
 
 class AuthController extends Notifier<AuthViewState> {
+  bool _disposed = false;
+
   @override
   AuthViewState build() {
+    _disposed = false;
     final subscription = FirebaseAuth.instance.authStateChanges().listen(
       _onFirebaseAuthStateChanged,
       onError: (Object error) {
         debugPrint('Firebase auth stream error: $error');
       },
     );
-    ref.onDispose(subscription.cancel);
+    ref.onDispose(() {
+      _disposed = true;
+      subscription.cancel();
+    });
     Future.microtask(initialize);
     return AuthViewState.initial();
   }
@@ -111,13 +117,20 @@ class AuthController extends Notifier<AuthViewState> {
 
     if (user != null && current.status == AuthStatus.unauthenticated) {
       // Session silently restored (e.g. token refresh edge case)
-      final idToken = await user.getIdToken() ?? 'firebase-user';
+      final String? idToken;
+      try {
+        idToken = await user.getIdToken();
+      } catch (e) {
+        debugPrint('Failed to fetch Firebase ID token: $e');
+        return;
+      }
+      if (_disposed) return;
       state = state.copyWith(
         status: AuthStatus.authenticated,
         session: AuthSession(
           userId: user.uid,
           email: user.email ?? '',
-          token: idToken,
+          token: idToken ?? 'firebase-user',
           createdAt: user.metadata.creationTime ?? DateTime.now(),
         ),
         clearError: true,
