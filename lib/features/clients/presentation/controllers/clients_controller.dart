@@ -174,6 +174,8 @@ class ClientsController extends Notifier<AsyncValue<List<Client>>> {
       final current = state.valueOrNull ?? const <Client>[];
       state = AsyncValue.data(_mergeClients(current, updated));
       ref.invalidate(clientDetailProvider(updated.id));
+      // Clear invoice cache so clientName resolves to the new name on next fetch
+      ref.read(invoicesLocalDatasourceProvider).clearCache();
       return updated;
     } catch (error, stackTrace) {
       if (error is AppException) {
