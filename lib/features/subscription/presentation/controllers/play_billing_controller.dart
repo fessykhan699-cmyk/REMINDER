@@ -298,6 +298,14 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     final action = _currentAction;
     _currentAction = _BillingAction.none;
 
+    // A confirmed cancellation/error from the purchase stream is the only
+    // reliable downgrade signal. Revoke Pro if the user currently has it.
+    final subscriptionState =
+        ref.read(subscriptionControllerProvider).valueOrNull;
+    if (subscriptionState?.isPro == true) {
+      _persistPlan(isPro: false);
+    }
+
     if (action == _BillingAction.purchase) {
       _emitFeedback(
         current,
