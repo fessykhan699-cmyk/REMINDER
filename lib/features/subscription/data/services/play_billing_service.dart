@@ -120,8 +120,8 @@ class PlayBillingService {
         continue;
       }
 
-      if (purchase.status == PurchaseStatus.error ||
-          purchase.status == PurchaseStatus.canceled) {
+      if (purchase.status != PurchaseStatus.purchased &&
+          purchase.status != PurchaseStatus.restored) {
         continue;
       }
 
