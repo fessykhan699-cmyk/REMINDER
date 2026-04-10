@@ -22,6 +22,8 @@ class HiveStorage {
   static const String appPreferencesBoxName = 'appPreferencesBox';
 
   static const String _demoCleanupFlag = '_demoCleanupDone';
+  static const String _reminderPruneFlag = '_reminderPruneDone_v1';
+  static const int _maxReminderRecords = 500;
 
   static void registerAdapters() {
     if (!Hive.isAdapterRegistered(0)) {
@@ -105,5 +107,29 @@ class HiveStorage {
 
     // Mark as done so it never runs again
     settingsBox?.put(_demoCleanupFlag, true);
+  }
+
+  /// Trims the reminders box to the most recent [_maxReminderRecords] entries.
+  /// Runs once per app version to clear any unbounded growth from older builds.
+  static Future<void> pruneRemindersOnce() async {
+    if (!Hive.isBoxOpen(remindersBoxName)) return;
+
+    final settingsBox = Hive.isBoxOpen(settingsBoxName)
+        ? Hive.box<dynamic>(settingsBoxName)
+        : null;
+    final alreadyPruned = settingsBox?.get(_reminderPruneFlag) ?? false;
+    if (alreadyPruned) return;
+
+    final remindersBox = Hive.box<ReminderModel>(remindersBoxName);
+    final all = remindersBox.values.toList()
+      ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
+
+    if (all.length > _maxReminderRecords) {
+      final toDelete = all.skip(_maxReminderRecords).map((r) => r.id).toList();
+      await remindersBox.deleteAll(toDelete);
+      debugPrint('Pruned ${toDelete.length} old reminder records.');
+    }
+
+    settingsBox?.put(_reminderPruneFlag, true);
   }
 }

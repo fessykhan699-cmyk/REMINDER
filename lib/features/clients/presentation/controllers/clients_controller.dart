@@ -11,6 +11,8 @@ import '../../data/datasources/clients_local_datasource.dart';
 import '../../data/repositories/client_repository_impl.dart';
 import '../../domain/entities/client.dart';
 import '../../domain/repositories/client_repository.dart';
+import '../../../invoices/presentation/controllers/invoices_controller.dart';
+import '../../../reminders/data/providers/reminder_repository_provider.dart';
 import '../../domain/usecases/add_client_usecase.dart';
 import '../../domain/usecases/delete_client_usecase.dart';
 import '../../domain/usecases/get_clients_usecase.dart';
@@ -37,7 +39,11 @@ final updateClientUseCaseProvider = Provider<UpdateClientUseCase>(
 );
 
 final deleteClientUseCaseProvider = Provider<DeleteClientUseCase>(
-  (ref) => DeleteClientUseCase(ref.watch(clientRepositoryProvider)),
+  (ref) => DeleteClientUseCase(
+    ref.watch(clientRepositoryProvider),
+    ref.watch(invoiceRepositoryProvider),
+    ref.watch(reminderRepositoryProvider),
+  ),
 );
 
 final clientsControllerProvider =

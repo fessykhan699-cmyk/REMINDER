@@ -40,6 +40,7 @@ Future<void> main() async {
 
   // 🔥 One-time cleanup: remove any leftover demo/seed data from previous versions
   await HiveStorage.purgeDemoDataOnce();
+  await HiveStorage.pruneRemindersOnce();
 
   await NotificationService.instance.initialize();
 

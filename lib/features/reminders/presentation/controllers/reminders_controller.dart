@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
-import '../../../../shared/services/reminder_launcher_service.dart';
 import '../../../../shared/services/whatsapp_service.dart';
 import '../../../clients/domain/repositories/client_repository.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
@@ -12,8 +11,7 @@ import '../../../settings/domain/repositories/settings_repository.dart';
 import '../../../settings/presentation/controllers/settings_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
-import '../../data/datasources/reminders_local_datasource.dart';
-import '../../data/repositories/reminder_repository_impl.dart';
+import '../../data/providers/reminder_repository_provider.dart';
 import '../../domain/entities/reminder.dart';
 import '../../domain/entities/reminder_message_type.dart';
 import '../../domain/repositories/reminder_repository.dart';
@@ -83,14 +81,6 @@ class ReminderFlowState {
     );
   }
 }
-
-final remindersLocalDatasourceProvider = Provider<RemindersLocalDatasource>(
-  (ref) => RemindersLocalDatasource(ref.watch(reminderLauncherServiceProvider)),
-);
-
-final reminderRepositoryProvider = Provider<ReminderRepository>(
-  (ref) => ReminderRepositoryImpl(ref.watch(remindersLocalDatasourceProvider)),
-);
 
 final sendReminderUseCaseProvider = Provider<SendReminderUseCase>(
   (ref) => SendReminderUseCase(ref.watch(reminderRepositoryProvider)),

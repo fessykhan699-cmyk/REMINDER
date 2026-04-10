@@ -46,6 +46,14 @@ class ReminderRepositoryImpl implements ReminderRepository {
   }
 
   @override
+  Future<void> deleteByInvoiceId(String invoiceId) =>
+      _datasource.deleteByInvoiceId(invoiceId);
+
+  @override
+  Future<void> deleteByClientId(String clientId) =>
+      _datasource.deleteByClientId(clientId);
+
+  @override
   String buildPreviewMessage({
     required Invoice invoice,
     required ReminderMessageType type,

@@ -39,8 +39,6 @@ class InvoicesLocalDatasource {
       return _pageCache[page]!;
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 240));
-
     final source = _normalizedInvoices();
     final start = (page - 1) * pageSize;
     if (start >= source.length) {
@@ -62,7 +60,6 @@ class InvoicesLocalDatasource {
   }
 
   Future<InvoiceModel> createInvoice(InvoiceModel invoice) async {
-    await Future<void>.delayed(const Duration(milliseconds: 140));
     await _invoicesBox.put(invoice.id, invoice);
     _invoiceCache[invoice.id] = invoice;
     _pageCache.clear();
@@ -70,8 +67,6 @@ class InvoicesLocalDatasource {
   }
 
   Future<InvoiceModel> updateInvoice(InvoiceModel invoice) async {
-    await Future<void>.delayed(const Duration(milliseconds: 140));
-
     if (!_invoicesBox.containsKey(invoice.id)) {
       throw Exception('Invoice not found.');
     }
@@ -83,8 +78,6 @@ class InvoicesLocalDatasource {
   }
 
   Future<void> deleteInvoice(String id) async {
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-
     // Direct delete by ID — createInvoice uses box.put(invoice.id, invoice) so key == id
     if (!_invoicesBox.containsKey(id)) {
       throw Exception('Invoice not found.');
@@ -95,13 +88,23 @@ class InvoicesLocalDatasource {
     _pageCache.clear();
   }
 
+  Future<void> deleteByClientId(String clientId) async {
+    final keysToDelete = _invoicesBox.values
+        .where((inv) => inv.clientId == clientId)
+        .map((inv) => inv.id)
+        .toList();
+    for (final id in keysToDelete) {
+      _invoiceCache.remove(id);
+    }
+    await _invoicesBox.deleteAll(keysToDelete);
+    _pageCache.clear();
+  }
+
   Future<InvoiceModel?> getInvoiceById(String id) async {
     final cached = _invoiceCache[id];
     if (cached != null) {
       return cached;
     }
-
-    await Future<void>.delayed(const Duration(milliseconds: 100));
 
     for (final invoice in _normalizedInvoices()) {
       if (invoice.id == id) {
@@ -117,8 +120,6 @@ class InvoicesLocalDatasource {
     required String prefix,
     DateTime? now,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-
     final normalizedPrefix = prefix.trim().toUpperCase();
     final currentTime = now ?? DateTime.now();
     final currentYear = currentTime.year;

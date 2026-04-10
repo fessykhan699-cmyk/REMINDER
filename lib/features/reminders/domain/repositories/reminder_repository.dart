@@ -20,6 +20,10 @@ abstract interface class ReminderRepository {
     ReminderStatus status = ReminderStatus.sent,
   });
 
+  Future<void> deleteByInvoiceId(String invoiceId);
+
+  Future<void> deleteByClientId(String clientId);
+
   String buildPreviewMessage({
     required Invoice invoice,
     required ReminderMessageType type,

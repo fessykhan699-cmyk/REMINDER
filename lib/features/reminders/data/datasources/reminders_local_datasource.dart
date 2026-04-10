@@ -15,7 +15,6 @@ class RemindersLocalDatasource {
   );
 
   Future<List<ReminderModel>> fetchReminders() async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
     final reminders = _remindersBox.values.toList()
       ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
     return List<ReminderModel>.unmodifiable(reminders);
@@ -28,18 +27,44 @@ class RemindersLocalDatasource {
     required ReminderChannel channel,
     required String message,
   }) async {
-    final launchResult = await _launcherService.launchReminder(
-      preferredChannel: channel,
-      phoneNumber: phoneNumber,
-      message: message,
-    );
+    try {
+      final launchResult = await _launcherService.launchReminder(
+        preferredChannel: channel,
+        phoneNumber: phoneNumber,
+        message: message,
+      );
 
-    return createReminderRecord(
-      invoiceId: invoiceId,
-      clientId: clientId,
-      channel: launchResult.channel,
-      status: ReminderStatus.sent,
-    );
+      return createReminderRecord(
+        invoiceId: invoiceId,
+        clientId: clientId,
+        channel: launchResult.channel,
+        status: ReminderStatus.sent,
+      );
+    } catch (_) {
+      await createReminderRecord(
+        invoiceId: invoiceId,
+        clientId: clientId,
+        channel: channel,
+        status: ReminderStatus.failed,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> deleteByInvoiceId(String invoiceId) async {
+    final keysToDelete = _remindersBox.values
+        .where((r) => r.invoiceId == invoiceId)
+        .map((r) => r.id)
+        .toList();
+    await _remindersBox.deleteAll(keysToDelete);
+  }
+
+  Future<void> deleteByClientId(String clientId) async {
+    final keysToDelete = _remindersBox.values
+        .where((r) => r.clientId == clientId)
+        .map((r) => r.id)
+        .toList();
+    await _remindersBox.deleteAll(keysToDelete);
   }
 
   Future<ReminderModel> createReminderRecord({

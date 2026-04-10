@@ -321,7 +321,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                         onPressed: billing.canRestore
                             ? () => ref
                                   .read(playBillingControllerProvider.notifier)
-                                  .restoreMonthlyPro()
+                                  .restorePurchases()
                             : null,
                         child: Text(
                           billing.isRestoring

@@ -195,7 +195,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     }
   }
 
-  Future<void> restoreMonthlyPro() async {
+  Future<void> restorePurchases() async {
     final current = state.valueOrNull;
     if (current == null || !current.canRestore) {
       return;

@@ -12,6 +12,7 @@ import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/invoice_repository.dart';
+import '../../../reminders/data/providers/reminder_repository_provider.dart';
 import '../../domain/usecases/create_invoice_usecase.dart';
 import '../../domain/usecases/delete_invoice_usecase.dart';
 import '../../domain/usecases/get_invoices_usecase.dart';
@@ -39,7 +40,10 @@ final updateInvoiceUseCaseProvider = Provider<UpdateInvoiceUseCase>(
 );
 
 final deleteInvoiceUseCaseProvider = Provider<DeleteInvoiceUseCase>(
-  (ref) => DeleteInvoiceUseCase(ref.watch(invoiceRepositoryProvider)),
+  (ref) => DeleteInvoiceUseCase(
+    ref.watch(invoiceRepositoryProvider),
+    ref.watch(reminderRepositoryProvider),
+  ),
 );
 
 final invoicesControllerProvider =
