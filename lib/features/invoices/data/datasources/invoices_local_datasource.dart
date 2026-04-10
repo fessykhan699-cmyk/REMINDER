@@ -113,6 +113,11 @@ class InvoicesLocalDatasource {
     _pageCache.clear();
   }
 
+  void clearCache() {
+    _pageCache.clear();
+    _invoiceCache.clear();
+  }
+
   Future<InvoiceModel?> getInvoiceById(String id) async {
     final cached = _invoiceCache[id];
     if (cached != null) {
