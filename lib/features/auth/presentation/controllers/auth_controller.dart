@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/datasources/auth_local_datasource.dart';
@@ -73,14 +76,58 @@ final authControllerProvider = NotifierProvider<AuthController, AuthViewState>(
 
 class AuthController extends Notifier<AuthViewState> {
   bool _isBootstrapped = false;
+  StreamSubscription<User?>? _authStateSubscription;
 
   @override
   AuthViewState build() {
     if (!_isBootstrapped) {
       _isBootstrapped = true;
       Future<void>(initialize);
+      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen(
+        _onFirebaseAuthStateChanged,
+        onError: (Object error) {
+          debugPrint('Firebase auth stream error: $error');
+        },
+      );
+      ref.onDispose(() {
+        _authStateSubscription?.cancel();
+        _authStateSubscription = null;
+      });
     }
     return AuthViewState.initial();
+  }
+
+  void _onFirebaseAuthStateChanged(User? user) {
+    final current = state;
+
+    // Ignore during startup and active auth operations — those flows manage state themselves
+    if (current.status == AuthStatus.initializing || current.isSubmitting) {
+      return;
+    }
+
+    if (user == null && current.status == AuthStatus.authenticated) {
+      // Remote sign-out: session revoked, password changed, account deleted
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearSession: true,
+        errorMessage: 'Your session has expired. Please sign in again.',
+      );
+      return;
+    }
+
+    if (user != null && current.status == AuthStatus.unauthenticated) {
+      // Session silently restored (e.g. token refresh edge case)
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        session: AuthSession(
+          userId: user.uid,
+          email: user.email ?? '',
+          token: 'firebase-user',
+          createdAt: user.metadata.creationTime ?? DateTime.now(),
+        ),
+        clearError: true,
+      );
+    }
   }
 
   Future<void> initialize() async {
