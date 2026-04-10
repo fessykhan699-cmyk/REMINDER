@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../clients/presentation/controllers/clients_controller.dart';
@@ -46,7 +47,8 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
         return localState;
       }
       return datasource.savePlan(isPro: true);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[SubscriptionController] syncOwnedProState failed: $e\n$st');
       return localState;
     }
   }
