@@ -259,7 +259,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
             await _handleSuccessfulPurchase(purchase);
           case PurchaseStatus.error:
           case PurchaseStatus.canceled:
-            _handleCancelledPurchase();
+            await _handleCancelledPurchase();
         }
       } finally {
         if (purchase.pendingCompletePurchase) {
@@ -288,7 +288,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     state = AsyncValue.data(next);
   }
 
-  void _handleCancelledPurchase() {
+  Future<void> _handleCancelledPurchase() async {
     final current = state.valueOrNull;
     if (current == null) {
       _currentAction = _BillingAction.none;
@@ -303,7 +303,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     final subscriptionState =
         ref.read(subscriptionControllerProvider).valueOrNull;
     if (subscriptionState?.isPro == true) {
-      _persistPlan(isPro: false);
+      await _persistPlan(isPro: false);
     }
 
     if (action == _BillingAction.purchase) {
