@@ -258,6 +258,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
           case PurchaseStatus.restored:
             await _handleSuccessfulPurchase(purchase);
           case PurchaseStatus.error:
+            _handleErrorPurchase();
           case PurchaseStatus.canceled:
             await _handleCancelledPurchase();
         }
@@ -288,6 +289,33 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     state = AsyncValue.data(next);
   }
 
+  // Transient billing error — not a confirmed cancellation; do not revoke Pro.
+  void _handleErrorPurchase() {
+    final current = state.valueOrNull;
+    if (current == null) {
+      _currentAction = _BillingAction.none;
+      return;
+    }
+
+    final action = _currentAction;
+    _currentAction = _BillingAction.none;
+
+    if (action == _BillingAction.purchase) {
+      _emitFeedback(
+        current,
+        type: PlayBillingFeedbackType.purchaseCancelled,
+        message: 'Purchase cancelled',
+        isPurchasePending: false,
+      );
+      return;
+    }
+
+    state = AsyncValue.data(
+      current.copyWith(isPurchasePending: false, isRestoring: false),
+    );
+  }
+
+  // Explicit user cancellation — reliable downgrade signal; revoke Pro.
   Future<void> _handleCancelledPurchase() async {
     final current = state.valueOrNull;
     if (current == null) {
@@ -298,8 +326,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     final action = _currentAction;
     _currentAction = _BillingAction.none;
 
-    // A confirmed cancellation/error from the purchase stream is the only
-    // reliable downgrade signal. Revoke Pro if the user currently has it.
+    // User explicitly cancelled — revoke Pro if the user currently has it.
     final subscriptionState =
         ref.read(subscriptionControllerProvider).valueOrNull;
     if (subscriptionState?.isPro == true) {
