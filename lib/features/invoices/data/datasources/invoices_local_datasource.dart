@@ -4,9 +4,14 @@ import 'package:hive/hive.dart';
 
 import '../../../../core/storage/hive_storage.dart';
 import '../../../../shared/services/invoice_status_service.dart';
+import '../../../clients/data/datasources/clients_local_datasource.dart';
 import '../models/invoice_model.dart';
 
 class InvoicesLocalDatasource {
+  InvoicesLocalDatasource(this._clientsDatasource);
+
+  final ClientsLocalDatasource _clientsDatasource;
+
   static const InvoiceStatusService _statusService = InvoiceStatusService();
   final Box<InvoiceModel> _invoicesBox = Hive.box<InvoiceModel>(
     HiveStorage.invoicesBoxName,
@@ -20,11 +25,19 @@ class InvoicesLocalDatasource {
     final invoices = _invoicesBox.values.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+    // Build a lookup map from live client data — O(n clients), O(1) per invoice
+    final clientNameMap = {
+      for (final client in _clientsDatasource.allClients())
+        client.id: client.name,
+    };
+
     return invoices
         .map(
           (invoice) => invoice.copyWith(
             status: _statusService.resolveStatus(invoice, now: now),
             paymentLink: invoice.normalizedPaymentLink,
+            // Use live client name; fall back to stored name if client was deleted
+            clientName: clientNameMap[invoice.clientId] ?? invoice.clientName,
           ),
         )
         .toList(growable: false);

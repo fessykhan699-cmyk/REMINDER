@@ -8,6 +8,7 @@ import '../../../../shared/services/invoice_status_service.dart';
 import '../../../../shared/services/reminder_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
@@ -20,7 +21,7 @@ import '../../domain/usecases/update_invoice_usecase.dart';
 import 'invoice_creation_learning_controller.dart';
 
 final invoicesLocalDatasourceProvider = Provider<InvoicesLocalDatasource>(
-  (ref) => InvoicesLocalDatasource(),
+  (ref) => InvoicesLocalDatasource(ref.watch(clientsLocalDatasourceProvider)),
 );
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(

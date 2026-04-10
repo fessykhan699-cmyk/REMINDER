@@ -166,4 +166,10 @@ class ClientsLocalDatasource {
 
     return client;
   }
+
+  /// Returns all clients synchronously from the in-memory Hive box.
+  /// Used by InvoicesLocalDatasource to resolve live client names.
+  List<ClientModel> allClients() {
+    return _clientsBox.values.toList(growable: false);
+  }
 }
