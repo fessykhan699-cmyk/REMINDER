@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/utils/formatters.dart';
 import '../../data/datasources/settings_local_datasource.dart';
 import '../../data/repositories/settings_repository_impl.dart';
 import '../../domain/entities/profile.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/usecases/get_profile_usecase.dart';
 import '../../domain/usecases/save_profile_usecase.dart';
+import '../controllers/app_preferences_controller.dart';
 
 final settingsLocalDatasourceProvider = Provider<SettingsLocalDatasource>(
   (ref) => SettingsLocalDatasource(),
@@ -45,10 +47,26 @@ class SettingsController extends AutoDisposeNotifier<AsyncValue<UserProfile>> {
     try {
       final saved = await ref.read(saveProfileUseCaseProvider).call(profile);
       state = AsyncValue.data(saved);
+      _maybeSyncCurrencyFromPhone(saved.phone);
       return saved;
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
       rethrow;
     }
+  }
+
+  /// When the user saves a phone number we detect the likely currency and
+  /// apply it automatically — but only if they haven't already changed the
+  /// currency from the factory default ('USD'). This avoids overwriting a
+  /// deliberate currency choice.
+  void _maybeSyncCurrencyFromPhone(String phone) {
+    final detected = AppFormatters.currencyFromPhone(phone);
+    if (detected == null) return;
+    ref.read(appPreferencesControllerProvider.notifier).patch((prefs) {
+      if (prefs.defaultCurrency == 'USD') {
+        return prefs.copyWith(defaultCurrency: detected);
+      }
+      return prefs;
+    });
   }
 }

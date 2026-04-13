@@ -17,6 +17,7 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/domain/entities/invoice.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../../reminders/presentation/controllers/reminders_controller.dart';
+import '../../../settings/presentation/controllers/app_preferences_controller.dart';
 import '../../../settings/presentation/controllers/settings_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -326,6 +327,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     BuildContext context,
     _DashboardViewModel model,
     SubscriptionState subscription,
+    String currencyCode,
   ) {
     final sections = <Widget>[];
 
@@ -482,11 +484,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final subscription =
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
+    final currencyCode =
+        ref.watch(appPreferencesControllerProvider).valueOrNull?.defaultCurrency
+        ?? 'USD';
     final dashboard = _DashboardViewModel.fromSignals(
       invoices: invoices,
       adaptiveState: adaptiveState,
       clientCount: clientCount,
       reminderCount: reminderCount,
+      currencyCode: currencyCode,
     );
     final dashboardSections = <Widget>[
       _staggeredCard(
@@ -494,10 +500,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         child: _HeaderSection(
           name: profileName,
           amount: dashboard.totals.totalUnpaid,
+          currencyCode: currencyCode,
           avatar: const DashboardAvatar(),
         ),
       ),
-      _buildDashboardContent(context, dashboard, subscription),
+      _buildDashboardContent(context, dashboard, subscription, currencyCode),
     ];
 
     return Scaffold(
@@ -545,11 +552,13 @@ class _HeaderSection extends StatelessWidget {
   const _HeaderSection({
     required this.name,
     required this.amount,
+    required this.currencyCode,
     required this.avatar,
   });
 
   final String name;
   final double amount;
+  final String currencyCode;
   final Widget avatar;
 
   @override
@@ -603,7 +612,7 @@ class _HeaderSection extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  AppFormatters.currency(amount),
+                  AppFormatters.currency(amount, currencyCode: currencyCode),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -1237,6 +1246,7 @@ class _DashboardViewModel {
     required AdaptiveSystemState adaptiveState,
     required int clientCount,
     required int reminderCount,
+    String currencyCode = 'USD',
   }) {
     final now = DateTime.now();
     final overdueInvoices = <Invoice>[];
@@ -1349,12 +1359,14 @@ class _DashboardViewModel {
         totalUnpaid: totals.totalUnpaid,
         ignoredReminderCount: adaptiveState.ignoredReminderCount,
         hasRecentResolution: adaptiveState.hasRecentResolution,
+        currencyCode: currencyCode,
       ),
       _DashboardUrgency.dueSoon => _PrioritySectionData.dueSoon(
         dueSoonHighlights,
         totalUnpaid: totals.totalUnpaid,
         ignoredReminderCount: adaptiveState.ignoredReminderCount,
         hasRecentResolution: adaptiveState.hasRecentResolution,
+        currencyCode: currencyCode,
       ),
       _DashboardUrgency.empty || _DashboardUrgency.calm => null,
     };
@@ -1368,6 +1380,7 @@ class _DashboardViewModel {
       adaptiveState: adaptiveState,
       reminderCount: reminderCount,
       focusMode: focusMode,
+      currencyCode: currencyCode,
     );
 
     final emptySubtitle = clientCount > 0
@@ -1432,6 +1445,7 @@ class _PrioritySectionData {
     required double totalUnpaid,
     required int ignoredReminderCount,
     required bool hasRecentResolution,
+    String currencyCode = 'USD',
   }) {
     final leadClient = invoices.isEmpty
         ? 'Top overdue invoice'
@@ -1440,7 +1454,7 @@ class _PrioritySectionData {
     String summary;
     if (ignoredReminderCount >= 2) {
       summary =
-          '$leadClient still needs attention. ${AppFormatters.currency(totalUnpaid)} remains at risk.';
+          '$leadClient still needs attention. ${AppFormatters.currency(totalUnpaid, currencyCode: currencyCode)} remains at risk.';
     } else if (hasRecentResolution) {
       summary = 'You are catching up. $leadClient is the next follow-up.';
     } else if (invoices.length > 1) {
@@ -1468,6 +1482,7 @@ class _PrioritySectionData {
     required double totalUnpaid,
     required int ignoredReminderCount,
     required bool hasRecentResolution,
+    String currencyCode = 'USD',
   }) {
     final leadClient = invoices.isEmpty
         ? 'Upcoming invoice'
@@ -1478,7 +1493,7 @@ class _PrioritySectionData {
       summary = 'You are ahead of the curve. Keep $leadClient on track.';
     } else if (totalUnpaid >= 2500) {
       summary =
-          '${AppFormatters.currency(totalUnpaid)} is due soon. Start with $leadClient.';
+          '${AppFormatters.currency(totalUnpaid, currencyCode: currencyCode)} is due soon. Start with $leadClient.';
     } else if (ignoredReminderCount >= 2) {
       summary = '$leadClient is coming due and still needs a follow-up.';
     } else if (invoices.length > 1) {
@@ -1585,6 +1600,7 @@ List<_DashboardSuggestion> _buildDashboardSuggestions({
   required AdaptiveSystemState adaptiveState,
   required int reminderCount,
   required _DashboardFocusMode focusMode,
+  String currencyCode = 'USD',
 }) {
   final suggestions = <_DashboardSuggestion>[];
   final topPriority = topPriorityInvoices.isEmpty
@@ -1647,7 +1663,7 @@ List<_DashboardSuggestion> _buildDashboardSuggestions({
     addSuggestion(
       _DashboardSuggestion(
         id: 'monetary-risk',
-        title: '${AppFormatters.currency(totals.totalUnpaid)} is still unpaid',
+        title: '${AppFormatters.currency(totals.totalUnpaid, currencyCode: currencyCode)} is still unpaid',
         detail: 'Review payments to reduce your cash-risk exposure.',
         icon: Icons.account_balance_wallet_outlined,
         action: _DashboardSuggestionAction.reviewPayments,
