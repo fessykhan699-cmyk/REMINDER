@@ -499,8 +499,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         index: 0,
         child: _HeaderSection(
           name: profileName,
-          amount: dashboard.totals.totalUnpaid,
-          currencyCode: currencyCode,
+          unpaidByCurrency: dashboard.totals.unpaidByCurrency,
           avatar: const DashboardAvatar(),
         ),
       ),
@@ -551,18 +550,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 class _HeaderSection extends StatelessWidget {
   const _HeaderSection({
     required this.name,
-    required this.amount,
-    required this.currencyCode,
+    required this.unpaidByCurrency,
     required this.avatar,
   });
 
   final String name;
-  final double amount;
-  final String currencyCode;
+  final List<({String currencyCode, double amount})> unpaidByCurrency;
   final Widget avatar;
 
   @override
   Widget build(BuildContext context) {
+    // Build display string: single currency → "AED 2,278.00"
+    // Multiple currencies → "AED 2,000 · USD 500"
+    final String amountText;
+    if (unpaidByCurrency.isEmpty) {
+      amountText = AppFormatters.currency(0);
+    } else if (unpaidByCurrency.length == 1) {
+      final entry = unpaidByCurrency.first;
+      amountText = AppFormatters.currency(
+        entry.amount,
+        currencyCode: entry.currencyCode,
+      );
+    } else {
+      amountText = unpaidByCurrency
+          .map(
+            (e) => AppFormatters.currency(
+              e.amount,
+              currencyCode: e.currencyCode,
+              includeDecimals: false,
+            ),
+          )
+          .join(' · ');
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -612,7 +632,7 @@ class _HeaderSection extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  AppFormatters.currency(amount, currencyCode: currencyCode),
+                  amountText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -1139,13 +1159,21 @@ class _DashboardTotals {
     required this.paidCount,
     required this.pendingCount,
     required this.overdueCount,
+    required this.unpaidByCurrency,
   });
 
+  /// Sum of all unpaid invoice amounts regardless of currency.
+  /// Used only for threshold comparisons (e.g. "is more than 2500 at risk?").
+  /// Do NOT display this as a money value — use [unpaidByCurrency] instead.
   final double totalUnpaid;
   final double pendingAmount;
   final int paidCount;
   final int pendingCount;
   final int overdueCount;
+
+  /// Unpaid totals grouped by currency code, sorted descending by amount.
+  /// Use this for display so multi-currency invoices are shown accurately.
+  final List<({String currencyCode, double amount})> unpaidByCurrency;
 
   factory _DashboardTotals.fromInvoices(List<Invoice> invoices) {
     var pendingAmount = 0.0;
@@ -1153,6 +1181,7 @@ class _DashboardTotals {
     var paidCount = 0;
     var pendingCount = 0;
     var overdueCount = 0;
+    final Map<String, double> byCurrency = {};
 
     for (final invoice in invoices) {
       switch (invoice.status) {
@@ -1163,11 +1192,20 @@ class _DashboardTotals {
         case InvoiceStatus.viewed:
           pendingCount++;
           pendingAmount += invoice.amount;
+          byCurrency[invoice.currencyCode] =
+              (byCurrency[invoice.currencyCode] ?? 0) + invoice.amount;
         case InvoiceStatus.overdue:
           overdueCount++;
           overdueAmount += invoice.amount;
+          byCurrency[invoice.currencyCode] =
+              (byCurrency[invoice.currencyCode] ?? 0) + invoice.amount;
       }
     }
+
+    final unpaidByCurrency = byCurrency.entries
+        .map((e) => (currencyCode: e.key, amount: e.value))
+        .toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
 
     return _DashboardTotals(
       totalUnpaid: pendingAmount + overdueAmount,
@@ -1175,6 +1213,7 @@ class _DashboardTotals {
       paidCount: paidCount,
       pendingCount: pendingCount,
       overdueCount: overdueCount,
+      unpaidByCurrency: unpaidByCurrency,
     );
   }
 }
