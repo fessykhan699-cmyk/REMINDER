@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub *)",
+      "Bash(python -c \"import sys,json; cfg=json.load\\(sys.stdin\\); pkg=[p for p in cfg['packages'] if p['name']=='reminder'][0]; print\\(pkg\\)\")",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

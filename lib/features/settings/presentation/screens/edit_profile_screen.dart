@@ -1,19 +1,15 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../../../shared/widgets/phone_input_field.dart';
-import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
-import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/profile.dart';
 import '../controllers/settings_controller.dart';
+import '../../../../data/services/user_profile_image_service.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -24,7 +20,6 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _picker = ImagePicker();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _businessNameController = TextEditingController();
@@ -57,22 +52,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _businessNameController.text = profile.businessName;
     _phoneController.text = profile.phone;
     _addressController.text = profile.address;
-    _logoPath = profile.logoPath;
-    _signaturePath = profile.signaturePath;
+    
+    // Load local asset paths from the specialized service
+    _loadLocalAssetPaths();
+  }
+
+  Future<void> _loadLocalAssetPaths() async {
+    final logoPath = await UserProfileImageService.getLogoPath();
+    final signaturePath = await UserProfileImageService.getSignaturePath();
+    if (mounted) {
+      setState(() {
+        _logoPath = logoPath ?? '';
+        _signaturePath = signaturePath ?? '';
+      });
+    }
   }
 
   Future<void> _pickBrandAsset({required bool isSignature}) async {
-    final decision = await ref
-        .read(subscriptionGatekeeperProvider)
-        .evaluate(SubscriptionGateFeature.premiumBranding);
-    if (!decision.isAllowed) {
-      if (!mounted) {
-        return;
-      }
-      await promptUpgradeForDecision(context, decision);
-      return;
-    }
-
     setState(() {
       if (isSignature) {
         _isPickingSignature = true;
@@ -82,36 +78,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     });
 
     try {
-      final pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 92,
-        maxWidth: 1600,
-      );
-      if (pickedFile == null || !mounted) {
-        return;
+      final String? persistedPath = isSignature
+          ? await UserProfileImageService.pickSignature()
+          : await UserProfileImageService.pickLogo();
+
+      if (!mounted) return;
+
+      if (persistedPath != null) {
+        setState(() {
+          if (isSignature) {
+            _signaturePath = persistedPath;
+          } else {
+            _logoPath = persistedPath;
+          }
+        });
       }
-
-      final persistedPath = await _persistBrandAsset(
-        pickedFile,
-        baseName: isSignature ? 'signature' : 'logo',
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        if (isSignature) {
-          _signaturePath = persistedPath;
-        } else {
-          _logoPath = persistedPath;
-        }
-      });
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open image picker right now.')),
       );
@@ -128,42 +111,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
-  Future<String> _persistBrandAsset(
-    XFile file, {
-    required String baseName,
-  }) async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final assetDirectory = Directory(
-      '${documentsDirectory.path}${Platform.pathSeparator}brand_assets',
-    );
-    if (!await assetDirectory.exists()) {
-      await assetDirectory.create(recursive: true);
+  Future<void> _clearBrandAsset({required bool isSignature}) async {
+    if (isSignature) {
+      await UserProfileImageService.removeSignature();
+      setState(() => _signaturePath = '');
+    } else {
+      await UserProfileImageService.removeLogo();
+      setState(() => _logoPath = '');
     }
-
-    final extension = _fileExtension(file.path);
-    final targetPath =
-        '${assetDirectory.path}${Platform.pathSeparator}$baseName$extension';
-    await File(file.path).copy(targetPath);
-    return targetPath;
-  }
-
-  String _fileExtension(String path) {
-    final lastDot = path.lastIndexOf('.');
-    if (lastDot < 0 || lastDot == path.length - 1) {
-      return '.png';
-    }
-
-    return path.substring(lastDot);
-  }
-
-  void _clearBrandAsset({required bool isSignature}) {
-    setState(() {
-      if (isSignature) {
-        _signaturePath = '';
-      } else {
-        _logoPath = '';
-      }
-    });
   }
 
   Future<void> _save() async {
@@ -186,8 +141,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       businessName: _businessNameController.text.trim(),
       phone: _fullPhoneValue.trim(),
       address: _addressController.text.trim(),
-      logoPath: _logoPath.trim(),
-      signaturePath: _signaturePath.trim(),
+      // Assets are managed by UserProfileImageService via local Hive settings
+      logoPath: '',
+      signaturePath: '',
     );
     var shouldResetSavingState = true;
 
@@ -377,8 +333,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         _BrandAssetField(
                           label: 'Brand Logo',
                           helper: isPro
-                              ? 'Used on Pro invoices. Falls back to the app logo if empty.'
-                              : 'Pro only. Upgrade to use your own logo on invoices.',
+                              ? 'Visible on generated invoices.'
+                              : 'Upgrade to Pro to customize your invoice branding.',
                           assetPath: _logoPath,
                           isLoading: _isPickingLogo,
                           emptyLabel: 'No logo selected',
@@ -391,8 +347,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         _BrandAssetField(
                           label: 'Authorized Signature',
                           helper: isPro
-                              ? 'Optional signature image for Pro invoices.'
-                              : 'Pro only. Upgrade to add a signature block to invoices.',
+                              ? 'Optional signature image for professional invoices.'
+                              : 'Upgrade to Pro to add an authorized signature.',
                           assetPath: _signaturePath,
                           isLoading: _isPickingSignature,
                           emptyLabel: 'No signature selected',

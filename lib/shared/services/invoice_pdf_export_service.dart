@@ -14,6 +14,7 @@ import '../../features/clients/presentation/controllers/clients_controller.dart'
 import '../../features/invoices/domain/entities/invoice.dart';
 import 'invoice_pdf_profile_hook.dart';
 import 'pdf_file_storage.dart';
+import '../../data/services/user_profile_image_service.dart';
 
 final invoicePdfExportServiceProvider = Provider<InvoicePdfExportService>(
   (ref) => InvoicePdfExportService(
@@ -141,6 +142,30 @@ Future<pw.Document> buildInvoicePdf(
 }) async {
   final logoImage = await _loadBrandLogo(senderProfile, isPro: isPro);
   final signatureImage = await _loadSignatureImage(senderProfile, isPro: isPro);
+
+  final customLogoPath = await UserProfileImageService.getLogoPath();
+  final customSignaturePath = await UserProfileImageService.getSignaturePath();
+
+  pw.MemoryImage? customLogo;
+  if (customLogoPath != null) {
+    try {
+      final file = File(customLogoPath);
+      if (await file.exists()) {
+        customLogo = pw.MemoryImage(await file.readAsBytes());
+      }
+    } catch (_) {}
+  }
+
+  pw.MemoryImage? customSignature;
+  if (customSignaturePath != null) {
+    try {
+      final file = File(customSignaturePath);
+      if (await file.exists()) {
+        customSignature = pw.MemoryImage(await file.readAsBytes());
+      }
+    } catch (_) {}
+  }
+
   final lineItems = _resolveLineItems(invoice, items);
   final subtotalAmount = invoice.subtotalAmount;
   final discountAmount = invoice.appliedDiscountAmount;
@@ -192,7 +217,11 @@ Future<pw.Document> buildInvoicePdf(
             : null,
       ),
       build: (context) => <pw.Widget>[
-        _buildHeader(logoImage: logoImage, brandName: brandName),
+        _buildHeader(
+          logoImage: logoImage,
+          customLogo: customLogo,
+          brandName: brandName,
+        ),
         pw.SizedBox(height: _spaceLg),
         _buildDetailsRow(invoice),
         pw.SizedBox(height: _spaceLg),
@@ -245,7 +274,30 @@ Future<pw.Document> buildInvoicePdf(
           pw.SizedBox(height: _spaceMd),
           _buildPaymentSection(invoice.normalizedPaymentLink!),
         ],
-        if (signatureImage != null) ...[
+        if (customSignature != null) ...[
+          pw.SizedBox(height: _spaceLg),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Container(
+                  constraints: const pw.BoxConstraints(maxWidth: 150, maxHeight: 60),
+                  child: pw.Image(customSignature, fit: pw.BoxFit.contain),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Authorized Signature',
+                  style: pw.TextStyle(
+                    color: _pdfMuted,
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else if (signatureImage != null) ...[
           pw.SizedBox(height: _spaceLg),
           _buildSignatureSection(
             signatureImage,
@@ -266,15 +318,23 @@ Future<pw.Document> buildInvoicePdf(
 
 pw.Widget _buildHeader({
   required pw.MemoryImage? logoImage,
+  required pw.MemoryImage? customLogo,
   required String brandName,
 }) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
+      if (customLogo != null) ...[
+        pw.Container(
+          constraints: const pw.BoxConstraints(maxWidth: 120, maxHeight: 60),
+          child: pw.Image(customLogo, fit: pw.BoxFit.contain),
+        ),
+        pw.SizedBox(height: _spaceMd),
+      ],
       pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          if (logoImage != null) ...[
+          if (customLogo == null && logoImage != null) ...[
             pw.Container(
               width: 36,
               height: 36,

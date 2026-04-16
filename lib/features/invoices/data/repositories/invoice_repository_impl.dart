@@ -3,6 +3,7 @@ import '../../domain/repositories/invoice_repository.dart';
 import '../datasources/invoices_local_datasource.dart';
 import '../models/invoice_model.dart';
 import '../../../../data/services/firestore_sync_service.dart';
+import '../../../../data/services/notification_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
   const InvoiceRepositoryImpl(
@@ -35,6 +36,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final model = InvoiceModel.fromEntity(invoice);
     final saved = await _datasource.createInvoice(model);
     _syncInvoice(saved);
+    try {
+      if (!saved.status.isPaid) {
+        NotificationService.scheduleInvoiceReminders(saved);
+      } else {
+        NotificationService.cancelInvoiceReminders(saved.id);
+      }
+    } catch (_) {}
     return saved;
   }
 
@@ -43,6 +51,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final model = InvoiceModel.fromEntity(invoice);
     final saved = await _datasource.updateInvoice(model);
     _syncInvoice(saved);
+    try {
+      if (!saved.status.isPaid) {
+        NotificationService.scheduleInvoiceReminders(saved);
+      } else {
+        NotificationService.cancelInvoiceReminders(saved.id);
+      }
+    } catch (_) {}
     return saved;
   }
 
@@ -50,6 +65,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   Future<void> deleteInvoice(String id) async {
     await _datasource.deleteInvoice(id);
     _deleteInvoice(id);
+    try {
+      NotificationService.cancelInvoiceReminders(id);
+    } catch (_) {}
   }
 
   @override

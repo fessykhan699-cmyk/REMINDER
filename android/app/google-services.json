@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "276742242102-6r7p3n06hq789uavhg78sk57ar4ujim8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.apexmobilelabs.reminder",
+            "certificate_hash": "264ece46cc2ceccbcf7cbbcdb5a0dcf9991ee8f7"
+          }
+        },
+        {
           "client_id": "276742242102-bj9bmh5g4mh0bsbdc2vojo9untp8g3fi.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

@@ -13,7 +13,8 @@ import 'features/settings/data/models/profile_model.dart';
 
 import 'app.dart';
 import 'core/storage/hive_storage.dart';
-import 'shared/services/notification_service.dart';
+import 'data/services/notification_service.dart';
+import 'data/services/overdue_flip_service.dart';
 
 const Color _rootBackground = Color(0xFF0F1115);
 
@@ -42,9 +43,16 @@ Future<void> main() async {
   await HiveStorage.purgeDemoDataOnce();
   await HiveStorage.pruneRemindersOnce();
 
-  await NotificationService.instance.initialize();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService.init();
+
+  // Flip overdue invoices on startup
+  try {
+    await OverdueFlipService().flipOverdueInvoices();
+  } catch (e) {
+    debugPrint('OverdueFlipService error on startup: $e');
+  }
 
   runApp(
     const ProviderScope(

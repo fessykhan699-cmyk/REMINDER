@@ -425,6 +425,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionCard(
               title: 'Notifications',
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: subscription.isPro ? null : () => const UpgradeToProRoute().push(context),
+                    child: Text(
+                      subscription.isPro ? 'Reminders: Active' : 'Reminders: Upgrade to Pro to enable',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: subscription.isPro ? Colors.greenAccent : AppColors.accent,
+                        fontWeight: FontWeight.w600,
+                        decoration: subscription.isPro ? null : TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
                 _SwitchRow(
                   title: 'Push notifications',
                   subtitle: 'Schedule local due reminders on this device.',

@@ -1795,8 +1795,8 @@ String _formatInvoiceDueLabel({
   final difference = invoice.dueDate.difference(now);
 
   if (isOverdue) {
-    final overdueHours = difference.inHours.abs().clamp(1, 9999);
-    return 'Overdue by $overdueHours h';
+    final overdueDays = difference.inDays.abs().clamp(0, 9999);
+    return 'Overdue by $overdueDays day${overdueDays == 1 ? '' : 's'}';
   }
 
   final dueHours = difference.inHours.clamp(1, 9999);

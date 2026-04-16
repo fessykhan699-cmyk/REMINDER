@@ -15,8 +15,9 @@ import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../subscription/presentation/widgets/usage_limit_nudge_card.dart';
-import '../../data/models/invoice_model.dart';
 import '../../domain/entities/invoice.dart';
+import '../../data/models/invoice_model.dart';
+import '../../../../data/services/overdue_flip_service.dart';
 import '../widgets/invoice_tile.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,13 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     vsync: this,
     duration: const Duration(milliseconds: 400),
   )..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    // Scan and flip overdue status on list view
+    OverdueFlipService().flipOverdueInvoices();
+  }
 
   @override
   void dispose() {
