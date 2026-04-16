@@ -847,6 +847,17 @@ class _PlanSectionCard extends StatelessWidget {
           const SizedBox(height: 12),
           _UsageStatRow(label: 'Invoices', value: invoiceUsage),
           if (!isPro && onUpgrade != null) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onUpgrade,
+              child: Text(
+                'Cloud backup: Upgrade to Pro',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
             PremiumPrimaryButton(
               label: 'Upgrade to Pro',
@@ -863,6 +874,13 @@ class _PlanSectionCard extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Invoice Flow Pro is active on this device.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Cloud backup: Active',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
