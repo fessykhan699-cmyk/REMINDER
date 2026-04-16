@@ -2,11 +2,20 @@ import '../../domain/entities/client.dart';
 import '../../domain/repositories/client_repository.dart';
 import '../datasources/clients_local_datasource.dart';
 import '../models/client_model.dart';
+import '../../../../data/services/firestore_sync_service.dart';
 
 class ClientRepositoryImpl implements ClientRepository {
-  const ClientRepositoryImpl(this._datasource);
+  const ClientRepositoryImpl(
+    this._datasource, {
+    this.syncService,
+    this.userId,
+    this.isPro = false,
+  });
 
   final ClientsLocalDatasource _datasource;
+  final FirestoreSyncService? syncService;
+  final String? userId;
+  final bool isPro;
 
   @override
   Future<List<Client>> getClients({
@@ -22,20 +31,43 @@ class ClientRepositoryImpl implements ClientRepository {
   }
 
   @override
-  Future<Client> addClient(Client client) {
-    return _datasource.addClient(ClientModel.fromEntity(client));
+  Future<Client> addClient(Client client) async {
+    final model = ClientModel.fromEntity(client);
+    final saved = await _datasource.addClient(model);
+    _syncClient(saved);
+    return saved;
   }
 
   @override
-  Future<Client> updateClient(Client client) {
-    return _datasource.updateClient(ClientModel.fromEntity(client));
+  Future<Client> updateClient(Client client) async {
+    final model = ClientModel.fromEntity(client);
+    final saved = await _datasource.updateClient(model);
+    _syncClient(saved);
+    return saved;
   }
 
   @override
-  Future<void> deleteClient(String id) {
-    return _datasource.deleteClient(id);
+  Future<void> deleteClient(String id) async {
+    await _datasource.deleteClient(id);
+    _deleteClient(id);
   }
 
   @override
   Future<Client?> getClientById(String id) => _datasource.getClientById(id);
+
+  // ── Private sync helpers ────────────────────────────────────────────────
+
+  void _syncClient(ClientModel model) {
+    final svc = syncService;
+    final uid = userId;
+    if (svc == null || uid == null) return;
+    svc.syncClientToCloud(userId: uid, isPro: isPro, client: model);
+  }
+
+  void _deleteClient(String clientId) {
+    final svc = syncService;
+    final uid = userId;
+    if (svc == null || uid == null) return;
+    svc.deleteClientFromCloud(userId: uid, isPro: isPro, clientId: clientId);
+  }
 }

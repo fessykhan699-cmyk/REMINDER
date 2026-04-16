@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/invoice_status_service.dart';
@@ -23,9 +24,16 @@ final invoicesLocalDatasourceProvider = Provider<InvoicesLocalDatasource>(
   (ref) => InvoicesLocalDatasource(ref.watch(clientsLocalDatasourceProvider)),
 );
 
-final invoiceRepositoryProvider = Provider<InvoiceRepository>(
-  (ref) => InvoiceRepositoryImpl(ref.watch(invoicesLocalDatasourceProvider)),
-);
+final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
+  final datasource = ref.watch(invoicesLocalDatasourceProvider);
+  return InvoiceRepositoryImpl(
+    datasource,
+    syncService: ref.watch(firestoreSyncServiceProvider),
+    userId: ref.watch(currentUserIdProvider),
+    isPro:
+        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+  );
+});
 
 final getInvoicesUseCaseProvider = Provider<GetInvoicesUseCase>(
   (ref) => GetInvoicesUseCase(ref.watch(invoiceRepositoryProvider)),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/utils/id_generator.dart';
+import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -22,9 +23,16 @@ final clientsLocalDatasourceProvider = Provider<ClientsLocalDatasource>(
   (ref) => ClientsLocalDatasource(),
 );
 
-final clientRepositoryProvider = Provider<ClientRepository>(
-  (ref) => ClientRepositoryImpl(ref.watch(clientsLocalDatasourceProvider)),
-);
+final clientRepositoryProvider = Provider<ClientRepository>((ref) {
+  final datasource = ref.watch(clientsLocalDatasourceProvider);
+  return ClientRepositoryImpl(
+    datasource,
+    syncService: ref.watch(firestoreSyncServiceProvider),
+    userId: ref.watch(currentUserIdProvider),
+    isPro:
+        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+  );
+});
 
 final getClientsUseCaseProvider = Provider<GetClientsUseCase>(
   (ref) => GetClientsUseCase(ref.watch(clientRepositoryProvider)),

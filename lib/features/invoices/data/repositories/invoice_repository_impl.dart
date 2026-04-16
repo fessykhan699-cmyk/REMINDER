@@ -2,11 +2,20 @@ import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/invoice_repository.dart';
 import '../datasources/invoices_local_datasource.dart';
 import '../models/invoice_model.dart';
+import '../../../../data/services/firestore_sync_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
-  const InvoiceRepositoryImpl(this._datasource);
+  const InvoiceRepositoryImpl(
+    this._datasource, {
+    this.syncService,
+    this.userId,
+    this.isPro = false,
+  });
 
   final InvoicesLocalDatasource _datasource;
+  final FirestoreSyncService? syncService;
+  final String? userId;
+  final bool isPro;
 
   @override
   Future<List<Invoice>> getInvoices({
@@ -22,18 +31,25 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   @override
-  Future<Invoice> createInvoice(Invoice invoice) {
-    return _datasource.createInvoice(InvoiceModel.fromEntity(invoice));
+  Future<Invoice> createInvoice(Invoice invoice) async {
+    final model = InvoiceModel.fromEntity(invoice);
+    final saved = await _datasource.createInvoice(model);
+    _syncInvoice(saved);
+    return saved;
   }
 
   @override
-  Future<Invoice> updateInvoice(Invoice invoice) {
-    return _datasource.updateInvoice(InvoiceModel.fromEntity(invoice));
+  Future<Invoice> updateInvoice(Invoice invoice) async {
+    final model = InvoiceModel.fromEntity(invoice);
+    final saved = await _datasource.updateInvoice(model);
+    _syncInvoice(saved);
+    return saved;
   }
 
   @override
-  Future<void> deleteInvoice(String id) {
-    return _datasource.deleteInvoice(id);
+  Future<void> deleteInvoice(String id) async {
+    await _datasource.deleteInvoice(id);
+    _deleteInvoice(id);
   }
 
   @override
@@ -47,4 +63,20 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   @override
   Future<void> deleteByClientId(String clientId) =>
       _datasource.deleteByClientId(clientId);
+
+  // ── Private sync helpers (fire-and-forget) ─────────────────────────────
+
+  void _syncInvoice(InvoiceModel model) {
+    final svc = syncService;
+    final uid = userId;
+    if (svc == null || uid == null) return;
+    svc.syncInvoiceToCloud(userId: uid, isPro: isPro, invoice: model);
+  }
+
+  void _deleteInvoice(String invoiceId) {
+    final svc = syncService;
+    final uid = userId;
+    if (svc == null || uid == null) return;
+    svc.deleteInvoiceFromCloud(userId: uid, isPro: isPro, invoiceId: invoiceId);
+  }
 }
