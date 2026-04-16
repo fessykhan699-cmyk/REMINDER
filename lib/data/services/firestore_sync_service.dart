@@ -190,8 +190,9 @@ class FirestoreSyncService {
     if (!doc.exists || doc.data() == null) return;
     try {
       final model = ProfileModel.fromJson(doc.data()!);
+      // Write to the actual profile Hive box using the same key as SettingsLocalDatasource
       final settingsBox = Hive.box<dynamic>(HiveStorage.settingsBoxName);
-      await settingsBox.put('profile_restore', model.toJson());
+      await settingsBox.put('currentUserProfile', model);
     } catch (e) {
       debugPrint('[FirestoreSync] skipping malformed profile: $e');
     }
@@ -208,19 +209,30 @@ class FirestoreSyncService {
       final remindersBox =
           Hive.box<ReminderModel>(HiveStorage.remindersBoxName);
 
-      final batch = _db.batch();
+      WriteBatch batch = _db.batch();
+      int opCount = 0;
+
+      Future<void> flush() async {
+        if (opCount == 0) return;
+        await batch.commit();
+        batch = _db.batch();
+        opCount = 0;
+      }
 
       for (final invoice in invoicesBox.values) {
         batch.set(_invoices(userId).doc(invoice.id), invoice.toJson());
+        if (++opCount >= 490) await flush();
       }
       for (final client in clientsBox.values) {
         batch.set(_clients(userId).doc(client.id), client.toJson());
+        if (++opCount >= 490) await flush();
       }
       for (final reminder in remindersBox.values) {
         batch.set(_reminders(userId).doc(reminder.id), reminder.toJson());
+        if (++opCount >= 490) await flush();
       }
+      await flush();
 
-      await batch.commit();
       debugPrint('[FirestoreSync] uploadLocalDataToCloud complete for $userId');
     } catch (e, st) {
       debugPrint('[FirestoreSync] uploadLocalDataToCloud failed: $e\n$st');
