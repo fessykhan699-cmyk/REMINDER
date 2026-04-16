@@ -784,7 +784,7 @@ class _PlanSectionCard extends StatelessWidget {
             'No PDF watermark',
           ]
         : const <String>[
-            '5 clients limit',
+            '3 clients limit',
             '5 invoices/month',
             'PDF includes watermark',
           ];

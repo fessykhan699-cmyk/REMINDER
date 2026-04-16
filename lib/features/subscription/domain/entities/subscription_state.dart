@@ -19,7 +19,7 @@ class SubscriptionState {
 
   const SubscriptionState.pro() : isPro = true;
 
-  static const int freeClientLimit = 5;
+  static const int freeClientLimit = 3;
   static const int freeMonthlyInvoiceLimit = 5;
 
   final bool isPro;

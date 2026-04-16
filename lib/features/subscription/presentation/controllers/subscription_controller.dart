@@ -118,7 +118,7 @@ class SubscriptionGatekeeper {
           reason: SubscriptionGateReason.limitReached,
           promptTitle: 'You\'ve reached your free limit',
           promptMessage:
-              'You already have 5 clients on Free. Upgrade to continue without limits and keep every client in one premium workspace.',
+              'You already have 3 clients on Free. Upgrade to continue without limits and keep every client in one premium workspace.',
         );
       case SubscriptionGateFeature.exportPdf:
         return SubscriptionGateDecision.allowed(
