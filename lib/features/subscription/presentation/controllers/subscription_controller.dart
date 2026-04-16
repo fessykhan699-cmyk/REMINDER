@@ -6,6 +6,7 @@ import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../data/datasources/subscription_local_datasource.dart';
 import '../../data/services/play_billing_service.dart';
 import '../../domain/entities/subscription_state.dart';
+import '../../../../data/providers/firestore_sync_provider.dart';
 
 final subscriptionLocalDatasourceProvider =
     Provider<SubscriptionLocalDatasource>(
@@ -62,6 +63,18 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
 
   Future<void> upgradeToPro() async {
     await setPlan(isPro: true);
+
+    // Upload any existing local Hive data to Firestore now that user is Pro.
+    final userId = ref.read(currentUserIdProvider);
+    if (userId != null) {
+      ref
+          .read(firestoreSyncServiceProvider)
+          .uploadLocalDataToCloud(userId)
+          .catchError((Object e) {
+        debugPrint('[SubscriptionController] uploadLocalDataToCloud error: $e');
+        return null;
+      });
+    }
   }
 }
 

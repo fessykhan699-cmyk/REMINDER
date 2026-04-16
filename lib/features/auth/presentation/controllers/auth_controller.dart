@@ -9,6 +9,7 @@ import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
+import '../../../../data/providers/firestore_sync_provider.dart';
 
 class AuthViewState {
   const AuthViewState({
@@ -175,6 +176,7 @@ class AuthController extends Notifier<AuthViewState> {
         isSubmitting: false,
         clearError: true,
       );
+      _triggerCloudRestore(session.userId);
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -197,6 +199,7 @@ class AuthController extends Notifier<AuthViewState> {
         isSubmitting: false,
         clearError: true,
       );
+      _triggerCloudRestore(session.userId);
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -233,5 +236,17 @@ class AuthController extends Notifier<AuthViewState> {
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString());
     }
+  }
+
+  /// Triggers a cloud restore in the background after successful login.
+  /// Only runs if Hive is empty (first install or new device).
+  /// Does not await — runs fire-and-forget to avoid blocking login UX.
+  void _triggerCloudRestore(String userId) {
+    ref.read(firestoreSyncServiceProvider).restoreAllFromCloud(userId).catchError(
+      (Object e) {
+        debugPrint('[AuthController] cloud restore error: $e');
+        return null;
+      },
+    );
   }
 }
