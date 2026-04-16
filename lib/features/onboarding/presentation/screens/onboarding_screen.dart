@@ -296,7 +296,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                       ),
                     ),
 
-                    // Dots — between content and CTA
+                    // Dots -- between content and CTA
                     Padding(
                       padding: const EdgeInsets.only(bottom: 96),
                       child: _buildDots(),
@@ -327,7 +327,7 @@ class _CardData {
 }
 
 // =============================================================================
-// Galaxy Background — REAL image + overlay + noise
+// Galaxy Background -- REAL image + overlay + noise
 // =============================================================================
 
 class _GalaxyBackground extends StatelessWidget {
@@ -350,7 +350,7 @@ class _GalaxyBackground extends StatelessWidget {
             height: double.infinity,
           ),
 
-          // Layer 3: dark overlay — light enough to keep galaxy visible
+          // Layer 3: dark overlay -- light enough to keep galaxy visible
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -382,7 +382,7 @@ class _GalaxyBackground extends StatelessWidget {
 }
 
 // =============================================================================
-// Page Content — headline + subtitle + staggered cards, NO scroll
+// Page Content -- headline + subtitle + staggered cards, NO scroll
 // =============================================================================
 
 class _PageContent extends StatefulWidget {
@@ -510,7 +510,7 @@ class _PageContentState extends State<_PageContent>
 }
 
 // =============================================================================
-// Glass Card — frosted with golden border glow
+// Glass Card -- frosted with golden border glow
 // =============================================================================
 
 class _GlassCard extends StatelessWidget {
