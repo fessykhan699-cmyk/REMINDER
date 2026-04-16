@@ -24,6 +24,30 @@ class ProfileModel extends UserProfile {
       signaturePath: profile.signaturePath,
     );
   }
+
+  factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    return ProfileModel(
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      businessName: json['businessName'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      logoPath: json['logoPath'] as String? ?? '',
+      signaturePath: json['signaturePath'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'email': email,
+      'businessName': businessName,
+      'phone': phone,
+      'address': address,
+      'logoPath': logoPath,
+      'signaturePath': signaturePath,
+    };
+  }
 }
 
 class ProfileModelAdapter extends TypeAdapter<ProfileModel> {
