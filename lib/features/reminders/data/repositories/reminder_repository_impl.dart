@@ -4,11 +4,21 @@ import '../../domain/entities/reminder.dart';
 import '../../domain/entities/reminder_message_type.dart';
 import '../../domain/repositories/reminder_repository.dart';
 import '../datasources/reminders_local_datasource.dart';
+import '../models/reminder_model.dart';
+import '../../../../data/services/firestore_sync_service.dart';
 
 class ReminderRepositoryImpl implements ReminderRepository {
-  const ReminderRepositoryImpl(this._datasource);
+  const ReminderRepositoryImpl(
+    this._datasource, {
+    this.syncService,
+    this.userId,
+    this.isPro = false,
+  });
 
   final RemindersLocalDatasource _datasource;
+  final FirestoreSyncService? syncService;
+  final String? userId;
+  final bool isPro;
 
   @override
   Future<List<Reminder>> getReminders() => _datasource.fetchReminders();
@@ -36,13 +46,15 @@ class ReminderRepositoryImpl implements ReminderRepository {
     required String clientId,
     required ReminderChannel channel,
     ReminderStatus status = ReminderStatus.sent,
-  }) {
-    return _datasource.createReminderRecord(
+  }) async {
+    final saved = await _datasource.createReminderRecord(
       invoiceId: invoiceId,
       clientId: clientId,
       channel: channel,
       status: status,
     );
+    _syncReminder(saved);
+    return saved;
   }
 
   @override
@@ -87,5 +99,18 @@ class ReminderRepositoryImpl implements ReminderRepository {
             'Please arrange payment today to avoid service delays.'
             '$paymentLinkLine';
     }
+  }
+
+  // ── Private sync helper ────────────────────────────────────────────────
+
+  void _syncReminder(Reminder reminder) {
+    final svc = syncService;
+    final uid = userId;
+    if (svc == null || uid == null) return;
+    svc.syncReminderToCloud(
+      userId: uid,
+      isPro: isPro,
+      reminder: ReminderModel.fromEntity(reminder),
+    );
   }
 }
