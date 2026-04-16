@@ -63,6 +63,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '276742242102',
     projectId: 'reminder-d0ca3',
     storageBucket: 'reminder-d0ca3.firebasestorage.app',
-    iosBundleId: 'com.example.reminder',
+    iosBundleId: 'com.apexmobilelabs.reminder',
   );
 }
