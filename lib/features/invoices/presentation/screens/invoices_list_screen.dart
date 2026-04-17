@@ -2,21 +2,19 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../../core/constants/app_routes.dart';
-import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/components/app_scaffold.dart';
-import '../../../../shared/services/invoice_status_service.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../subscription/presentation/widgets/usage_limit_nudge_card.dart';
-import '../../domain/entities/invoice.dart';
-import '../../data/models/invoice_model.dart';
+import '../providers/invoice_search_filter_provider.dart';
+import '../controllers/invoices_controller.dart';
+import '../../../../data/services/invoice_search_filter_service.dart';
 import '../../../../data/services/overdue_flip_service.dart';
 import '../widgets/invoice_tile.dart';
 
@@ -29,7 +27,7 @@ class InvoicesListScreen extends ConsumerStatefulWidget {
 
 class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     with SingleTickerProviderStateMixin {
-  static const InvoiceStatusService _statusService = InvoiceStatusService();
+  final _searchController = TextEditingController();
 
   int _visibleItemCount = 20;
 
@@ -47,6 +45,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
 
   @override
   void dispose() {
+    _searchController.dispose();
     _entryCtrl.dispose();
     super.dispose();
   }
@@ -71,19 +70,6 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     );
   }
 
-  List<Invoice> _sortedInvoices(Box<InvoiceModel> box) {
-    final now = DateTime.now();
-    final invoices = box.values.toList();
-    invoices.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return invoices
-        .map(
-          (invoice) => invoice.copyWith(
-            status: _statusService.resolveStatus(invoice, now: now),
-            paymentLink: invoice.normalizedPaymentLink,
-          ),
-        )
-        .toList(growable: false);
-  }
 
   Future<void> _openCreateInvoice() async {
     final decision = await ref
@@ -112,139 +98,264 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
         const SubscriptionState.free();
     final usage = ref.watch(subscriptionUsageProvider);
 
+    final filteredInvoices = ref.watch(filteredInvoicesProvider);
+    final allInvoicesAsync = ref.watch(invoicesControllerProvider);
+    final allInvoices = allInvoicesAsync.valueOrNull ?? [];
+    
+    final query = ref.watch(invoiceSearchQueryProvider);
+    final statusFilter = ref.watch(invoiceStatusFilterProvider);
+    final fromDate = ref.watch(invoiceFromDateFilterProvider);
+    final toDate = ref.watch(invoiceToDatFilterProvider);
+    
+    final isFiltering = query.isNotEmpty || statusFilter != null || fromDate != null || toDate != null;
+    final availableStatuses = InvoiceSearchFilterService.getAvailableStatuses(allInvoices);
+    
+    final visibleCount = math.min(filteredInvoices.length, _visibleItemCount);
+    final visibleInvoices = filteredInvoices.take(visibleCount).toList(growable: false);
+    final showNudge = !subscription.isPro;
+    final hasMore = filteredInvoices.length > visibleCount;
+
     return AppScaffold(
       extendBody: true,
       body: SafeArea(
-        child: ValueListenableBuilder<Box<InvoiceModel>>(
-          valueListenable: HiveStorage.invoicesBox.listenable(),
-          builder: (context, box, _) {
-            final invoices = _sortedInvoices(box);
-            final visibleCount = math.min(invoices.length, _visibleItemCount);
-            final visibleInvoices = invoices.take(visibleCount).toList(growable: false);
-            final showNudge = !subscription.isPro;
-            final hasMore = invoices.length > visibleCount;
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Header ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  spacingMD,
+                  spacingMD,
+                  spacingMD,
+                  spacingLG,
+                ),
+                child: _staggeredItem(
+                  index: 0,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Invoices',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'New Invoice',
+                        onPressed: _openCreateInvoice,
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              AppColors.accent.withValues(alpha: 0.14),
+                          foregroundColor: AppColors.textPrimary,
+                          shape: const CircleBorder(),
+                        ),
+                        icon: const Icon(Icons.add, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-            return CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // ── Header ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      spacingMD,
-                      spacingMD,
-                      spacingMD,
-                      spacingLG,
+            // ── Search & Filter ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: spacingMD),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      onChanged: (val) => ref.read(invoiceSearchQueryProvider.notifier).state = val,
+                      decoration: InputDecoration(
+                        hintText: 'Search by client, invoice number, or item',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  ref.read(invoiceSearchQueryProvider.notifier).state = "";
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      ),
                     ),
-                    child: _staggeredItem(
-                      index: 0,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Invoices',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
+                    const SizedBox(height: spacingSM),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            initialValue: statusFilter,
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
                               ),
                             ),
+                            hint: const Text('Status'),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('All')),
+                              ...availableStatuses.map((s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(s[0].toUpperCase() + s.substring(1)),
+                              )),
+                            ],
+                            onChanged: (val) => ref.read(invoiceStatusFilterProvider.notifier).state = val,
                           ),
-                          IconButton(
-                            tooltip: 'New Invoice',
-                            onPressed: _openCreateInvoice,
-                            style: IconButton.styleFrom(
-                              backgroundColor:
-                                  AppColors.accent.withValues(alpha: 0.14),
-                              foregroundColor: AppColors.textPrimary,
-                              shape: const CircleBorder(),
+                        ),
+                        const SizedBox(width: spacingSM),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              initialDateRange: fromDate != null && toDate != null
+                                  ? DateTimeRange(start: fromDate, end: toDate)
+                                  : null,
+                            );
+                            if (picked != null) {
+                              ref.read(invoiceFromDateFilterProvider.notifier).state = picked.start;
+                              ref.read(invoiceToDatFilterProvider.notifier).state = picked.end;
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            icon: const Icon(Icons.add, size: 20),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.date_range, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  fromDate != null && toDate != null
+                                      ? '${fromDate.day}/${fromDate.month}'
+                                      : 'Date',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
+                        if (fromDate != null || toDate != null)
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              ref.read(invoiceFromDateFilterProvider.notifier).state = null;
+                              ref.read(invoiceToDatFilterProvider.notifier).state = null;
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: spacingLG),
+                  ],
+                ),
+              ),
+            ),
+
+            if (filteredInvoices.isEmpty)
+              SliverFillRemaining(
+                child: isFiltering
+                    ? Center(
+                        child: Text(
+                          'No invoices match your search',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : AppEmptyState(
+                        title: 'No invoices yet',
+                        message: 'Create your first invoice in seconds.',
+                        action: FilledButton.icon(
+                          onPressed: _openCreateInvoice,
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Create Invoice'),
+                        ),
+                      ),
+              )
+            else ...[
+              // ── Usage nudge ──
+              if (showNudge)
+                SliverToBoxAdapter(
+                  child: _staggeredItem(
+                    index: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: spacingMD,
+                      ),
+                      child: UsageLimitNudgeCard(
+                        usage: usage,
+                        focus: UsageLimitFocus.invoices,
+                        onUpgrade: () {
+                          const UpgradeToProRoute().push(context);
+                        },
                       ),
                     ),
                   ),
                 ),
 
-                if (invoices.isEmpty)
-                  SliverFillRemaining(
-                    child: AppEmptyState(
-                      title: 'No invoices yet',
-                      message: 'Create your first invoice in seconds.',
-                      action: FilledButton.icon(
-                        onPressed: _openCreateInvoice,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Create Invoice'),
+              // ── Invoice list ──
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final invoice = visibleInvoices[index];
+                    return _staggeredItem(
+                      index: index + (showNudge ? 2 : 1),
+                      child: InvoiceTile(
+                        key: ValueKey(invoice.id),
+                        invoice: invoice,
+                        onTap: () async {
+                          final result = await InvoiceDetailRoute(invoice.id)
+                              .push<bool>(context);
+                          if (mounted && result == true) {
+                            // refresh logic if needed, but provider handles it
+                          }
+                        },
                       ),
-                    ),
-                  )
-                else ...[
-                  // ── Usage nudge ──
-                  if (showNudge)
-                    SliverToBoxAdapter(
-                      child: _staggeredItem(
-                        index: 1,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: spacingMD,
-                          ),
-                          child: UsageLimitNudgeCard(
-                            usage: usage,
-                            focus: UsageLimitFocus.invoices,
-                            onUpgrade: () {
-                              const UpgradeToProRoute().push(context);
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
+                    );
+                  },
+                  childCount: visibleInvoices.length,
+                ),
+              ),
 
-                  // ── Invoice list ──
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final invoice = visibleInvoices[index];
-                        return _staggeredItem(
-                          index: index + (showNudge ? 2 : 1),
-                          child: InvoiceTile(
-                            key: ValueKey(invoice.id),
-                            invoice: invoice,
-                            onTap: () async {
-                              await InvoiceDetailRoute(invoice.id)
-                                  .push<bool>(context);
-                              if (mounted) setState(() {});
-                            },
-                          ),
-                        );
-                      },
-                      childCount: visibleInvoices.length,
+              // ── Load more ──
+              if (hasMore)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: appCardPadding,
+                    child: Center(
+                      child: TextButton(
+                        onPressed: () => _loadMoreInvoices(filteredInvoices.length),
+                        child: const Text('Load more'),
+                      ),
                     ),
                   ),
+                ),
 
-                  // ── Load more ──
-                  if (hasMore)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: appCardPadding,
-                        child: Center(
-                          child: TextButton(
-                            onPressed: () => _loadMoreInvoices(invoices.length),
-                            child: const Text('Load more'),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // ── Bottom padding ──
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).padding.bottom + 100,
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
+              // ── Bottom padding ──
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom + 100,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

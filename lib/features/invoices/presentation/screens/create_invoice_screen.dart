@@ -16,6 +16,7 @@ import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../domain/entities/invoice.dart';
+import '../../domain/entities/line_item.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
 import '../controllers/invoice_prediction_engine.dart';
 import '../controllers/invoices_controller.dart';
@@ -50,6 +51,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   DateTime? _lastAutoDueDate;
   bool _isSaving = false;
   bool _smartSyncScheduled = false;
+  final List<LineItem> _lineItems = [];
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
@@ -245,6 +247,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         );
       }
       _lastAutoServiceValue = suggestedService;
+      
+      // Update first line item if empty or matches last auto
+      if (_lineItems.isEmpty) {
+        _lineItems.add(LineItem(id: '1', description: suggestedService, quantity: 1, unitPrice: 0));
+      } else if (_lineItems.length == 1 && _sameServiceValue(_lineItems[0].description, _lastAutoServiceValue)) {
+        _lineItems[0] = _lineItems[0].copyWith(description: suggestedService);
+      }
     }
 
     if (amount != null) {
@@ -257,6 +266,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           );
         }
         _lastAutoAmountValue = amountText;
+
+        // Update first line item amount
+        if (_lineItems.isNotEmpty) {
+           _lineItems[0] = _lineItems[0].copyWith(unitPrice: amount);
+        }
       }
     }
 
@@ -543,6 +557,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       discountAmount: discountAmount,
       paymentLink: paymentLink,
       notes: notes,
+      items: _lineItems,
     );
 
     final createdInvoice = await invoicesController.createInvoice(invoice);
@@ -614,6 +629,17 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         : _notesController.text.trim();
     final paymentLink = _normalizedPaymentLink();
     final now = DateTime.now();
+
+    // Ensure at least one line item from classic fields if none added
+    if (_lineItems.isEmpty && service.isNotEmpty && amount != null) {
+      _lineItems.add(LineItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        description: service,
+        quantity: 1,
+        unitPrice: amount,
+      ));
+    }
+
     final intelligence = ref.read(smartInvoicePredictionProvider);
     final invoicesController = ref.read(invoicesControllerProvider.notifier);
     final learningController = ref.read(
@@ -712,6 +738,116 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _showAddLineItemDialog() async {
+    final result = await showDialog<LineItem>(
+      context: context,
+      builder: (context) => const _LineItemDialog(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _lineItems.add(result);
+        _syncFirstItemToControllers();
+      });
+    }
+  }
+
+  Future<void> _showEditLineItemDialog(int index) async {
+    final result = await showDialog<LineItem>(
+      context: context,
+      builder: (context) => _LineItemDialog(item: _lineItems[index]),
+    );
+
+    if (result != null) {
+      setState(() {
+        _lineItems[index] = result;
+        _syncFirstItemToControllers();
+      });
+    }
+  }
+
+  void _syncFirstItemToControllers() {
+    if (_lineItems.isNotEmpty) {
+      final first = _lineItems.first;
+      _serviceController.text = first.description;
+      _amountController.text = _formatAmountInput(first.unitPrice);
+    }
+  }
+
+  Widget _buildLineItemsSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Line Items',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _showAddLineItemDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Item'),
+            ),
+          ],
+        ),
+        if (_lineItems.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'No items added yet. Classic fields above will be used.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _lineItems.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _lineItems[index];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(item.description),
+                subtitle: Text(
+                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: 'USD')}',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppFormatters.currency(item.amount, currencyCode: 'USD'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      onPressed: () => _showEditLineItemDialog(index),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _lineItems.removeAt(index);
+                          _syncFirstItemToControllers();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
   }
 
   @override
@@ -966,6 +1102,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                           await _selectDueDate();
                         },
                       ),
+                      const SizedBox(height: 24),
+                      _buildLineItemsSection(theme),
                       const SizedBox(height: 16),
                       FormField<DateTime?>(
                         key: _dueDateFieldKey,
@@ -2035,5 +2173,100 @@ class _ClientAvatar extends StatelessWidget {
     final first = parts.first.characters.first;
     final second = parts.last.characters.first;
     return '$first$second'.toUpperCase();
+  }
+}
+
+class _LineItemDialog extends StatefulWidget {
+  const _LineItemDialog({this.item});
+
+  final LineItem? item;
+
+  @override
+  State<_LineItemDialog> createState() => _LineItemDialogState();
+}
+
+class _LineItemDialogState extends State<_LineItemDialog> {
+  late final _descriptionController = TextEditingController(text: widget.item?.description ?? '');
+  late final _quantityController = TextEditingController(text: (widget.item?.quantity ?? 1).toString());
+  late final _unitPriceController = TextEditingController(text: widget.item?.unitPrice.toStringAsFixed(2) ?? '');
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    _quantityController.dispose();
+    _unitPriceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.item == null ? 'Add Item' : 'Edit Item'),
+      backgroundColor: AppColors.backgroundSecondary,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(labelText: 'Description', hintText: 'Development services'),
+              validator: (v) => (v?.isEmpty ?? true) ? 'Required' : null,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _quantityController,
+                    decoration: const InputDecoration(labelText: 'Quantity'),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                       final d = double.tryParse(v ?? '');
+                       if (d == null || d <= 0) return 'Invalid';
+                       return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _unitPriceController,
+                    decoration: const InputDecoration(labelText: 'Unit Price'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) {
+                       final d = double.tryParse(v ?? '');
+                       if (d == null || d < 0) return 'Invalid';
+                       return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState?.validate() ?? false) {
+              final item = LineItem(
+                id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                description: _descriptionController.text.trim(),
+                quantity: double.tryParse(_quantityController.text) ?? 1,
+                unitPrice: double.tryParse(_unitPriceController.text) ?? 0,
+              );
+              Navigator.pop(context, item);
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
   }
 }

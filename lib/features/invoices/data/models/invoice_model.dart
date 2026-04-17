@@ -3,6 +3,8 @@
 import 'package:hive/hive.dart';
 
 import '../../domain/entities/invoice.dart';
+import 'line_item_model.dart';
+import '../../domain/entities/line_item.dart';
 
 const Object _invoiceModelPaymentLinkSentinel = Object();
 const Object _invoiceModelNotesSentinel = Object();
@@ -60,23 +62,25 @@ class InvoiceModel extends Invoice {
     required this.discountAmount,
     this.paymentLink,
     this.notes,
+    this.items = const [],
   }) : super(
-         id: id,
-         invoiceNumber: invoiceNumber,
-         clientId: clientId,
-         clientName: clientName,
-         service: service,
-         amount: amount,
-         dueDate: dueDate,
-         status: status,
-         createdAt: createdAt,
-         currencyCode: currencyCode,
-         taxPercent: taxPercent,
-         paymentTermsDays: paymentTermsDays,
-         discountAmount: discountAmount,
-         paymentLink: paymentLink,
-         notes: notes,
-       );
+          id: id,
+          invoiceNumber: invoiceNumber,
+          clientId: clientId,
+          clientName: clientName,
+          service: service,
+          amount: amount,
+          dueDate: dueDate,
+          status: status,
+          createdAt: createdAt,
+          currencyCode: currencyCode,
+          taxPercent: taxPercent,
+          paymentTermsDays: paymentTermsDays,
+          discountAmount: discountAmount,
+          paymentLink: paymentLink,
+          notes: notes,
+          items: items,
+        );
 
   @override
   @HiveField(0)
@@ -138,6 +142,10 @@ class InvoiceModel extends Invoice {
   @HiveField(13)
   final String? notes;
 
+  @override
+  @HiveField(15)
+  final List<LineItemModel> items;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -155,6 +163,7 @@ class InvoiceModel extends Invoice {
       discountAmount: invoice.discountAmount,
       paymentLink: invoice.paymentLink,
       notes: invoice.notes,
+      items: invoice.items.map((e) => LineItemModel.fromEntity(e)).toList(),
     );
   }
 
@@ -175,6 +184,10 @@ class InvoiceModel extends Invoice {
       discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
       paymentLink: json['paymentLink'] as String?,
       notes: json['notes'] as String?,
+      items: (json['items'] as List?)
+              ?.map((e) => LineItemModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -195,6 +208,7 @@ class InvoiceModel extends Invoice {
       'discountAmount': discountAmount,
       'paymentLink': paymentLink,
       'notes': notes,
+      'items': items.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -215,6 +229,7 @@ class InvoiceModel extends Invoice {
     double? discountAmount,
     Object? paymentLink = _invoiceModelPaymentLinkSentinel,
     Object? notes = _invoiceModelNotesSentinel,
+    List<LineItem>? items,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -236,6 +251,9 @@ class InvoiceModel extends Invoice {
       notes: identical(notes, _invoiceModelNotesSentinel)
           ? this.notes
           : notes as String?,
+      items: items != null
+          ? items.map((e) => LineItemModel.fromEntity(e)).toList()
+          : this.items,
     );
   }
 
@@ -272,16 +290,19 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
     final dueDate = DateTime.parse(reader.readString());
     final status = reader.read() as InvoiceStatus;
     final createdAt = DateTime.parse(reader.readString());
-    final currencyCode =
-        reader.availableBytes > 0 ? reader.readString() : 'USD';
+    final currencyCode = reader.availableBytes > 0 ? reader.readString() : 'USD';
     final taxPercent = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final paymentTermsDays = reader.availableBytes > 0 ? reader.readInt() : 0;
     final paymentLink = reader.availableBytes > 0 ? reader.readString() : '';
-    final discountAmount =
-        reader.availableBytes > 0 ? reader.readDouble() : 0.0;
+    final discountAmount = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final notes = reader.availableBytes > 0 ? reader.readString() : '';
-    final invoiceNumber =
-        reader.availableBytes > 0 ? reader.readString() : '';
+    final invoiceNumber = reader.availableBytes > 0 ? reader.readString() : '';
+
+    List<LineItemModel> items = [];
+    if (reader.availableBytes > 0) {
+      final itemsRaw = reader.readList();
+      items = itemsRaw.cast<LineItemModel>();
+    }
 
     return InvoiceModel(
       id: id,
@@ -299,6 +320,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       discountAmount: discountAmount,
       paymentLink: paymentLink.isEmpty ? null : paymentLink,
       notes: notes.isEmpty ? null : notes,
+      items: items,
     );
   }
 
@@ -319,6 +341,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeString(obj.paymentLink ?? '')
       ..writeDouble(obj.discountAmount)
       ..writeString(obj.notes ?? '')
-      ..writeString(obj.invoiceNumber);
+      ..writeString(obj.invoiceNumber)
+      ..writeList(obj.items);
   }
 }

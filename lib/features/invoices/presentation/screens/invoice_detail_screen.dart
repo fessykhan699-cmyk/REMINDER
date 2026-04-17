@@ -423,7 +423,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    invoice.service,
+                    invoice.items.length > 1
+                        ? '${invoice.items.length} Items'
+                        : invoice.items.isNotEmpty
+                            ? invoice.items.first.description
+                            : invoice.service,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleLarge,
@@ -474,6 +478,65 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   ),
 
                   const SizedBox(height: spacingMD),
+
+                  if (invoice.items.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'Items',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: spacingSM),
+                    GlassCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          ...invoice.items.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final item = entry.value;
+                            return Column(
+                              children: [
+                                if (idx > 0)
+                                  Divider(
+                                    height: 1,
+                                    indent: spacingMD,
+                                    endIndent: spacingMD,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: spacingMD,
+                                    vertical: 4,
+                                  ),
+                                  title: Text(
+                                    item.description,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: Text(
+                                    '${item.quantity.toStringAsFixed(item.quantity == item.quantity.toInt() ? 0 : 2)} × ${AppFormatters.currency(item.unitPrice, currencyCode: invoice.currencyCode)}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  trailing: Text(
+                                    AppFormatters.currency(item.amount,
+                                        currencyCode: invoice.currencyCode),
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: spacingMD),
+                  ],
 
                   // ── Actions card ──
                   GlassCard(

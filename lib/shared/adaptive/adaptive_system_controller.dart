@@ -138,24 +138,12 @@ class AdaptiveSystemState {
     return bestAction;
   }
 
-  List<AdaptiveTabKey> get orderedTabs {
-    const workTabs = [
-      AdaptiveTabKey.dashboard,
-      AdaptiveTabKey.invoices,
-      AdaptiveTabKey.clients,
-    ];
-
-    final sortedTabs = [...workTabs]
-      ..sort((a, b) {
-        final usageCompare = tabUsage(b).compareTo(tabUsage(a));
-        if (usageCompare != 0) {
-          return usageCompare;
-        }
-        return workTabs.indexOf(a).compareTo(workTabs.indexOf(b));
-      });
-
-    return [...sortedTabs, AdaptiveTabKey.settings];
-  }
+  List<AdaptiveTabKey> get orderedTabs => const [
+        AdaptiveTabKey.dashboard,
+        AdaptiveTabKey.invoices,
+        AdaptiveTabKey.clients,
+        AdaptiveTabKey.settings,
+      ];
 
   bool get hasRecentResolution {
     final action = lastAction;

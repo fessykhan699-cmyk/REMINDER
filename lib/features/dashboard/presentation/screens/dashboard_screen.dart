@@ -860,7 +860,7 @@ class _PriorityInvoiceRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                invoice.dueLabel,
+                '${invoice.invoice.items.length > 1 ? "${invoice.invoice.items.length} Items" : (invoice.invoice.items.isNotEmpty ? invoice.invoice.items.first.description : invoice.invoice.service)} • ${invoice.dueLabel}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1065,7 +1065,7 @@ class _RecentActivityRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    invoice.status.label,
+                    '${invoice.items.length > 1 ? "${invoice.items.length} Items" : (invoice.items.isNotEmpty ? invoice.items.first.description : invoice.service)} • ${invoice.status.label}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(

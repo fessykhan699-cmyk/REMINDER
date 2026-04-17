@@ -1,5 +1,4 @@
-const Object _paymentLinkSentinel = Object();
-const Object _notesSentinel = Object();
+import 'line_item.dart';
 
 enum InvoiceStatus { draft, sent, viewed, paid, overdue }
 
@@ -20,119 +19,111 @@ extension InvoiceStatusX on InvoiceStatus {
   }
 
   bool get isPaid => this == InvoiceStatus.paid;
-
   bool get isShareable => !isPaid;
 }
 
 class Invoice {
   const Invoice({
     required this.id,
-    required this.invoiceNumber,
     required this.clientId,
     required this.clientName,
-    required this.service,
     required this.amount,
     required this.dueDate,
-    required this.status,
     required this.createdAt,
+    this.status = InvoiceStatus.draft,
+    this.service = '',
     this.currencyCode = 'USD',
-    this.taxPercent = 0,
-    this.paymentTermsDays = 0,
-    this.discountAmount = 0,
-    this.paymentLink,
     this.notes,
+    this.paymentLink,
+    this.taxPercent = 0.0,
+    this.discountAmount = 0.0,
+    this.invoiceNumber = '',
+    this.paymentTermsDays = 0,
+    this.items = const [],
   });
 
   final String id;
-  final String invoiceNumber;
   final String clientId;
   final String clientName;
-  final String service;
-  final double amount;
+  final double amount; // Total amount (after tax and discount)
   final DateTime dueDate;
-  final InvoiceStatus status;
   final DateTime createdAt;
+  final InvoiceStatus status;
+  final String service;
   final String currencyCode;
-  final double taxPercent;
-  final int paymentTermsDays;
-  final double discountAmount;
-  final String? paymentLink;
   final String? notes;
+  final String? paymentLink;
+  final double taxPercent;
+  final double discountAmount;
+  final String invoiceNumber;
+  final int paymentTermsDays;
+  final List<LineItem> items;
 
-  bool get hasPaymentLink {
-    final trimmed = paymentLink?.trim() ?? '';
-    return trimmed.isNotEmpty;
-  }
+  bool get isPaid => status == InvoiceStatus.paid;
+  bool get isOverdue =>
+      status != InvoiceStatus.paid && dueDate.isBefore(DateTime.now());
 
-  String? get normalizedPaymentLink {
-    final trimmed = paymentLink?.trim() ?? '';
-    return trimmed.isEmpty ? null : trimmed;
-  }
-
-  String? get normalizedNotes {
-    final trimmed = notes?.trim() ?? '';
-    return trimmed.isEmpty ? null : trimmed;
-  }
+  String? get normalizedNotes => notes?.trim().isEmpty == true ? null : notes;
+  String? get normalizedPaymentLink =>
+      paymentLink?.trim().isEmpty == true ? null : paymentLink;
 
   bool get hasNotes => normalizedNotes != null;
+  bool get hasPaymentLink => normalizedPaymentLink != null;
 
-  double get appliedDiscountAmount {
-    final normalizedDiscount = discountAmount < 0 ? 0 : discountAmount;
-    final taxableSubtotal = taxableSubtotalAmount;
-    return normalizedDiscount > taxableSubtotal
-        ? taxableSubtotal
-        : normalizedDiscount.toDouble();
-  }
-
-  double get taxableSubtotalAmount {
-    if (taxPercent <= 0) {
-      return amount;
+  // New calculation logic
+  double get calculatedSubtotal {
+    if (items.isEmpty) {
+      // Backward compatibility: infer subtotal from total amount
+      // amount = subtotal + subtotal * (taxPercent / 100) - discountAmount
+      // amount + discountAmount = subtotal * (1 + (taxPercent / 100))
+      return (amount + discountAmount) / (1 + (taxPercent / 100));
     }
-
-    return amount / (1 + (taxPercent / 100));
+    return items.fold(0, (sum, item) => sum + item.amount);
   }
 
-  double get subtotalAmount {
-    return taxableSubtotalAmount + appliedDiscountAmount;
-  }
+  double get subtotalAmount => calculatedSubtotal;
 
-  double get taxAmount => amount - taxableSubtotalAmount;
+  double get taxAmount => subtotalAmount * (taxPercent / 100);
+
+  double get appliedDiscountAmount => discountAmount;
+
+  double get calculatedTotal => subtotalAmount + taxAmount - discountAmount;
 
   Invoice copyWith({
     String? id,
-    String? invoiceNumber,
     String? clientId,
     String? clientName,
-    String? service,
     double? amount,
     DateTime? dueDate,
-    InvoiceStatus? status,
     DateTime? createdAt,
+    InvoiceStatus? status,
+    String? service,
     String? currencyCode,
+    String? notes,
+    String? paymentLink,
     double? taxPercent,
-    int? paymentTermsDays,
     double? discountAmount,
-    Object? paymentLink = _paymentLinkSentinel,
-    Object? notes = _notesSentinel,
+    String? invoiceNumber,
+    int? paymentTermsDays,
+    List<LineItem>? items,
   }) {
     return Invoice(
       id: id ?? this.id,
-      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       clientId: clientId ?? this.clientId,
       clientName: clientName ?? this.clientName,
-      service: service ?? this.service,
       amount: amount ?? this.amount,
       dueDate: dueDate ?? this.dueDate,
-      status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      service: service ?? this.service,
       currencyCode: currencyCode ?? this.currencyCode,
+      notes: notes ?? this.notes,
+      paymentLink: paymentLink ?? this.paymentLink,
       taxPercent: taxPercent ?? this.taxPercent,
-      paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
       discountAmount: discountAmount ?? this.discountAmount,
-      paymentLink: identical(paymentLink, _paymentLinkSentinel)
-          ? this.paymentLink
-          : paymentLink as String?,
-      notes: identical(notes, _notesSentinel) ? this.notes : notes as String?,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
+      items: items ?? this.items,
     );
   }
 }

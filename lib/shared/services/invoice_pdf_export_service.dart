@@ -36,10 +36,17 @@ class InvoicePdfDocument {
 }
 
 class InvoicePdfLineItem {
-  const InvoicePdfLineItem({required this.service, required this.amount});
+  const InvoicePdfLineItem({
+    required this.service,
+    required this.amount,
+    this.quantity = 1,
+    this.unitPrice = 0,
+  });
 
   final String service;
   final double amount;
+  final double quantity;
+  final double unitPrice;
 }
 
 class _InvoicePdfParty {
@@ -581,10 +588,13 @@ pw.Widget _buildItemsTable(
               ),
               children: [
                 _buildTableBodyCell(item.service),
-                _buildTableBodyCell('1', alignRight: true),
+                _buildTableBodyCell(
+                  item.quantity.toStringAsFixed(item.quantity == item.quantity.toInt() ? 0 : 2),
+                  alignRight: true,
+                ),
                 _buildTableBodyCell(
                   AppFormatters.currency(
-                    item.amount,
+                    item.unitPrice,
                     currencyCode: currencyCode,
                   ),
                   alignRight: true,
@@ -824,10 +834,25 @@ List<InvoicePdfLineItem> _resolveLineItems(
     return items;
   }
 
+  if (invoice.items.isNotEmpty) {
+    return invoice.items
+        .map(
+          (item) => InvoicePdfLineItem(
+            service: item.description,
+            amount: item.amount,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          ),
+        )
+        .toList();
+  }
+
   return <InvoicePdfLineItem>[
     InvoicePdfLineItem(
       service: invoice.service.trim().isEmpty ? 'Service' : invoice.service,
       amount: invoice.subtotalAmount,
+      quantity: 1,
+      unitPrice: invoice.subtotalAmount,
     ),
   ];
 }

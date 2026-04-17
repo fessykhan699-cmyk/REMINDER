@@ -66,7 +66,11 @@ class InvoiceTile extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          invoice.service,
+                          invoice.items.length > 1
+                              ? '${invoice.items.length} Items'
+                              : invoice.items.isNotEmpty
+                                  ? invoice.items.first.description
+                                  : invoice.service,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,

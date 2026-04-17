@@ -9,8 +9,11 @@ import '../../../../shared/services/invoice_status_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../data/models/invoice_model.dart';
+import '../../data/models/line_item_model.dart';
 import '../../domain/entities/invoice.dart';
+import '../../domain/entities/line_item.dart';
 import '../controllers/invoices_controller.dart';
+import '../../../../core/theme/app_colors.dart';
 
 class EditInvoiceScreen extends ConsumerStatefulWidget {
   const EditInvoiceScreen({super.key, required this.invoiceId});
@@ -34,6 +37,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   DateTime? _dueDate;
   InvoiceStatus _status = InvoiceStatus.draft;
+  final List<LineItem> _lineItems = [];
   bool _isSaving = false;
   bool _isDeleting = false;
   bool _didHydrate = false;
@@ -80,6 +84,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         : invoice.discountAmount.toStringAsFixed(2);
     _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
+    _lineItems.clear();
+    _lineItems.addAll(invoice.items);
   }
 
   String? _normalizedPaymentLink() {
@@ -111,9 +117,19 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
         ? 0.0
         : double.tryParse(discountText);
     final paymentLink = _normalizedPaymentLink();
+    final serviceStr = _serviceController.text.trim();
 
     if (dueDate == null || amount == null || discountAmount == null) {
       return;
+    }
+
+    if (_lineItems.isEmpty && serviceStr.isNotEmpty && amount > 0) {
+      _lineItems.add(LineItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        description: serviceStr,
+        quantity: 1,
+        unitPrice: amount,
+      ));
     }
 
     if (discountAmount < 0) {
@@ -132,7 +148,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
     final updated = invoice.copyWith(
       clientName: _clientNameController.text.trim(),
-      service: _serviceController.text.trim(),
+      service: serviceStr,
       amount: amount,
       dueDate: dueDate,
       status: _status,
@@ -141,6 +157,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
+      items: _lineItems.map((e) => LineItemModel.fromEntity(e)).toList(),
     );
     final resolvedEntity = _statusService.prepareForUpdate(updated);
     final resolved = InvoiceModel.fromEntity(resolvedEntity);
@@ -322,6 +339,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                             onTap: _pickDueDate,
                             decoration: _inputDecoration(label: 'Due Date'),
                           ),
+                          const SizedBox(height: 24),
+                          _buildLineItemsSection(theme),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _paymentLinkController,
@@ -488,6 +507,211 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
           body: _buildBody(invoice, context),
         );
       },
+    );
+  }
+
+  Future<void> _showAddLineItemDialog() async {
+    final result = await showDialog<LineItem>(
+      context: context,
+      builder: (context) => const _LineItemDialog(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _lineItems.add(result);
+        _syncFirstItemToControllers();
+      });
+    }
+  }
+
+  Future<void> _showEditLineItemDialog(int index) async {
+    final result = await showDialog<LineItem>(
+      context: context,
+      builder: (context) => _LineItemDialog(item: _lineItems[index]),
+    );
+
+    if (result != null) {
+      setState(() {
+        _lineItems[index] = result;
+        _syncFirstItemToControllers();
+      });
+    }
+  }
+
+  void _syncFirstItemToControllers() {
+    if (_lineItems.isNotEmpty) {
+      final first = _lineItems.first;
+      _serviceController.text = first.description;
+      _amountController.text = first.unitPrice.toStringAsFixed(2);
+    }
+  }
+
+  Widget _buildLineItemsSection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Line Items',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _showAddLineItemDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Item'),
+            ),
+          ],
+        ),
+        if (_lineItems.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'No items added yet. Classic fields above will be used.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _lineItems.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = _lineItems[index];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(item.description),
+                subtitle: Text(
+                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: 'USD')}',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppFormatters.currency(item.amount, currencyCode: 'USD'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      onPressed: () => _showEditLineItemDialog(index),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _lineItems.removeAt(index);
+                          _syncFirstItemToControllers();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _LineItemDialog extends StatefulWidget {
+  const _LineItemDialog({this.item});
+
+  final LineItem? item;
+
+  @override
+  State<_LineItemDialog> createState() => _LineItemDialogState();
+}
+
+class _LineItemDialogState extends State<_LineItemDialog> {
+  late final _descriptionController = TextEditingController(text: widget.item?.description ?? '');
+  late final _quantityController = TextEditingController(text: (widget.item?.quantity ?? 1).toString());
+  late final _unitPriceController = TextEditingController(text: widget.item?.unitPrice.toStringAsFixed(2) ?? '');
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    _quantityController.dispose();
+    _unitPriceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.item == null ? 'Add Item' : 'Edit Item'),
+      backgroundColor: AppColors.backgroundSecondary,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(labelText: 'Description', hintText: 'Development services'),
+              validator: (v) => (v?.isEmpty ?? true) ? 'Required' : null,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _quantityController,
+                    decoration: const InputDecoration(labelText: 'Quantity'),
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                       final d = double.tryParse(v ?? '');
+                       if (d == null || d <= 0) return 'Invalid';
+                       return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _unitPriceController,
+                    decoration: const InputDecoration(labelText: 'Unit Price'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) {
+                       final d = double.tryParse(v ?? '');
+                       if (d == null || d < 0) return 'Invalid';
+                       return null;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState?.validate() ?? false) {
+              final item = LineItem(
+                id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                description: _descriptionController.text.trim(),
+                quantity: double.tryParse(_quantityController.text) ?? 1,
+                unitPrice: double.tryParse(_unitPriceController.text) ?? 0,
+              );
+              Navigator.pop(context, item);
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
