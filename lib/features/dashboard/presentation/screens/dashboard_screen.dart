@@ -22,6 +22,8 @@ import '../../../settings/presentation/controllers/settings_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+import '../../../../data/services/cash_flow_service.dart';
+import '../../../../presentation/widgets/cash_flow_chart_widget.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -328,6 +330,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     _DashboardViewModel model,
     SubscriptionState subscription,
     String currencyCode,
+    AsyncValue<List<Invoice>> invoicesState,
   ) {
     final sections = <Widget>[];
 
@@ -369,6 +372,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
+        addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.dueSoon:
@@ -390,6 +394,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
         addSection('stats', _StatsSection(totals: model.totals));
+        addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
@@ -424,7 +429,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           }
           addSection('stats', _StatsSection(totals: model.totals));
         }
-        addSection('recent', _buildRecentActivitySection(context, model));
+      addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
+      addSection('recent', _buildRecentActivitySection(context, model));
         break;
     }
 
@@ -503,7 +509,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           avatar: const DashboardAvatar(),
         ),
       ),
-      _buildDashboardContent(context, dashboard, subscription, currencyCode),
+      _buildDashboardContent(context, dashboard, subscription, currencyCode, invoicesState),
     ];
 
     return Scaffold(
@@ -545,6 +551,112 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       ),
     );
   }
+  Widget _buildCashFlowSection(
+    BuildContext context,
+    AsyncValue<List<Invoice>> invoicesState,
+    SubscriptionState subscription,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Cash Flow — Last 6 Months',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        invoicesState.when(
+          data: (invoices) {
+            if (!subscription.isPro) {
+              return _buildLockedCashFlowPlaceholder(context);
+            }
+            final chartData = CashFlowService().getLast6MonthsCashFlow(invoices);
+            return CashFlowChartWidget(data: chartData);
+          },
+          loading: () => const SizedBox(
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stack) => const SizedBox(
+            height: 220,
+            child: Center(child: Text('Could not load chart')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLockedCashFlowPlaceholder(BuildContext context) {
+    return SizedBox(
+      height: 220,
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        child: Stack(
+        children: [
+          // Background "faked" bars
+          Opacity(
+            opacity: 0.1,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(6, (index) {
+                  final heights = [0.4, 0.7, 0.5, 0.9, 0.6, 0.8];
+                  return Container(
+                    width: 16,
+                    height: 180 * heights[index],
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+          // Content
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, color: AppColors.accent, size: 32),
+                const SizedBox(height: 12),
+                const Text(
+                  'Pro Feature',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Visualize your earnings over time',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    const UpgradeToProRoute().push(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text('Upgrade to Pro'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+   );
+  }
+
 }
 
 class _HeaderSection extends StatelessWidget {
