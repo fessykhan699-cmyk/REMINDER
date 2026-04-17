@@ -14,6 +14,8 @@ class BiometricLockScreen extends ConsumerStatefulWidget {
 }
 
 class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
+  bool _isAuthenticating = false;
+
   @override
   void initState() {
     super.initState();
@@ -21,14 +23,20 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
   }
 
   Future<void> _authenticate() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
     try {
       final service = ref.read(biometricServiceProvider);
       final success = await service.authenticate();
-      if (success) {
+      if (success && mounted) {
         ref.read(isBiometricLockedProvider.notifier).state = false;
       }
     } catch (_) {
       // stay locked on any error
+    } finally {
+      if (mounted) {
+        _isAuthenticating = false;
+      }
     }
   }
 
@@ -36,9 +44,9 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
-      body: SafeArea(
+    return Material(
+      color: AppColors.backgroundPrimary,
+      child: SafeArea(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),

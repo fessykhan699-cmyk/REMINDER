@@ -24,7 +24,6 @@ class InvoiceReminderApp extends ConsumerWidget {
     ref.listen(playBillingControllerProvider, (previous, next) {});
 
     final router = ref.watch(appRouterProvider);
-    final isLocked = ref.watch(isBiometricLockedProvider);
 
     return MaterialApp.router(
       title: 'Invoice Reminder',
@@ -38,13 +37,18 @@ class InvoiceReminderApp extends ConsumerWidget {
         if (child == null) {
           return const SizedBox.shrink();
         }
-        Widget content = AppLockGate(child: child);
-        if (isLocked) {
-          content = Stack(
-            children: [content, const BiometricLockScreen()],
-          );
-        }
-        return content;
+        return Consumer(
+          builder: (context, ref, _) {
+            final isLocked = ref.watch(isBiometricLockedProvider);
+            return Stack(
+              children: [
+                AppLockGate(child: child),
+                if (isLocked)
+                  const Positioned.fill(child: BiometricLockScreen()),
+              ],
+            );
+          },
+        );
       },
       routerConfig: router,
     );

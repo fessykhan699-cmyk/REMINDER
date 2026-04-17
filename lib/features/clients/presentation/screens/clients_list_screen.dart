@@ -17,9 +17,10 @@ import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../subscription/presentation/widgets/usage_limit_nudge_card.dart';
-import '../../data/models/client_model.dart';
+
 import '../../domain/entities/client.dart';
 import '../controllers/clients_controller.dart';
+import '../providers/client_search_provider.dart';
 import '../widgets/client_tile.dart';
 
 class ClientsListScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class ClientsListScreen extends ConsumerStatefulWidget {
 
 class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
     with SingleTickerProviderStateMixin {
+  final TextEditingController _searchController = TextEditingController();
   int _visibleItemCount = AppConstants.defaultPageSize;
 
   late final AnimationController _entryCtrl = AnimationController(
@@ -41,6 +43,7 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
   @override
   void dispose() {
     _entryCtrl.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -64,11 +67,7 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
     );
   }
 
-  List<Client> _sortedClients(Box<ClientModel> box) {
-    final clients = box.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return clients.toList(growable: false);
-  }
+
 
   Future<void> _openAddClient() async {
     final decision = await ref
@@ -145,13 +144,16 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
         ? 'Add a client to keep your future invoices organized.'
         : 'Add your first client to start invoicing faster.';
 
+    final clientsAsync = ref.watch(filteredClientsProvider);
+    final searchQuery = ref.watch(clientSearchQueryProvider);
+
     return AppScaffold(
       extendBody: true,
       body: SafeArea(
-        child: ValueListenableBuilder<Box<ClientModel>>(
-          valueListenable: HiveStorage.clientsBox.listenable(),
-          builder: (context, box, _) {
-            final clients = _sortedClients(box);
+        child: clientsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(child: Text(error.toString())),
+          data: (clients) {
             final visibleCount = math.min(clients.length, _visibleItemCount);
             final visibleClients = clients.take(visibleCount).toList(growable: false);
             final showNudge = !subscription.isPro;
@@ -167,7 +169,7 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
                       spacingMD,
                       spacingMD,
                       spacingMD,
-                      spacingLG,
+                      spacingXS,
                     ),
                     child: _staggeredItem(
                       index: 0,
@@ -202,7 +204,64 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
                   ),
                 ),
 
-                if (clients.isEmpty)
+                // ── Search Bar ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: spacingMD,
+                      vertical: spacingSM,
+                    ),
+                    child: _staggeredItem(
+                      index: 1,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          ref.read(clientSearchQueryProvider.notifier).state = value;
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search by name, email, or phone',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 20),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    ref.read(clientSearchQueryProvider.notifier).state = "";
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: AppColors.cardBackground,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                if (clients.isEmpty && searchQuery.isNotEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(spacingLG),
+                        child: Text(
+                          'No clients match your search',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (clients.isEmpty && searchQuery.isEmpty)
                   SliverFillRemaining(
                     child: AppEmptyState(
                       title: 'No clients yet',
@@ -219,10 +278,11 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
                   if (showNudge)
                     SliverToBoxAdapter(
                       child: _staggeredItem(
-                        index: 1,
+                        index: 2,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: spacingMD,
+                            vertical: spacingSM,
                           ),
                           child: UsageLimitNudgeCard(
                             usage: usage,
@@ -241,7 +301,7 @@ class _ClientsListScreenState extends ConsumerState<ClientsListScreen>
                       (context, index) {
                         final client = visibleClients[index];
                         return _staggeredItem(
-                          index: index + (showNudge ? 2 : 1),
+                          index: index + (showNudge ? 3 : 2),
                           child: ClientTile(
                             client: client,
                             onTap: () => ClientDetailRoute(client.id).push(context),

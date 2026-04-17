@@ -24,6 +24,7 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   final TextEditingController _pinController = TextEditingController();
   String? _errorText;
   AppPreferences _lastKnownPreferences = const AppPreferences.defaults();
+  bool _wasPaused = false;
 
   @override
   void initState() {
@@ -41,15 +42,17 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
+      _wasPaused = true;
       if (_lastKnownPreferences.appLockEnabled &&
           _lastKnownPreferences.hasPin) {
         ref.read(appLockSessionProvider.notifier).state = false;
       }
     }
     if (state == AppLifecycleState.resumed) {
-      if (_lastKnownPreferences.biometricLockEnabled) {
+      if (_wasPaused && _lastKnownPreferences.biometricLockEnabled) {
         ref.read(isBiometricLockedProvider.notifier).state = true;
       }
+      _wasPaused = false;
     }
   }
 

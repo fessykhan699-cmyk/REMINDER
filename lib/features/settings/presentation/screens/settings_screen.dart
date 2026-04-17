@@ -449,72 +449,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionCard(
               title: 'Notifications',
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: subscription.isPro ? null : () => const UpgradeToProRoute().push(context),
-                    child: Text(
-                      subscription.isPro ? 'Reminders: Active' : 'Reminders: Upgrade to Pro to enable',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: subscription.isPro ? Colors.greenAccent : AppColors.accent,
-                        fontWeight: FontWeight.w600,
-                        decoration: subscription.isPro ? null : TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
                 _SwitchRow(
                   title: 'Push notifications',
                   subtitle: 'Schedule local due reminders on this device.',
                   value: preferences.pushNotificationsEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) =>
-                        current.copyWith(pushNotificationsEnabled: value),
-                  ),
+                  enabled: subscription.isPro,
+                  onChanged: subscription.isPro
+                      ? (value) => _togglePreference(
+                            (current) => current.copyWith(
+                              pushNotificationsEnabled: value,
+                            ),
+                          )
+                      : null,
                 ),
                 _SwitchRow(
                   title: 'WhatsApp reminders',
                   subtitle: 'Allow reminder launches through WhatsApp.',
                   value: preferences.whatsAppRemindersEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) =>
-                        current.copyWith(whatsAppRemindersEnabled: value),
-                  ),
+                  enabled: subscription.isPro,
+                  onChanged: subscription.isPro
+                      ? (value) => _togglePreference(
+                            (current) => current.copyWith(
+                              whatsAppRemindersEnabled: value,
+                            ),
+                          )
+                      : null,
                 ),
                 _SwitchRow(
                   title: 'SMS reminders',
                   subtitle: 'Allow reminder launches through SMS.',
                   value: preferences.smsRemindersEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) => current.copyWith(smsRemindersEnabled: value),
-                  ),
+                  enabled: subscription.isPro,
+                  onChanged: subscription.isPro
+                      ? (value) => _togglePreference(
+                            (current) =>
+                                current.copyWith(smsRemindersEnabled: value),
+                          )
+                      : null,
                 ),
                 _SwitchRow(
                   title: '24h before',
                   subtitle: 'Schedule a reminder one day before the due date.',
                   value: preferences.remind24HoursBefore,
-                  enabled: preferences.pushNotificationsEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) => current.copyWith(remind24HoursBefore: value),
-                  ),
+                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                      ? (value) => _togglePreference(
+                            (current) =>
+                                current.copyWith(remind24HoursBefore: value),
+                          )
+                      : null,
                 ),
                 _SwitchRow(
                   title: '3h before',
                   subtitle: 'Schedule a final heads-up three hours before due.',
                   value: preferences.remind3HoursBefore,
-                  enabled: preferences.pushNotificationsEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) => current.copyWith(remind3HoursBefore: value),
-                  ),
+                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                      ? (value) => _togglePreference(
+                            (current) =>
+                                current.copyWith(remind3HoursBefore: value),
+                          )
+                      : null,
                 ),
                 _SwitchRow(
                   title: 'On due date',
                   subtitle: 'Notify when the invoice becomes due.',
                   value: preferences.remindOnDueDate,
-                  enabled: preferences.pushNotificationsEnabled,
-                  onChanged: (value) => _togglePreference(
-                    (current) => current.copyWith(remindOnDueDate: value),
-                  ),
+                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                      ? (value) => _togglePreference(
+                            (current) => current.copyWith(remindOnDueDate: value),
+                          )
+                      : null,
                   isLast: true,
                 ),
               ],
@@ -1217,7 +1223,7 @@ class _SwitchRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.value,
-    required this.onChanged,
+    this.onChanged,
     this.enabled = true,
     this.isLast = false,
   });
@@ -1225,7 +1231,7 @@ class _SwitchRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
   final bool enabled;
   final bool isLast;
 
@@ -1235,7 +1241,7 @@ class _SwitchRow extends StatelessWidget {
       opacity: enabled ? 1 : 0.6,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: enabled ? () => onChanged(!value) : null,
+        onTap: (enabled && onChanged != null) ? () => onChanged!(!value) : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
