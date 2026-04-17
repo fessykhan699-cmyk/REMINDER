@@ -53,6 +53,9 @@ class HiveStorage {
     if (!Hive.isAdapterRegistered(8)) {
       Hive.registerAdapter(AppPreferencesModelAdapter());
     }
+    if (!Hive.isAdapterRegistered(9)) {
+      Hive.registerAdapter(RecurringIntervalAdapter());
+    }
   }
 
   static Box<ClientModel> get clientsBox =>

@@ -2,6 +2,56 @@ import 'line_item.dart';
 
 enum InvoiceStatus { draft, sent, viewed, paid, overdue }
 
+enum RecurringInterval { none, weekly, biweekly, monthly, quarterly }
+
+extension RecurringIntervalX on RecurringInterval {
+  String get label {
+    switch (this) {
+      case RecurringInterval.none:
+        return 'None';
+      case RecurringInterval.weekly:
+        return 'Weekly';
+      case RecurringInterval.biweekly:
+        return 'Bi-weekly';
+      case RecurringInterval.monthly:
+        return 'Monthly';
+      case RecurringInterval.quarterly:
+        return 'Quarterly';
+    }
+  }
+
+  DateTime calculateNextDate(DateTime from) {
+    switch (this) {
+      case RecurringInterval.weekly:
+        return from.add(const Duration(days: 7));
+      case RecurringInterval.biweekly:
+        return from.add(const Duration(days: 14));
+      case RecurringInterval.monthly:
+        var nextMonth = from.month + 1;
+        var year = from.year;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          year++;
+        }
+        var lastDayOfNextMonth = DateTime(year, nextMonth + 1, 0).day;
+        var day = from.day > lastDayOfNextMonth ? lastDayOfNextMonth : from.day;
+        return DateTime(year, nextMonth, day);
+      case RecurringInterval.quarterly:
+        var nextMonth = from.month + 3;
+        var year = from.year;
+        if (nextMonth > 12) {
+          nextMonth = nextMonth - 12;
+          year++;
+        }
+        var lastDayOfNextMonth = DateTime(year, nextMonth + 1, 0).day;
+        var day = from.day > lastDayOfNextMonth ? lastDayOfNextMonth : from.day;
+        return DateTime(year, nextMonth, day);
+      case RecurringInterval.none:
+        return from;
+    }
+  }
+}
+
 extension InvoiceStatusX on InvoiceStatus {
   String get label {
     switch (this) {
@@ -40,6 +90,10 @@ class Invoice {
     this.invoiceNumber = '',
     this.paymentTermsDays = 0,
     this.items = const [],
+    this.isRecurring = false,
+    this.recurringInterval = RecurringInterval.none,
+    this.recurringNextDate,
+    this.recurringParentId,
   });
 
   final String id;
@@ -58,6 +112,10 @@ class Invoice {
   final String invoiceNumber;
   final int paymentTermsDays;
   final List<LineItem> items;
+  final bool isRecurring;
+  final RecurringInterval recurringInterval;
+  final DateTime? recurringNextDate;
+  final String? recurringParentId;
 
   bool get isPaid => status == InvoiceStatus.paid;
   bool get isOverdue =>
@@ -106,6 +164,10 @@ class Invoice {
     String? invoiceNumber,
     int? paymentTermsDays,
     List<LineItem>? items,
+    bool? isRecurring,
+    RecurringInterval? recurringInterval,
+    DateTime? recurringNextDate,
+    String? recurringParentId,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -124,6 +186,10 @@ class Invoice {
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       paymentTermsDays: paymentTermsDays ?? this.paymentTermsDays,
       items: items ?? this.items,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringInterval: recurringInterval ?? this.recurringInterval,
+      recurringNextDate: recurringNextDate ?? this.recurringNextDate,
+      recurringParentId: recurringParentId ?? this.recurringParentId,
     );
   }
 }

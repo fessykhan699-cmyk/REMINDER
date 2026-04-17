@@ -44,6 +44,41 @@ class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
   }
 }
 
+class RecurringIntervalAdapter extends TypeAdapter<RecurringInterval> {
+  @override
+  final int typeId = 9; // Changed from 5 to avoid collision with ReminderModelAdapter
+
+  @override
+  RecurringInterval read(BinaryReader reader) {
+    final rawValue = reader.readByte();
+    switch (rawValue) {
+      case 0:
+        return RecurringInterval.none;
+      case 1:
+        return RecurringInterval.weekly;
+      case 2:
+        return RecurringInterval.biweekly;
+      case 3:
+        return RecurringInterval.monthly;
+      case 4:
+        return RecurringInterval.quarterly;
+      default:
+        return RecurringInterval.none;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, RecurringInterval obj) {
+    writer.writeByte(switch (obj) {
+      RecurringInterval.none => 0,
+      RecurringInterval.weekly => 1,
+      RecurringInterval.biweekly => 2,
+      RecurringInterval.monthly => 3,
+      RecurringInterval.quarterly => 4,
+    });
+  }
+}
+
 @HiveType(typeId: 2)
 class InvoiceModel extends Invoice {
   const InvoiceModel({
@@ -63,6 +98,10 @@ class InvoiceModel extends Invoice {
     this.paymentLink,
     this.notes,
     this.items = const [],
+    this.isRecurring = false,
+    this.recurringInterval = RecurringInterval.none,
+    this.recurringNextDate,
+    this.recurringParentId,
   }) : super(
           id: id,
           invoiceNumber: invoiceNumber,
@@ -80,6 +119,10 @@ class InvoiceModel extends Invoice {
           paymentLink: paymentLink,
           notes: notes,
           items: items,
+          isRecurring: isRecurring,
+          recurringInterval: recurringInterval,
+          recurringNextDate: recurringNextDate,
+          recurringParentId: recurringParentId,
         );
 
   @override
@@ -146,6 +189,22 @@ class InvoiceModel extends Invoice {
   @HiveField(15)
   final List<LineItemModel> items;
 
+  @override
+  @HiveField(16)
+  final bool isRecurring;
+
+  @override
+  @HiveField(17)
+  final RecurringInterval recurringInterval;
+
+  @override
+  @HiveField(18)
+  final DateTime? recurringNextDate;
+
+  @override
+  @HiveField(19)
+  final String? recurringParentId;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -164,6 +223,10 @@ class InvoiceModel extends Invoice {
       paymentLink: invoice.paymentLink,
       notes: invoice.notes,
       items: invoice.items.map((e) => LineItemModel.fromEntity(e)).toList(),
+      isRecurring: invoice.isRecurring,
+      recurringInterval: invoice.recurringInterval,
+      recurringNextDate: invoice.recurringNextDate,
+      recurringParentId: invoice.recurringParentId,
     );
   }
 
@@ -188,6 +251,15 @@ class InvoiceModel extends Invoice {
               ?.map((e) => LineItemModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      isRecurring: json['isRecurring'] as bool? ?? false,
+      recurringInterval: RecurringInterval.values.firstWhere(
+        (e) => e.name == json['recurringInterval'],
+        orElse: () => RecurringInterval.none,
+      ),
+      recurringNextDate: json['recurringNextDate'] != null
+          ? DateTime.parse(json['recurringNextDate'] as String)
+          : null,
+      recurringParentId: json['recurringParentId'] as String?,
     );
   }
 
@@ -209,6 +281,10 @@ class InvoiceModel extends Invoice {
       'paymentLink': paymentLink,
       'notes': notes,
       'items': items.map((e) => e.toJson()).toList(),
+      'isRecurring': isRecurring,
+      'recurringInterval': recurringInterval.name,
+      'recurringNextDate': recurringNextDate?.toIso8601String(),
+      'recurringParentId': recurringParentId,
     };
   }
 
@@ -230,6 +306,10 @@ class InvoiceModel extends Invoice {
     Object? paymentLink = _invoiceModelPaymentLinkSentinel,
     Object? notes = _invoiceModelNotesSentinel,
     List<LineItem>? items,
+    bool? isRecurring,
+    RecurringInterval? recurringInterval,
+    DateTime? recurringNextDate,
+    String? recurringParentId,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -254,6 +334,10 @@ class InvoiceModel extends Invoice {
       items: items != null
           ? items.map((e) => LineItemModel.fromEntity(e)).toList()
           : this.items,
+      isRecurring: isRecurring ?? this.isRecurring,
+      recurringInterval: recurringInterval ?? this.recurringInterval,
+      recurringNextDate: recurringNextDate ?? this.recurringNextDate,
+      recurringParentId: recurringParentId ?? this.recurringParentId,
     );
   }
 
@@ -304,6 +388,18 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       items = itemsRaw.cast<LineItemModel>();
     }
 
+    final isRecurring = reader.availableBytes > 0 ? reader.readBool() : false;
+    final recurringInterval = reader.availableBytes > 0
+        ? reader.read() as RecurringInterval
+        : RecurringInterval.none;
+    final recurringNextDateStr =
+        reader.availableBytes > 0 ? reader.readString() : '';
+    final recurringNextDate = recurringNextDateStr.isEmpty
+        ? null
+        : DateTime.parse(recurringNextDateStr);
+    final recurringParentId =
+        reader.availableBytes > 0 ? reader.readString() : '';
+
     return InvoiceModel(
       id: id,
       invoiceNumber: invoiceNumber,
@@ -321,6 +417,10 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       paymentLink: paymentLink.isEmpty ? null : paymentLink,
       notes: notes.isEmpty ? null : notes,
       items: items,
+      isRecurring: isRecurring,
+      recurringInterval: recurringInterval,
+      recurringNextDate: recurringNextDate,
+      recurringParentId: recurringParentId.isEmpty ? null : recurringParentId,
     );
   }
 
@@ -342,6 +442,10 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeDouble(obj.discountAmount)
       ..writeString(obj.notes ?? '')
       ..writeString(obj.invoiceNumber)
-      ..writeList(obj.items);
+      ..writeList(obj.items)
+      ..writeBool(obj.isRecurring)
+      ..write(obj.recurringInterval)
+      ..writeString(obj.recurringNextDate?.toIso8601String() ?? '')
+      ..writeString(obj.recurringParentId ?? '');
   }
 }

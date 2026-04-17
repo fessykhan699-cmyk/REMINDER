@@ -12,6 +12,7 @@ import '../../features/settings/presentation/controllers/app_preferences_control
 import '../../features/subscription/domain/entities/subscription_state.dart';
 import '../../features/subscription/presentation/controllers/subscription_controller.dart';
 import '../../features/subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+import '../../data/services/one_tap_invoice_service.dart';
 
 class AppShellScaffold extends ConsumerStatefulWidget {
   const AppShellScaffold({
@@ -31,6 +32,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
   int? _lastTrackedBranchIndex;
   List<AdaptiveTabKey>? _cachedTabOrder;
   List<_AdaptiveNavItem>? _cachedNavItems;
+  bool _isOneTapProcessing = false;
 
   static final _clientIdRegExp = RegExp(r'^/clients/([^/]+)$');
   static const _navBorderDecoration = BoxDecoration(
@@ -302,6 +304,43 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         if (!context.mounted) {
           return;
         }
+
+        // Attempt One-Tap creation if automation mode is instant
+        if (preferences?.oneTapInvoiceEnabled ?? true) {
+          setState(() => _isOneTapProcessing = true);
+          try {
+            final createdInvoice = await ref
+                .read(oneTapInvoiceServiceProvider)
+                .createInstantInvoice();
+
+            if (createdInvoice != null) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Invoice ${createdInvoice.invoiceNumber} created for ${createdInvoice.clientName}!',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    action: SnackBarAction(
+                      label: 'View',
+                      onPressed: () {
+                        // Navigate to invoice details if needed
+                        context.go('/invoices/${createdInvoice.id}');
+                      },
+                    ),
+                  ),
+                );
+              }
+              return;
+            }
+          } finally {
+            if (context.mounted) {
+              setState(() => _isOneTapProcessing = false);
+            }
+          }
+        }
+
+        if (!context.mounted) return;
         await _openNewInvoiceWithMode(
           context,
           launchMode: preferences?.oneTapInvoiceEnabled ?? true
@@ -374,7 +413,18 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
     return Scaffold(
       extendBody: true,
       resizeToAvoidBottomInset: true,
-      body: widget.navigationShell,
+      body: Stack(
+        children: [
+          widget.navigationShell,
+          if (_isOneTapProcessing)
+            Container(
+              color: Colors.black26,
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+        ],
+      ),
       floatingActionButton: _buildFloatingActionButton(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(

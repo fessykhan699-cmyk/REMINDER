@@ -432,6 +432,43 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
+                  if (invoice.recurringParentId != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome_outlined,
+                            size: 14,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Auto-generated recurring draft',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: spacingMD),
 
                   // ── Details card ──
@@ -472,6 +509,28 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ),
+                        ],
+                        if (invoice.isRecurring) ...[
+                          const SizedBox(height: spacingSM),
+                          _InfoRow(
+                            label: 'Recurring',
+                            value: Text(
+                              invoice.recurringInterval.label,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                          if (invoice.recurringNextDate != null) ...[
+                            const SizedBox(height: spacingSM),
+                            _InfoRow(
+                              label: 'Next Invoice',
+                              value: Text(
+                                AppFormatters.shortDate(
+                                  invoice.recurringNextDate!,
+                                ),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
                         ],
                       ],
                     ),
@@ -571,13 +630,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           onTap: _isPdfBusy
                               ? null
                               : () => _openPdfPreview(invoice),
-                          showTopBorder: true,
-                        ),
-                        _ActionRow(
-                          icon: Icons.notifications_active_outlined,
-                          label: 'Advanced Reminder Flow',
-                          onTap: () =>
-                              ReminderFlowRoute(invoice.id).push(context),
                           showTopBorder: true,
                         ),
                         _ActionRow(

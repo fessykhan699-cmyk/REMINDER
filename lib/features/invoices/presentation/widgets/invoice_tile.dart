@@ -58,11 +58,25 @@ class InvoiceTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          invoice.clientName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                invoice.clientName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium,
+                              ),
+                            ),
+                            if (invoice.isRecurring) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.sync_rounded,
+                                size: 14,
+                                color: AppColors.accent,
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -82,6 +96,16 @@ class InvoiceTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
                         ),
+                        if (invoice.recurringParentId != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Recurring Draft',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

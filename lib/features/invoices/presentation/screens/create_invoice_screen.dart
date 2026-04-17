@@ -36,7 +36,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   final _dueDateFieldKey = GlobalKey<FormFieldState<DateTime?>>();
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
-  final _discountController = TextEditingController();
   final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
   final _invoiceNumberController = TextEditingController();
@@ -53,6 +52,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   bool _smartSyncScheduled = false;
   final List<LineItem> _lineItems = [];
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+  bool _isRecurring = false;
+  RecurringInterval _recurringInterval = RecurringInterval.monthly;
 
   @override
   void initState() {
@@ -72,7 +73,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   void dispose() {
     _serviceController.dispose();
     _amountController.dispose();
-    _discountController.dispose();
     _notesController.dispose();
     _paymentLinkController.dispose();
     _serviceFocusNode.dispose();
@@ -532,7 +532,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     required String currencyCode,
     required double taxPercent,
     required int paymentTermsDays,
-    required double discountAmount,
     required String? notes,
     required String? paymentLink,
     required DateTime now,
@@ -540,7 +539,14 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     required InvoicesController invoicesController,
     required InvoiceCreationLearningController learningController,
     required String invoiceNumber,
+    bool isRecurring = false,
+    RecurringInterval recurringInterval = RecurringInterval.none,
   }) async {
+    DateTime? recurringNextDate;
+    if (isRecurring) {
+      recurringNextDate = recurringInterval.calculateNextDate(selectedDueDate);
+    }
+
     final invoice = Invoice(
       id: invoiceId,
       invoiceNumber: invoiceNumber,
@@ -554,10 +560,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       currencyCode: currencyCode,
       taxPercent: taxPercent,
       paymentTermsDays: paymentTermsDays,
-      discountAmount: discountAmount,
+      discountAmount: 0.0,
       paymentLink: paymentLink,
       notes: notes,
       items: _lineItems,
+      isRecurring: isRecurring,
+      recurringInterval: recurringInterval,
+      recurringNextDate: recurringNextDate,
     );
 
     final createdInvoice = await invoicesController.createInvoice(invoice);
@@ -620,10 +629,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final invoiceNumber = _invoiceNumberController.text.trim();
     final service = _serviceController.text.trim();
     final amount = double.tryParse(_amountController.text.trim());
-    final discountText = _discountController.text.trim();
-    final discountAmount = discountText.isEmpty
-        ? 0.0
-        : double.tryParse(discountText);
     final notes = _notesController.text.trim().isEmpty
         ? null
         : _notesController.text.trim();
@@ -651,15 +656,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         selectedClient == null ||
         selectedDueDate == null ||
         amount == null ||
-        discountAmount == null ||
         invoiceNumber.isEmpty) {
-      return;
-    }
-
-    if (discountAmount < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Discount must be zero or greater')),
-      );
       return;
     }
 
@@ -678,11 +675,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       final preferences =
           ref.read(appPreferencesControllerProvider).valueOrNull ??
           await ref.read(getAppPreferencesUseCaseProvider).call();
-      if (discountAmount > 0) {
-        await ref
-            .read(subscriptionGatekeeperProvider)
-            .ensureAllowed(SubscriptionGateFeature.advancedTotals);
-      }
       final invoiceId = await ref
           .read(invoicesLocalDatasourceProvider)
           .getNextInvoiceId(prefix: preferences.invoicePrefix, now: now);
@@ -696,7 +688,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         currencyCode: preferences.defaultCurrency,
         taxPercent: preferences.defaultTaxPercent,
         paymentTermsDays: preferences.paymentTerms.days,
-        discountAmount: discountAmount,
         notes: notes,
         paymentLink: paymentLink,
         now: now,
@@ -704,6 +695,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         invoicesController: invoicesController,
         learningController: learningController,
         invoiceNumber: invoiceNumber,
+        isRecurring: _isRecurring,
+        recurringInterval: _isRecurring ? _recurringInterval : RecurringInterval.none,
       );
 
       if (!mounted) {
@@ -856,6 +849,9 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     ref.watch(invoiceCreateLaunchModeProvider);
     final intelligence = ref.watch(smartInvoicePredictionProvider);
+    final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
+    final isPro = subscription?.isPro ?? false;
+
     final clientSuggestion = _selectedClient == null
         ? null
         : intelligence.suggestionFor(_selectedClient!.id);
@@ -1150,6 +1146,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                           );
                         },
                       ),
+                      const SizedBox(height: 24),
+                      _buildRecurringSection(theme, isPro),
                       const SizedBox(height: 16),
                       _InvoiceTextField(
                         controller: _paymentLinkController,
@@ -1175,40 +1173,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                       ),
                       const SizedBox(height: 16),
                       _InvoiceTextField(
-                        controller: _discountController,
-                        label: 'Discount (Pro)',
-                        hintText: '0.00',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,2}$'),
-                          ),
-                        ],
-                        validator: (value) {
-                          final rawValue = value?.trim() ?? '';
-                          if (rawValue.isEmpty) {
-                            return null;
-                          }
-
-                          final parsedValue = double.tryParse(rawValue);
-                          if (parsedValue == null || parsedValue < 0) {
-                            return 'Enter a valid discount.';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Free plan invoices stay basic. Add a discount to unlock Pro totals.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _InvoiceTextField(
                         controller: _notesController,
                         label: 'Notes',
                         hintText: 'Payment instructions or terms',
@@ -1230,6 +1194,145 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRecurringSection(ThemeData theme, bool isPro) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Recurring Invoice',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (!isPro) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'PRO',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Switch.adaptive(
+              value: _isRecurring,
+              onChanged: (value) {
+                if (!isPro && value) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Recurring invoices require a Pro subscription.'),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _isRecurring = value;
+                  if (value && _recurringInterval == RecurringInterval.none) {
+                    _recurringInterval = RecurringInterval.monthly;
+                  }
+                });
+              },
+              activeTrackColor: AppColors.accent.withAlpha(128),
+              activeThumbColor: AppColors.accent,
+            ),
+          ],
+        ),
+        if (_isRecurring && isPro) ...[
+          const SizedBox(height: 12),
+          _LabeledField(
+            label: 'Repeat Every',
+            child: _InputSurface(
+              onTap: () => _showIntervalPicker(theme),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _recurringInterval.label,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.expand_more_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'New draft invoices will be automatically created on this schedule.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _showIntervalPicker(ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Recurring Interval',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ...RecurringInterval.values
+                  .where((e) => e != RecurringInterval.none)
+                  .map((interval) => ListTile(
+                        title: Text(interval.label),
+                        trailing: _recurringInterval == interval
+                            ? const Icon(Icons.check, color: AppColors.accent)
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _recurringInterval = interval;
+                          });
+                          Navigator.pop(context);
+                        },
+                      )),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/services/invoice_status_service.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
+import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../data/models/invoice_model.dart';
 import '../../data/models/line_item_model.dart';
@@ -31,7 +32,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   final _serviceController = TextEditingController();
   final _amountController = TextEditingController();
   final _dueDateController = TextEditingController();
-  final _discountController = TextEditingController();
   final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
 
@@ -41,6 +41,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   bool _isSaving = false;
   bool _isDeleting = false;
   bool _didHydrate = false;
+  bool _isRecurring = false;
+  RecurringInterval _recurringInterval = RecurringInterval.none;
 
   @override
   void initState() {
@@ -66,7 +68,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.dispose();
     _amountController.dispose();
     _dueDateController.dispose();
-    _discountController.dispose();
     _notesController.dispose();
     _paymentLinkController.dispose();
     super.dispose();
@@ -79,11 +80,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _serviceController.text = invoice.service;
     _amountController.text = invoice.amount.toStringAsFixed(2);
     _dueDateController.text = AppFormatters.shortDate(invoice.dueDate);
-    _discountController.text = invoice.discountAmount == 0
-        ? ''
-        : invoice.discountAmount.toStringAsFixed(2);
     _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
+    _isRecurring = invoice.isRecurring;
+    _recurringInterval = invoice.recurringInterval;
     _lineItems.clear();
     _lineItems.addAll(invoice.items);
   }
@@ -112,14 +112,10 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   Future<void> _save(InvoiceModel invoice) async {
     final dueDate = _dueDate;
     final amount = double.tryParse(_amountController.text.trim());
-    final discountText = _discountController.text.trim();
-    final discountAmount = discountText.isEmpty
-        ? 0.0
-        : double.tryParse(discountText);
     final paymentLink = _normalizedPaymentLink();
     final serviceStr = _serviceController.text.trim();
 
-    if (dueDate == null || amount == null || discountAmount == null) {
+    if (dueDate == null || amount == null) {
       return;
     }
 
@@ -132,18 +128,23 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       ));
     }
 
-    if (discountAmount < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Discount must be zero or greater')),
-      );
-      return;
-    }
-
     if (_paymentLinkController.text.trim().isNotEmpty && paymentLink == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid payment link')),
       );
       return;
+    }
+
+    DateTime? recurringNextDate = invoice.recurringNextDate;
+    if (_isRecurring) {
+      if (!invoice.isRecurring ||
+          _recurringInterval != invoice.recurringInterval ||
+          dueDate != invoice.dueDate ||
+          recurringNextDate == null) {
+        recurringNextDate = _recurringInterval.calculateNextDate(dueDate);
+      }
+    } else {
+      recurringNextDate = null;
     }
 
     final updated = invoice.copyWith(
@@ -152,12 +153,15 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       amount: amount,
       dueDate: dueDate,
       status: _status,
-      discountAmount: discountAmount,
+      discountAmount: 0.0,
       paymentLink: paymentLink,
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
       items: _lineItems.map((e) => LineItemModel.fromEntity(e)).toList(),
+      isRecurring: _isRecurring,
+      recurringInterval: _recurringInterval,
+      recurringNextDate: recurringNextDate,
     );
     final resolvedEntity = _statusService.prepareForUpdate(updated);
     final resolved = InvoiceModel.fromEntity(resolvedEntity);
@@ -280,6 +284,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   Widget _buildBody(InvoiceModel invoice, BuildContext context) {
     final theme = Theme.of(context);
+    final isPro =
+        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false;
 
     return SafeArea(
       child: LayoutBuilder(
@@ -352,24 +358,6 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
-                            controller: _discountController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: _inputDecoration(
-                              label: 'Discount (Pro)',
-                              hint: '0.00',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Discounted totals are a Pro feature.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
                             controller: _notesController,
                             minLines: 3,
                             maxLines: 5,
@@ -396,6 +384,8 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                               }
                             },
                           ),
+                          const SizedBox(height: 16),
+                          _buildRecurringSection(theme, isPro),
                         ],
                       ),
                     ),
@@ -616,6 +606,100 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
               );
             },
           ),
+      ],
+    );
+  }
+
+  Widget _buildRecurringSection(ThemeData theme, bool isPro) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Recurring Invoice',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (!isPro) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'PRO',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Switch.adaptive(
+              value: _isRecurring,
+              onChanged: (value) {
+                if (!isPro && value) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Recurring invoices require a Pro subscription.'),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  _isRecurring = value;
+                  if (value && _recurringInterval == RecurringInterval.none) {
+                    _recurringInterval = RecurringInterval.monthly;
+                  }
+                });
+              },
+              activeTrackColor: AppColors.accent.withAlpha(128),
+              activeThumbColor: AppColors.accent,
+            ),
+          ],
+        ),
+        if (_isRecurring && isPro) ...[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<RecurringInterval>(
+            initialValue: _recurringInterval == RecurringInterval.none
+                ? RecurringInterval.monthly
+                : _recurringInterval,
+            decoration: _inputDecoration(label: 'Repeat Every'),
+            items: RecurringInterval.values
+                .where((e) => e != RecurringInterval.none)
+                .map(
+                  (interval) => DropdownMenuItem(
+                    value: interval,
+                    child: Text(interval.label),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _recurringInterval = value);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'New draft invoices will be automatically created on this schedule.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
       ],
     );
   }
