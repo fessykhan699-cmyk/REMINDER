@@ -10,6 +10,8 @@ import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/whatsapp_service.dart';
+import '../../../../data/services/whatsapp_reminder_service.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
@@ -138,6 +140,110 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       if (mounted) {
         setState(() => _isMarkingPaid = false);
       }
+    }
+  }
+
+  Future<void> _showWhatsAppReminderSheet(Invoice invoice) async {
+    // Phase 5 — Subscription Gate
+    final subscription =
+        ref.read(subscriptionControllerProvider).valueOrNull ??
+        const SubscriptionState.free();
+    if (!subscription.isPro) {
+      const UpgradeToProRoute().push(context);
+      return;
+    }
+
+    // if client has no phone number: show a snackbar
+    final client = await ref.read(clientDetailProvider(invoice.clientId).future);
+    final phone = client?.phone ?? '';
+    if (phone.trim().isEmpty) {
+      _showSnackBar('Add a WhatsApp number to this client first');
+      return;
+    }
+
+    if (!mounted) return;
+
+    final service = ref.read(whatsAppReminderServiceProvider);
+    final amountStr = AppFormatters.currency(
+      invoice.amount,
+      currencyCode: invoice.currencyCode,
+    );
+    final dueDateStr = AppFormatters.shortDate(invoice.dueDate);
+    final clientName = invoice.clientName;
+
+    final friendly = service.getFriendlyMessage(
+      clientName,
+      amountStr,
+      dueDateStr,
+    );
+    final firm = service.getFirmMessage(clientName, amountStr, dueDateStr);
+    final finalNotice = service.getFinalMessage(clientName, amountStr, dueDateStr);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            padding: const EdgeInsets.all(spacingMD),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Send WhatsApp Reminder',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: spacingMD),
+                _ReminderOption(
+                  title: 'Friendly Reminder',
+                  preview: friendly,
+                  onTap: () => _handleSend(invoice.id, phone, friendly, 'friendly'),
+                ),
+                const SizedBox(height: spacingSM),
+                _ReminderOption(
+                  title: 'Firm Reminder',
+                  preview: firm,
+                  onTap: () => _handleSend(invoice.id, phone, firm, 'firm'),
+                ),
+                const SizedBox(height: spacingSM),
+                _ReminderOption(
+                  title: 'Final Notice',
+                  preview: finalNotice,
+                  onTap: () => _handleSend(invoice.id, phone, finalNotice, 'final'),
+                ),
+                const SizedBox(height: spacingLG),
+              ],
+            ),
+          ),
+    );
+  }
+
+  Future<void> _handleSend(
+    String invoiceId,
+    String phone,
+    String message,
+    String template,
+  ) async {
+    Navigator.pop(context);
+    final success = await ref.read(whatsAppReminderServiceProvider).sendReminder(
+      invoiceId: invoiceId,
+      phone: phone,
+      message: message,
+      template: template,
+    );
+
+    if (!mounted) return;
+    if (success) {
+      _showSnackBar('WhatsApp opened successfully');
+    } else {
+      _showSnackBar('Could not open WhatsApp');
     }
   }
 
@@ -373,6 +479,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           accent: invoice.status != InvoiceStatus.paid,
                           showTopBorder: true,
                         ),
+                        _ActionRow(
+                          icon: Icons.message,
+                          label: 'Send WhatsApp Reminder',
+                          onTap: () => _showWhatsAppReminderSheet(invoice),
+                          showTopBorder: true,
+                        ),
                       ],
                     ),
                   ),
@@ -505,6 +617,49 @@ class _ActionRow extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderOption extends StatelessWidget {
+  const _ReminderOption({
+    required this.title,
+    required this.preview,
+    required this.onTap,
+  });
+
+  final String title;
+  final String preview;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(spacingMD),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.12)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              preview,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
