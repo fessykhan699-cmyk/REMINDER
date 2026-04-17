@@ -173,6 +173,16 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     );
     final noteController = TextEditingController();
     DateTime selectedDate = DateTime.now();
+    String? selectedMethod = 'bank_transfer';
+
+    const paymentMethods = [
+      {'id': 'cash', 'label': 'Cash'},
+      {'id': 'bank_transfer', 'label': 'Bank Transfer'},
+      {'id': 'cheque', 'label': 'Cheque'},
+      {'id': 'card', 'label': 'Card'},
+      {'id': 'crypto', 'label': 'Crypto'},
+      {'id': 'other', 'label': 'Other'},
+    ];
 
     showModalBottomSheet<void>(
       context: context,
@@ -234,6 +244,21 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: spacingSM),
+              DropdownButtonFormField<String>(
+                initialValue: selectedMethod,
+                decoration: const InputDecoration(
+                  labelText: 'Payment Method',
+                  border: OutlineInputBorder(),
+                ),
+                items: paymentMethods.map((m) {
+                  return DropdownMenuItem(
+                    value: m['id'],
+                    child: Text(m['label']!),
+                  );
+                }).toList(),
+                onChanged: (val) => setSheetState(() => selectedMethod = val),
+              ),
               const SizedBox(height: spacingLG),
               SizedBox(
                 width: double.infinity,
@@ -250,7 +275,13 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     }
 
                     Navigator.pop(context);
-                    await _addPayment(invoice, amount, selectedDate, noteController.text);
+                    await _addPayment(
+                      invoice,
+                      amount,
+                      selectedDate,
+                      noteController.text,
+                      selectedMethod,
+                    );
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(spacingMD),
@@ -265,7 +296,13 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     );
   }
 
-  Future<void> _addPayment(Invoice invoice, double amount, DateTime date, String note) async {
+  Future<void> _addPayment(
+    Invoice invoice,
+    double amount,
+    DateTime date,
+    String note,
+    String? paymentMethod,
+  ) async {
     setState(() => _isAddingPayment = true);
 
     try {
@@ -274,6 +311,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         amount: amount,
         date: date,
         note: note.trim().isEmpty ? null : note.trim(),
+        paymentMethod: paymentMethod,
       );
 
       if (!mounted) return;
@@ -729,6 +767,31 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             ),
                           ],
                         ],
+                        if (invoice.status == InvoiceStatus.paid && invoice.payments.length == 1) ...[
+                          const SizedBox(height: spacingSM),
+                          _InfoRow(
+                            label: 'Paid On',
+                            value: Text(
+                              AppFormatters.shortDate(invoice.payments.first.date),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                          if (invoice.payments.first.paymentMethod != null) ...[
+                            const SizedBox(height: spacingSM),
+                            _InfoRow(
+                              label: 'Method',
+                              value: Text(
+                                invoice.payments.first.paymentMethod!
+                                    .replaceAll('_', ' ')
+                                    .split(' ')
+                                    .map((word) =>
+                                        word[0].toUpperCase() + word.substring(1))
+                                    .join(' '),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
                     ),
                   ),
@@ -850,7 +913,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                                     style: const TextStyle(fontWeight: FontWeight.w600),
                                   ),
                                   subtitle: Text(
-                                    '${AppFormatters.shortDate(payment.date)}${payment.note != null ? ' • ${payment.note}' : ''}',
+                                    '${AppFormatters.shortDate(payment.date)}'
+                                    '${payment.paymentMethod != null ? ' • ${payment.paymentMethod!.replaceAll('_', ' ').split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ')}' : ''}'
+                                    '${payment.note != null ? ' • ${payment.note}' : ''}',
                                     style: Theme.of(context).textTheme.bodySmall,
                                   ),
                                   trailing: IconButton(

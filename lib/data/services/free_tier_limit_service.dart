@@ -57,6 +57,7 @@ class FreeTierLimitService {
         case SubscriptionGateFeature.premiumBranding:
         case SubscriptionGateFeature.advancedTotals:
         case SubscriptionGateFeature.partialPayments:
+        case SubscriptionGateFeature.exportCsv:
           return false;
         case SubscriptionGateFeature.createInvoice:
           return await canCreateInvoice();

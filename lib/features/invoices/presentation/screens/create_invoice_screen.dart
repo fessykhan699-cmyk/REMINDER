@@ -547,6 +547,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       recurringNextDate = recurringInterval.calculateNextDate(selectedDueDate);
     }
 
+
     final invoice = Invoice(
       id: invoiceId,
       invoiceNumber: invoiceNumber,
@@ -708,17 +709,21 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         shouldResetSavingState = false;
         navigator.pop();
       } else {
+        debugPrint('CreateInvoiceScreen: _saveInvoice returned false');
         messenger.showSnackBar(
           const SnackBar(content: Text('Unable to save invoice')),
         );
       }
     } on SubscriptionGateException catch (error) {
+      debugPrint('CreateInvoiceScreen: SubscriptionGateException: $error');
       if (!mounted) {
         return;
       }
 
       await promptUpgradeForDecision(context, error.decision);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('CreateInvoiceScreen: Exception during _save: $e');
+      debugPrintStack(stackTrace: st);
       if (!mounted) {
         return;
       }

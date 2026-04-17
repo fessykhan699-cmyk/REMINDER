@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../features/clients/data/models/client_model.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
+import '../../features/invoices/data/models/line_item_model.dart';
 import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/app_preferences_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
@@ -59,6 +60,9 @@ class HiveStorage {
     }
     if (!Hive.isAdapterRegistered(10)) {
       Hive.registerAdapter(PaymentModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(11)) {
+      Hive.registerAdapter(LineItemModelAdapter());
     }
   }
 

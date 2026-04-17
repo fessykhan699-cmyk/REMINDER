@@ -9,6 +9,7 @@ enum SubscriptionGateFeature {
   premiumBranding,
   advancedTotals,
   partialPayments,
+  exportCsv,
 }
 
 enum SubscriptionGateReason { limitReached, premiumFeature }

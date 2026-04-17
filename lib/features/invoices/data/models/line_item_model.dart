@@ -3,7 +3,7 @@
 import 'package:hive/hive.dart';
 import '../../domain/entities/line_item.dart';
 
-@HiveType(typeId: 3)
+@HiveType(typeId: 11)
 class LineItemModel extends LineItem {
   const LineItemModel({
     required this.id,
@@ -63,7 +63,7 @@ class LineItemModel extends LineItem {
 
 class LineItemModelAdapter extends TypeAdapter<LineItemModel> {
   @override
-  final int typeId = 3;
+  final int typeId = 11;
 
   @override
   LineItemModel read(BinaryReader reader) {

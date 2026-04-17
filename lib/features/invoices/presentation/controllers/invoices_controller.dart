@@ -145,17 +145,21 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   Future<Invoice> createInvoice(Invoice invoice) async {
     final numberingService = ref.read(invoiceNumberingServiceProvider);
 
+
     await ref
         .read(subscriptionGatekeeperProvider)
         .ensureAllowed(SubscriptionGateFeature.createInvoice);
 
     final draftInvoice = _invoiceStatusService.prepareForCreate(invoice);
+    
     final created = await ref
         .read(createInvoiceUseCaseProvider)
         .call(draftInvoice);
+
     final current = state.valueOrNull ?? const <Invoice>[];
     state = AsyncValue.data([created, ...current]);
     ref.invalidate(invoiceDetailProvider(created.id));
+
     await _runBestEffortSideEffect(
       'record invoice creation learning',
       () => ref
@@ -179,6 +183,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       'increment invoice number',
       () => numberingService.incrementNextInvoiceNumber(),
     );
+    
     return created;
   }
 

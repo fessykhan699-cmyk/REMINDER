@@ -19,6 +19,7 @@ class PaymentService {
     required double amount,
     required DateTime date,
     String? note,
+    String? paymentMethod,
   }) async {
     try {
       final subState = _ref.read(subscriptionControllerProvider).valueOrNull;
@@ -36,6 +37,7 @@ class PaymentService {
         amount: amount,
         date: date,
         note: note,
+        paymentMethod: paymentMethod,
       );
 
       var updatedInvoice = invoice.copyWith(

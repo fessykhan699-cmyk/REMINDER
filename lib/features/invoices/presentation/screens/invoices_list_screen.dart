@@ -17,6 +17,8 @@ import '../controllers/invoices_controller.dart';
 import '../../../../data/services/invoice_search_filter_service.dart';
 import '../../../../data/services/overdue_flip_service.dart';
 import '../widgets/invoice_tile.dart';
+import '../../../../shared/services/csv_export_service.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
   const InvoicesListScreen({super.key});
@@ -84,6 +86,42 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     await const CreateInvoiceRoute().push(context);
   }
 
+  Future<void> _exportInvoices() async {
+    final decision = await ref
+        .read(subscriptionGatekeeperProvider)
+        .evaluate(SubscriptionGateFeature.exportCsv);
+    if (!decision.isAllowed) {
+      if (!mounted) return;
+      final upgraded = await promptUpgradeForDecision(context, decision);
+      if (!upgraded || !mounted) return;
+    }
+
+    // Pro-only feature from here
+    try {
+      final invoices = ref.read(filteredInvoicesProvider);
+      if (invoices.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No invoices to export')),
+        );
+        return;
+      }
+
+      final clientsAsync = ref.read(clientsControllerProvider);
+      final clients = clientsAsync.valueOrNull ?? [];
+
+      await ref.read(csvExportServiceProvider).exportInvoicesToCsv(
+        invoices: invoices,
+        clients: clients,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e')),
+      );
+    }
+  }
+
   void _loadMoreInvoices(int totalCount) {
     setState(() {
       _visibleItemCount = math.min(totalCount, _visibleItemCount + 20);
@@ -143,6 +181,18 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                           ),
                         ),
                       ),
+                      IconButton(
+                        tooltip: 'Export to CSV',
+                        onPressed: _exportInvoices,
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          foregroundColor: AppColors.textPrimary,
+                          shape: const CircleBorder(),
+                        ),
+                        icon: const Icon(Icons.file_download_outlined, size: 20),
+                      ),
+                      const SizedBox(width: spacingSM),
                       IconButton(
                         tooltip: 'New Invoice',
                         onPressed: _openCreateInvoice,

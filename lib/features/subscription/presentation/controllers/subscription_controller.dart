@@ -186,6 +186,18 @@ class SubscriptionGatekeeper {
           promptMessage:
               'Upgrade to track partial payments, send payment receipts, and maintain clear records of what your clients still owe.',
         );
+      case SubscriptionGateFeature.exportCsv:
+        if (subscription.isPro) {
+          return SubscriptionGateDecision.allowed(feature, isPro: true);
+        }
+
+        return SubscriptionGateDecision.blocked(
+          feature: feature,
+          reason: SubscriptionGateReason.premiumFeature,
+          promptTitle: 'Unlock CSV Export',
+          promptMessage:
+              'Upgrade to export your entire invoice list as a CSV file, perfect for your records or sharing with your accountant.',
+        );
     }
   }
 
