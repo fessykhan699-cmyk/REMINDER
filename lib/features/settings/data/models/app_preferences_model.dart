@@ -34,6 +34,7 @@ class AppPreferencesModel extends AppPreferences {
     required super.paymentTerms,
     required super.oneTapInvoiceEnabled,
     required super.smartPredictionEnabled,
+    required super.biometricLockEnabled,
   });
 
   const AppPreferencesModel.defaults() : super.defaults();
@@ -55,6 +56,7 @@ class AppPreferencesModel extends AppPreferences {
       paymentTerms: preferences.paymentTerms,
       oneTapInvoiceEnabled: preferences.oneTapInvoiceEnabled,
       smartPredictionEnabled: preferences.smartPredictionEnabled,
+      biometricLockEnabled: preferences.biometricLockEnabled,
     );
   }
 }
@@ -81,6 +83,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       oneTapInvoiceEnabled: reader.readBool(),
       smartPredictionEnabled: reader.readBool(),
       nextInvoiceNumber: reader.availableBytes > 0 ? reader.readInt() : 1,
+      biometricLockEnabled: reader.availableBytes > 0 ? reader.readBool() : false,
     );
   }
 
@@ -101,6 +104,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       ..write(obj.paymentTerms)
       ..writeBool(obj.oneTapInvoiceEnabled)
       ..writeBool(obj.smartPredictionEnabled)
-      ..writeInt(obj.nextInvoiceNumber);
+      ..writeInt(obj.nextInvoiceNumber)
+      ..writeBool(obj.biometricLockEnabled);
   }
 }

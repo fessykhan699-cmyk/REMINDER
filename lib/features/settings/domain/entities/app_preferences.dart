@@ -41,6 +41,7 @@ class AppPreferences {
     required this.paymentTerms,
     required this.oneTapInvoiceEnabled,
     required this.smartPredictionEnabled,
+    required this.biometricLockEnabled,
   });
 
   const AppPreferences.defaults()
@@ -58,7 +59,8 @@ class AppPreferences {
       nextInvoiceNumber = 1,
       paymentTerms = PaymentTermsOption.net30,
       oneTapInvoiceEnabled = true,
-      smartPredictionEnabled = true;
+      smartPredictionEnabled = true,
+      biometricLockEnabled = false;
 
   final bool pushNotificationsEnabled;
   final bool whatsAppRemindersEnabled;
@@ -75,6 +77,7 @@ class AppPreferences {
   final PaymentTermsOption paymentTerms;
   final bool oneTapInvoiceEnabled;
   final bool smartPredictionEnabled;
+  final bool biometricLockEnabled;
 
   bool get hasPin => appLockPin.trim().length >= 4;
 
@@ -95,6 +98,7 @@ class AppPreferences {
     PaymentTermsOption? paymentTerms,
     bool? oneTapInvoiceEnabled,
     bool? smartPredictionEnabled,
+    bool? biometricLockEnabled,
   }) {
     return AppPreferences(
       pushNotificationsEnabled:
@@ -115,6 +119,7 @@ class AppPreferences {
       oneTapInvoiceEnabled: oneTapInvoiceEnabled ?? this.oneTapInvoiceEnabled,
       smartPredictionEnabled:
           smartPredictionEnabled ?? this.smartPredictionEnabled,
+      biometricLockEnabled: biometricLockEnabled ?? this.biometricLockEnabled,
     );
   }
 }

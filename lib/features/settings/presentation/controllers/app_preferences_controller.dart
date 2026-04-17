@@ -46,4 +46,8 @@ class AppPreferencesController
     final next = update(current);
     return save(next);
   }
+
+  Future<void> setBiometricLock(bool value) async {
+    await patch((current) => current.copyWith(biometricLockEnabled: value));
+  }
 }
