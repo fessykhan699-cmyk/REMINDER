@@ -19,6 +19,7 @@ import '../../domain/usecases/delete_invoice_usecase.dart';
 import '../../domain/usecases/get_invoices_usecase.dart';
 import '../../domain/usecases/update_invoice_usecase.dart';
 import 'invoice_creation_learning_controller.dart';
+import '../../../../data/services/invoice_numbering_service.dart';
 
 final invoicesLocalDatasourceProvider = Provider<InvoicesLocalDatasource>(
   (ref) => InvoicesLocalDatasource(ref.watch(clientsLocalDatasourceProvider)),
@@ -142,6 +143,8 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<Invoice> createInvoice(Invoice invoice) async {
+    final numberingService = ref.read(invoiceNumberingServiceProvider);
+
     await ref
         .read(subscriptionGatekeeperProvider)
         .ensureAllowed(SubscriptionGateFeature.createInvoice);
@@ -171,6 +174,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
     await _runBestEffortSideEffect(
       'schedule invoice reminders',
       () => _reminderService.scheduleInvoiceReminders(created),
+    );
+    await _runBestEffortSideEffect(
+      'increment invoice number',
+      () => numberingService.incrementNextInvoiceNumber(),
     );
     return created;
   }

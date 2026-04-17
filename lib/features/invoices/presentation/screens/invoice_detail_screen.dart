@@ -11,6 +11,7 @@ import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/whatsapp_service.dart';
 import '../../../../data/services/whatsapp_reminder_service.dart';
+import '../../../../data/services/email_invoice_service.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -34,10 +35,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   bool _isOpeningPdfPreview = false;
   bool _isSharingPdf = false;
   bool _isSendingWhatsApp = false;
+  bool _isSendingEmail = false;
   bool _isMarkingPaid = false;
 
   bool get _isPdfBusy =>
-      _isOpeningPdfPreview || _isSharingPdf || _isSendingWhatsApp;
+      _isOpeningPdfPreview || _isSharingPdf || _isSendingWhatsApp || _isSendingEmail;
 
   void _showSnackBar(String message) {
     final messenger = ScaffoldMessenger.of(context);
@@ -139,6 +141,55 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     } finally {
       if (mounted) {
         setState(() => _isMarkingPaid = false);
+      }
+    }
+  }
+
+  Future<void> _sendEmailInvoice(Invoice invoice) async {
+    // Phase 4 — Subscription Gate
+    final subscription =
+        ref.read(subscriptionControllerProvider).valueOrNull ??
+        const SubscriptionState.free();
+    if (!subscription.isPro) {
+      const UpgradeToProRoute().push(context);
+      return;
+    }
+
+    if (_isPdfBusy) return;
+
+    // if client has no email: show a snackbar
+    final client = await ref.read(clientDetailProvider(invoice.clientId).future);
+    final email = client?.email ?? '';
+    if (email.trim().isEmpty) {
+      _showSnackBar('Add an email address to this client first');
+      return;
+    }
+
+    setState(() => _isSendingEmail = true);
+
+    try {
+      final success = await ref.read(emailInvoiceServiceProvider).sendInvoiceEmail(
+        invoice: invoice,
+        email: email,
+        isPro: subscription.isPro,
+      );
+
+      await ref
+          .read(invoicesControllerProvider.notifier)
+          .markInvoiceSent(invoice);
+
+      if (!mounted) return;
+      if (success) {
+        _showSnackBar('Email sequence initiated');
+      } else {
+        _showSnackBar('Could not start email sequence');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Unable to open email client');
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingEmail = false);
       }
     }
   }
@@ -483,6 +534,15 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           icon: Icons.message,
                           label: 'Send WhatsApp Reminder',
                           onTap: () => _showWhatsAppReminderSheet(invoice),
+                          showTopBorder: true,
+                        ),
+                        _ActionRow(
+                          icon: Icons.email_outlined,
+                          label: _isSendingEmail ? 'Opening Email...' : 'Email Invoice',
+                          isLoading: _isSendingEmail,
+                          onTap: _isPdfBusy
+                              ? null
+                              : () => _sendEmailInvoice(invoice),
                           showTopBorder: true,
                         ),
                       ],

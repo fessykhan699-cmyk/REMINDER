@@ -313,6 +313,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _editNextInvoiceNumber(AppPreferences preferences) async {
+    final rawValue = await _showTextSettingSheet(
+      title: 'Next Invoice Number',
+      subtitle: 'The sequential number for your next invoice',
+      initialValue: preferences.nextInvoiceNumber.toString(),
+      hintText: '1',
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+    );
+
+    if (!mounted || rawValue == null) {
+      return;
+    }
+
+    final sanitized = int.tryParse(rawValue.trim()) ?? 1;
+    if (sanitized == preferences.nextInvoiceNumber) {
+      return;
+    }
+
+    await _togglePreference(
+      (current) => current.copyWith(nextInvoiceNumber: sanitized),
+    );
+  }
+
   Future<void> _editPaymentTerms(AppPreferences preferences) async {
     final nextValue = await _showSelectionSettingSheet<PaymentTermsOption>(
       title: 'Payment Terms',
@@ -544,6 +568,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: preferences.invoicePrefix,
                   trailingIcon: Icons.edit_outlined,
                   onTap: () => _editInvoicePrefix(preferences),
+                ),
+                _SettingValueRow(
+                  title: 'Next Number',
+                  subtitle: 'Sequential counter for next invoice',
+                  value: preferences.nextInvoiceNumber.toString(),
+                  trailingIcon: Icons.edit_outlined,
+                  onTap: () => _editNextInvoiceNumber(preferences),
                 ),
                 _SettingValueRow(
                   title: 'Payment Terms',

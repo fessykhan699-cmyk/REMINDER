@@ -46,6 +46,7 @@ class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
 class InvoiceModel extends Invoice {
   const InvoiceModel({
     required this.id,
+    required this.invoiceNumber,
     required this.clientId,
     required this.clientName,
     required this.service,
@@ -61,6 +62,7 @@ class InvoiceModel extends Invoice {
     this.notes,
   }) : super(
          id: id,
+         invoiceNumber: invoiceNumber,
          clientId: clientId,
          clientName: clientName,
          service: service,
@@ -79,6 +81,10 @@ class InvoiceModel extends Invoice {
   @override
   @HiveField(0)
   final String id;
+
+  @override
+  @HiveField(14)
+  final String invoiceNumber;
 
   @override
   @HiveField(1)
@@ -135,6 +141,7 @@ class InvoiceModel extends Invoice {
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
       clientId: invoice.clientId,
       clientName: invoice.clientName,
       service: invoice.service,
@@ -154,6 +161,7 @@ class InvoiceModel extends Invoice {
   factory InvoiceModel.fromJson(Map<String, dynamic> json) {
     return InvoiceModel(
       id: json['id'] as String,
+      invoiceNumber: json['invoiceNumber'] as String? ?? '',
       clientId: json['clientId'] as String,
       clientName: json['clientName'] as String,
       service: json['service'] as String,
@@ -173,6 +181,7 @@ class InvoiceModel extends Invoice {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'invoiceNumber': invoiceNumber,
       'clientId': clientId,
       'clientName': clientName,
       'service': service,
@@ -192,6 +201,7 @@ class InvoiceModel extends Invoice {
   @override
   InvoiceModel copyWith({
     String? id,
+    String? invoiceNumber,
     String? clientId,
     String? clientName,
     String? service,
@@ -208,6 +218,7 @@ class InvoiceModel extends Invoice {
   }) {
     return InvoiceModel(
       id: id ?? this.id,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       clientId: clientId ?? this.clientId,
       clientName: clientName ?? this.clientName,
       service: service ?? this.service,
@@ -261,19 +272,20 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
     final dueDate = DateTime.parse(reader.readString());
     final status = reader.read() as InvoiceStatus;
     final createdAt = DateTime.parse(reader.readString());
-    final currencyCode = reader.availableBytes > 0
-        ? reader.readString()
-        : 'USD';
+    final currencyCode =
+        reader.availableBytes > 0 ? reader.readString() : 'USD';
     final taxPercent = reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final paymentTermsDays = reader.availableBytes > 0 ? reader.readInt() : 0;
     final paymentLink = reader.availableBytes > 0 ? reader.readString() : '';
-    final discountAmount = reader.availableBytes > 0
-        ? reader.readDouble()
-        : 0.0;
+    final discountAmount =
+        reader.availableBytes > 0 ? reader.readDouble() : 0.0;
     final notes = reader.availableBytes > 0 ? reader.readString() : '';
+    final invoiceNumber =
+        reader.availableBytes > 0 ? reader.readString() : '';
 
     return InvoiceModel(
       id: id,
+      invoiceNumber: invoiceNumber,
       clientId: clientId,
       clientName: clientName,
       service: service,
@@ -306,6 +318,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeInt(obj.paymentTermsDays)
       ..writeString(obj.paymentLink ?? '')
       ..writeDouble(obj.discountAmount)
-      ..writeString(obj.notes ?? '');
+      ..writeString(obj.notes ?? '')
+      ..writeString(obj.invoiceNumber);
   }
 }

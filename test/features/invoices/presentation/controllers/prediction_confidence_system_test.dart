@@ -26,6 +26,7 @@ void main() {
         );
         final actualInvoice = Invoice(
           id: 'inv-1',
+          invoiceNumber: 'INV-001',
           clientId: 'client-a',
           clientName: 'Client A',
           service: 'Design',
@@ -61,6 +62,7 @@ void main() {
         );
         final actualInvoice = Invoice(
           id: 'inv-2',
+          invoiceNumber: 'INV-002',
           clientId: 'client-a',
           clientName: 'Client A',
           service: 'Design',
@@ -388,6 +390,7 @@ void main() {
         for (var i = 0; i < 6; i++) {
           final actualInvoice = Invoice(
             id: 'w-$i',
+            invoiceNumber: 'INV-W-$i',
             clientId: 'client-1',
             clientName: 'Client 1',
             service: 'Actual Service',
@@ -673,6 +676,7 @@ void main() {
 
         final actualInvoice = Invoice(
           id: 'e2e-actual',
+          invoiceNumber: 'INV-E2E',
           clientId: draft.clientId,
           clientName: draft.clientName,
           service: draft.service,
@@ -735,6 +739,7 @@ Invoice _invoice({
   );
   return Invoice(
     id: id,
+    invoiceNumber: 'INV-$id',
     clientId: client.id,
     clientName: client.name,
     service: service,

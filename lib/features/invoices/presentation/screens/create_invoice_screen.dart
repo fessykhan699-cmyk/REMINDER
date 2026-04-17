@@ -19,6 +19,7 @@ import '../../domain/entities/invoice.dart';
 import '../controllers/invoice_creation_learning_controller.dart';
 import '../controllers/invoice_prediction_engine.dart';
 import '../controllers/invoices_controller.dart';
+import '../../../../data/services/invoice_numbering_service.dart';
 
 class CreateInvoiceScreen extends ConsumerStatefulWidget {
   const CreateInvoiceScreen({super.key});
@@ -37,8 +38,10 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   final _discountController = TextEditingController();
   final _notesController = TextEditingController();
   final _paymentLinkController = TextEditingController();
+  final _invoiceNumberController = TextEditingController();
   final _serviceFocusNode = FocusNode();
   final _amountFocusNode = FocusNode();
+  final _invoiceNumberFocusNode = FocusNode();
 
   Client? _selectedClient;
   DateTime? _selectedDueDate;
@@ -50,6 +53,20 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
+  void initState() {
+    super.initState();
+    _initInvoiceNumber();
+  }
+
+  void _initInvoiceNumber() {
+    final prefs = ref.read(appPreferencesControllerProvider).valueOrNull;
+    if (prefs != null) {
+      _invoiceNumberController.text =
+          ref.read(invoiceNumberingServiceProvider).getNextInvoiceNumber(prefs);
+    }
+  }
+
+  @override
   void dispose() {
     _serviceController.dispose();
     _amountController.dispose();
@@ -58,6 +75,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     _paymentLinkController.dispose();
     _serviceFocusNode.dispose();
     _amountFocusNode.dispose();
+    _invoiceNumberController.dispose();
+    _invoiceNumberFocusNode.dispose();
     super.dispose();
   }
 
@@ -506,9 +525,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     required SmartInvoicePrediction intelligence,
     required InvoicesController invoicesController,
     required InvoiceCreationLearningController learningController,
+    required String invoiceNumber,
   }) async {
     final invoice = Invoice(
       id: invoiceId,
+      invoiceNumber: invoiceNumber,
       clientId: selectedClient.id,
       clientName: selectedClient.name,
       service: service,
@@ -581,6 +602,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final form = _formKey.currentState;
     final selectedClient = _selectedClient;
     final selectedDueDate = _selectedDueDate;
+    final invoiceNumber = _invoiceNumberController.text.trim();
     final service = _serviceController.text.trim();
     final amount = double.tryParse(_amountController.text.trim());
     final discountText = _discountController.text.trim();
@@ -603,7 +625,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         selectedClient == null ||
         selectedDueDate == null ||
         amount == null ||
-        discountAmount == null) {
+        discountAmount == null ||
+        invoiceNumber.isEmpty) {
       return;
     }
 
@@ -654,6 +677,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         intelligence: intelligence,
         invoicesController: invoicesController,
         learningController: learningController,
+        invoiceNumber: invoiceNumber,
       );
 
       if (!mounted) {
@@ -737,6 +761,23 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
+                      ),
+                      const SizedBox(height: 24),
+                      _InvoiceTextField(
+                        controller: _invoiceNumberController,
+                        label: 'Invoice Number',
+                        hintText: 'INV-001',
+                        focusNode: _invoiceNumberFocusNode,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) {
+                          _serviceFocusNode.requestFocus();
+                        },
+                        validator: (value) {
+                          if ((value?.trim() ?? '').isEmpty) {
+                            return 'Required';
+                          }
+                          return null;
+                        },
                       ),
                       if (_selectedClient == null &&
                           intelligence.suggestedClient != null) ...[

@@ -37,6 +37,7 @@ class AppPreferences {
     required this.defaultCurrency,
     required this.defaultTaxPercent,
     required this.invoicePrefix,
+    required this.nextInvoiceNumber,
     required this.paymentTerms,
     required this.oneTapInvoiceEnabled,
     required this.smartPredictionEnabled,
@@ -54,6 +55,7 @@ class AppPreferences {
       defaultCurrency = 'USD',
       defaultTaxPercent = 0,
       invoicePrefix = 'INV',
+      nextInvoiceNumber = 1,
       paymentTerms = PaymentTermsOption.net30,
       oneTapInvoiceEnabled = true,
       smartPredictionEnabled = true;
@@ -69,6 +71,7 @@ class AppPreferences {
   final String defaultCurrency;
   final double defaultTaxPercent;
   final String invoicePrefix;
+  final int nextInvoiceNumber;
   final PaymentTermsOption paymentTerms;
   final bool oneTapInvoiceEnabled;
   final bool smartPredictionEnabled;
@@ -88,6 +91,7 @@ class AppPreferences {
     String? defaultCurrency,
     double? defaultTaxPercent,
     String? invoicePrefix,
+    int? nextInvoiceNumber,
     PaymentTermsOption? paymentTerms,
     bool? oneTapInvoiceEnabled,
     bool? smartPredictionEnabled,
@@ -106,6 +110,7 @@ class AppPreferences {
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
       defaultTaxPercent: defaultTaxPercent ?? this.defaultTaxPercent,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
+      nextInvoiceNumber: nextInvoiceNumber ?? this.nextInvoiceNumber,
       paymentTerms: paymentTerms ?? this.paymentTerms,
       oneTapInvoiceEnabled: oneTapInvoiceEnabled ?? this.oneTapInvoiceEnabled,
       smartPredictionEnabled:

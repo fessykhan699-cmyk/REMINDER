@@ -27,6 +27,7 @@ extension InvoiceStatusX on InvoiceStatus {
 class Invoice {
   const Invoice({
     required this.id,
+    required this.invoiceNumber,
     required this.clientId,
     required this.clientName,
     required this.service,
@@ -43,6 +44,7 @@ class Invoice {
   });
 
   final String id;
+  final String invoiceNumber;
   final String clientId;
   final String clientName;
   final String service;
@@ -98,6 +100,7 @@ class Invoice {
 
   Invoice copyWith({
     String? id,
+    String? invoiceNumber,
     String? clientId,
     String? clientName,
     String? service,
@@ -114,6 +117,7 @@ class Invoice {
   }) {
     return Invoice(
       id: id ?? this.id,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       clientId: clientId ?? this.clientId,
       clientName: clientName ?? this.clientName,
       service: service ?? this.service,

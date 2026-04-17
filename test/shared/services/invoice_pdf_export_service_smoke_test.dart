@@ -37,6 +37,7 @@ void main() {
 
     invoice = Invoice(
       id: 'INV/TEST-001',
+      invoiceNumber: 'INV-001',
       clientId: 'client-001',
       clientName: 'Acme Studio',
       service: 'Design',

@@ -30,6 +30,7 @@ class AppPreferencesModel extends AppPreferences {
     required super.defaultCurrency,
     required super.defaultTaxPercent,
     required super.invoicePrefix,
+    required super.nextInvoiceNumber,
     required super.paymentTerms,
     required super.oneTapInvoiceEnabled,
     required super.smartPredictionEnabled,
@@ -50,6 +51,7 @@ class AppPreferencesModel extends AppPreferences {
       defaultCurrency: preferences.defaultCurrency,
       defaultTaxPercent: preferences.defaultTaxPercent,
       invoicePrefix: preferences.invoicePrefix,
+      nextInvoiceNumber: preferences.nextInvoiceNumber,
       paymentTerms: preferences.paymentTerms,
       oneTapInvoiceEnabled: preferences.oneTapInvoiceEnabled,
       smartPredictionEnabled: preferences.smartPredictionEnabled,
@@ -78,6 +80,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       paymentTerms: reader.read() as PaymentTermsOption,
       oneTapInvoiceEnabled: reader.readBool(),
       smartPredictionEnabled: reader.readBool(),
+      nextInvoiceNumber: reader.availableBytes > 0 ? reader.readInt() : 1,
     );
   }
 
@@ -97,6 +100,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       ..writeString(obj.invoicePrefix)
       ..write(obj.paymentTerms)
       ..writeBool(obj.oneTapInvoiceEnabled)
-      ..writeBool(obj.smartPredictionEnabled);
+      ..writeBool(obj.smartPredictionEnabled)
+      ..writeInt(obj.nextInvoiceNumber);
   }
 }
