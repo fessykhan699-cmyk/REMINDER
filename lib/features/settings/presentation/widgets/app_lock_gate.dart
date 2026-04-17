@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../data/providers/biometric_provider.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../domain/entities/app_preferences.dart';
@@ -43,6 +44,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
       if (_lastKnownPreferences.appLockEnabled &&
           _lastKnownPreferences.hasPin) {
         ref.read(appLockSessionProvider.notifier).state = false;
+      }
+    }
+    if (state == AppLifecycleState.resumed) {
+      if (_lastKnownPreferences.biometricLockEnabled) {
+        ref.read(isBiometricLockedProvider.notifier).state = true;
       }
     }
   }
