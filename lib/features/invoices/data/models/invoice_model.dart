@@ -5,6 +5,8 @@ import 'package:hive/hive.dart';
 import '../../domain/entities/invoice.dart';
 import 'line_item_model.dart';
 import '../../domain/entities/line_item.dart';
+import '../../../../domain/entities/payment.dart';
+import '../../../../data/models/payment_model.dart';
 
 const Object _invoiceModelPaymentLinkSentinel = Object();
 const Object _invoiceModelNotesSentinel = Object();
@@ -102,6 +104,7 @@ class InvoiceModel extends Invoice {
     this.recurringInterval = RecurringInterval.none,
     this.recurringNextDate,
     this.recurringParentId,
+    this.payments = const [],
   }) : super(
           id: id,
           invoiceNumber: invoiceNumber,
@@ -123,6 +126,7 @@ class InvoiceModel extends Invoice {
           recurringInterval: recurringInterval,
           recurringNextDate: recurringNextDate,
           recurringParentId: recurringParentId,
+          payments: payments,
         );
 
   @override
@@ -205,6 +209,10 @@ class InvoiceModel extends Invoice {
   @HiveField(19)
   final String? recurringParentId;
 
+  @override
+  @HiveField(20)
+  final List<PaymentModel> payments;
+
   factory InvoiceModel.fromEntity(Invoice invoice) {
     return InvoiceModel(
       id: invoice.id,
@@ -227,6 +235,7 @@ class InvoiceModel extends Invoice {
       recurringInterval: invoice.recurringInterval,
       recurringNextDate: invoice.recurringNextDate,
       recurringParentId: invoice.recurringParentId,
+      payments: invoice.payments.map((e) => PaymentModel.fromEntity(e)).toList(),
     );
   }
 
@@ -260,6 +269,10 @@ class InvoiceModel extends Invoice {
           ? DateTime.parse(json['recurringNextDate'] as String)
           : null,
       recurringParentId: json['recurringParentId'] as String?,
+      payments: (json['payments'] as List?)
+              ?.map((e) => PaymentModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -285,6 +298,7 @@ class InvoiceModel extends Invoice {
       'recurringInterval': recurringInterval.name,
       'recurringNextDate': recurringNextDate?.toIso8601String(),
       'recurringParentId': recurringParentId,
+      'payments': payments.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -310,6 +324,7 @@ class InvoiceModel extends Invoice {
     RecurringInterval? recurringInterval,
     DateTime? recurringNextDate,
     String? recurringParentId,
+    List<Payment>? payments,
   }) {
     return InvoiceModel(
       id: id ?? this.id,
@@ -338,6 +353,9 @@ class InvoiceModel extends Invoice {
       recurringInterval: recurringInterval ?? this.recurringInterval,
       recurringNextDate: recurringNextDate ?? this.recurringNextDate,
       recurringParentId: recurringParentId ?? this.recurringParentId,
+      payments: payments != null
+          ? payments.map((e) => PaymentModel.fromEntity(e)).toList()
+          : this.payments,
     );
   }
 
@@ -400,6 +418,12 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
     final recurringParentId =
         reader.availableBytes > 0 ? reader.readString() : '';
 
+    List<PaymentModel> payments = [];
+    if (reader.availableBytes > 0) {
+      final paymentsRaw = reader.readList();
+      payments = paymentsRaw.cast<PaymentModel>();
+    }
+
     return InvoiceModel(
       id: id,
       invoiceNumber: invoiceNumber,
@@ -421,6 +445,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       recurringInterval: recurringInterval,
       recurringNextDate: recurringNextDate,
       recurringParentId: recurringParentId.isEmpty ? null : recurringParentId,
+      payments: payments,
     );
   }
 
@@ -446,6 +471,7 @@ class InvoiceModelAdapter extends TypeAdapter<InvoiceModel> {
       ..writeBool(obj.isRecurring)
       ..write(obj.recurringInterval)
       ..writeString(obj.recurringNextDate?.toIso8601String() ?? '')
-      ..writeString(obj.recurringParentId ?? '');
+      ..writeString(obj.recurringParentId ?? '')
+      ..writeList(obj.payments);
   }
 }

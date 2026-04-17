@@ -174,6 +174,18 @@ class SubscriptionGatekeeper {
           promptMessage:
               'Upgrade to unlock advanced invoice features like discounts, premium totals, signatures, and polished branded exports.',
         );
+      case SubscriptionGateFeature.partialPayments:
+        if (subscription.isPro) {
+          return SubscriptionGateDecision.allowed(feature, isPro: true);
+        }
+
+        return SubscriptionGateDecision.blocked(
+          feature: feature,
+          reason: SubscriptionGateReason.premiumFeature,
+          promptTitle: 'Track partial payments',
+          promptMessage:
+              'Upgrade to track partial payments, send payment receipts, and maintain clear records of what your clients still owe.',
+        );
     }
   }
 

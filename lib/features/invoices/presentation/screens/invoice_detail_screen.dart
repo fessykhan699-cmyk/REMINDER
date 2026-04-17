@@ -16,6 +16,7 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+import '../../../../data/services/payment_service.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoices_controller.dart';
 import '../widgets/invoice_status_badge.dart';
@@ -37,9 +38,14 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   bool _isSendingWhatsApp = false;
   bool _isSendingEmail = false;
   bool _isMarkingPaid = false;
+  bool _isAddingPayment = false;
 
   bool get _isPdfBusy =>
-      _isOpeningPdfPreview || _isSharingPdf || _isSendingWhatsApp || _isSendingEmail;
+      _isOpeningPdfPreview ||
+      _isSharingPdf ||
+      _isSendingWhatsApp ||
+      _isSendingEmail ||
+      _isAddingPayment;
 
   void _showSnackBar(String message) {
     final messenger = ScaffoldMessenger.of(context);
@@ -141,6 +147,197 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     } finally {
       if (mounted) {
         setState(() => _isMarkingPaid = false);
+      }
+    }
+  }
+
+  Future<void> _showAddPaymentSheet(Invoice invoice) async {
+    final decision = await ref
+        .read(subscriptionGatekeeperProvider)
+        .evaluate(SubscriptionGateFeature.partialPayments);
+
+    if (!mounted) return;
+
+    if (!decision.isAllowed) {
+      await promptUpgradeForDecision(context, decision);
+      return;
+    }
+
+    if (invoice.isFullyPaid) {
+      _showSnackBar('Invoice is already fully paid');
+      return;
+    }
+
+    final amountController = TextEditingController(
+      text: invoice.remainingBalance.toStringAsFixed(2),
+    );
+    final noteController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            spacingMD,
+            spacingMD,
+            spacingMD,
+            MediaQuery.of(context).viewInsets.bottom + spacingMD,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add Payment',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: spacingMD),
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  prefixText: '${invoice.currencyCode} ',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: spacingSM),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today_outlined),
+                title: const Text('Date'),
+                trailing: Text(AppFormatters.shortDate(selectedDate)),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setSheetState(() => selectedDate = picked);
+                  }
+                },
+              ),
+              const SizedBox(height: spacingSM),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  labelText: 'Note (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: spacingLG),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final amount = double.tryParse(amountController.text) ?? 0;
+                    if (amount <= 0) {
+                      _showSnackBar('Please enter a valid amount');
+                      return;
+                    }
+                    if (amount > invoice.remainingBalance + 0.01) {
+                      _showSnackBar('Amount exceeds remaining balance');
+                      return;
+                    }
+
+                    Navigator.pop(context);
+                    await _addPayment(invoice, amount, selectedDate, noteController.text);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(spacingMD),
+                    child: Text('Record Payment'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addPayment(Invoice invoice, double amount, DateTime date, String note) async {
+    setState(() => _isAddingPayment = true);
+
+    try {
+      final updated = await ref.read(paymentServiceProvider).addPayment(
+        invoice: invoice,
+        amount: amount,
+        date: date,
+        note: note.trim().isEmpty ? null : note.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (updated != null) {
+        _showSnackBar('Payment recorded successfully');
+        ref.invalidate(invoiceDetailProvider(invoice.id));
+      } else {
+        _showSnackBar('Failed to record payment');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('An error occurred while adding payment');
+    } finally {
+      if (mounted) {
+        setState(() => _isAddingPayment = false);
+      }
+    }
+  }
+
+  Future<void> _removePayment(Invoice invoice, String paymentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Payment?'),
+        content: const Text('This payment will be deleted permanently.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isAddingPayment = true);
+
+    try {
+      final updated = await ref.read(paymentServiceProvider).removePayment(
+        invoice: invoice,
+        paymentId: paymentId,
+      );
+
+      if (!mounted) return;
+
+      if (updated != null) {
+        _showSnackBar('Payment removed');
+        ref.invalidate(invoiceDetailProvider(invoice.id));
+      } else {
+        _showSnackBar('Failed to remove payment');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('An error occurred');
+    } finally {
+      if (mounted) {
+        setState(() => _isAddingPayment = false);
       }
     }
   }
@@ -597,6 +794,80 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     const SizedBox(height: spacingMD),
                   ],
 
+                  // ── Payments section ──
+                  if (invoice.payments.isNotEmpty || invoice.totalPaid > 0) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Payments',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          if (invoice.totalPaid > 0)
+                            Text(
+                              'Balance: ${AppFormatters.currency(invoice.remainingBalance, currencyCode: invoice.currencyCode)}',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: spacingSM),
+                    GlassCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          ...invoice.payments.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final payment = entry.value;
+                            return Column(
+                              children: [
+                                if (idx > 0)
+                                  Divider(
+                                    height: 1,
+                                    indent: spacingMD,
+                                    endIndent: spacingMD,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: 0.5),
+                                  ),
+                                ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: spacingMD,
+                                    vertical: 4,
+                                  ),
+                                  title: Text(
+                                    AppFormatters.currency(payment.amount,
+                                        currencyCode: invoice.currencyCode),
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: Text(
+                                    '${AppFormatters.shortDate(payment.date)}${payment.note != null ? ' • ${payment.note}' : ''}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 20),
+                                    onPressed: () => _removePayment(invoice, payment.id),
+                                    color: AppColors.danger.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: spacingMD),
+                  ],
+
                   // ── Actions card ──
                   GlassCard(
                     padding: EdgeInsets.zero,
@@ -643,6 +914,17 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               ? null
                               : () => _markInvoicePaid(invoice),
                           accent: invoice.status != InvoiceStatus.paid,
+                          showTopBorder: true,
+                        ),
+                        _ActionRow(
+                          icon: Icons.add_card_outlined,
+                          label: _isAddingPayment
+                              ? 'Adding Payment...'
+                              : 'Add Partial Payment',
+                          isLoading: _isAddingPayment,
+                          onTap: invoice.isFullyPaid || _isAddingPayment
+                              ? null
+                              : () => _showAddPaymentSheet(invoice),
                           showTopBorder: true,
                         ),
                         _ActionRow(

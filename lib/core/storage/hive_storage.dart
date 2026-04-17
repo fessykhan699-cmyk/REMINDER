@@ -6,6 +6,7 @@ import '../../features/invoices/data/models/invoice_model.dart';
 import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/app_preferences_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
+import '../../data/models/payment_model.dart';
 
 /// Known demo/seed data identifiers that must be purged.
 const _demoClientIds = {'client-1', 'client-2'};
@@ -55,6 +56,9 @@ class HiveStorage {
     }
     if (!Hive.isAdapterRegistered(9)) {
       Hive.registerAdapter(RecurringIntervalAdapter());
+    }
+    if (!Hive.isAdapterRegistered(10)) {
+      Hive.registerAdapter(PaymentModelAdapter());
     }
   }
 

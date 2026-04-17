@@ -8,6 +8,7 @@ enum SubscriptionGateFeature {
   whatsappSharing,
   premiumBranding,
   advancedTotals,
+  partialPayments,
 }
 
 enum SubscriptionGateReason { limitReached, premiumFeature }

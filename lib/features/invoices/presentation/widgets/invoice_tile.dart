@@ -124,6 +124,16 @@ class InvoiceTile extends StatelessWidget {
                       ),
                       const SizedBox(height: spacingSM),
                       InvoiceStatusBadge(status: invoice.status),
+                      if (invoice.totalPaid > 0 && !invoice.isFullyPaid) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Paid: ${AppFormatters.currency(invoice.totalPaid, currencyCode: invoice.currencyCode)}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],

@@ -56,6 +56,7 @@ class FreeTierLimitService {
         case SubscriptionGateFeature.whatsappSharing:
         case SubscriptionGateFeature.premiumBranding:
         case SubscriptionGateFeature.advancedTotals:
+        case SubscriptionGateFeature.partialPayments:
           return false;
         case SubscriptionGateFeature.createInvoice:
           return await canCreateInvoice();

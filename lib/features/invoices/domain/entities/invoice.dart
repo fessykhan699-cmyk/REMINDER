@@ -1,4 +1,5 @@
 import 'line_item.dart';
+import '../../../../domain/entities/payment.dart';
 
 enum InvoiceStatus { draft, sent, viewed, paid, overdue }
 
@@ -94,6 +95,7 @@ class Invoice {
     this.recurringInterval = RecurringInterval.none,
     this.recurringNextDate,
     this.recurringParentId,
+    this.payments = const [],
   });
 
   final String id;
@@ -116,10 +118,19 @@ class Invoice {
   final RecurringInterval recurringInterval;
   final DateTime? recurringNextDate;
   final String? recurringParentId;
+  final List<Payment> payments;
 
   bool get isPaid => status == InvoiceStatus.paid;
   bool get isOverdue =>
       status != InvoiceStatus.paid && dueDate.isBefore(DateTime.now());
+
+  double get totalPaid => payments.fold(0, (sum, p) => sum + p.amount);
+  double get remainingBalance {
+    final balance = amount - totalPaid;
+    return balance < 0 ? 0.0 : balance;
+  }
+
+  bool get isFullyPaid => totalPaid >= amount;
 
   String? get normalizedNotes => notes?.trim().isEmpty == true ? null : notes;
   String? get normalizedPaymentLink =>
@@ -168,6 +179,7 @@ class Invoice {
     RecurringInterval? recurringInterval,
     DateTime? recurringNextDate,
     String? recurringParentId,
+    List<Payment>? payments,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -190,6 +202,7 @@ class Invoice {
       recurringInterval: recurringInterval ?? this.recurringInterval,
       recurringNextDate: recurringNextDate ?? this.recurringNextDate,
       recurringParentId: recurringParentId ?? this.recurringParentId,
+      payments: payments ?? this.payments,
     );
   }
 }
