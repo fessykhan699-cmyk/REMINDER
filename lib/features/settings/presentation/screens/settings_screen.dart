@@ -524,6 +524,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'Security',
               children: [
                 _SwitchRow(
+                  title: 'Biometric App Lock',
+                  subtitle: 'Require fingerprint or Face ID when opening the app',
+                  value: preferences.biometricLockEnabled,
+                  onChanged: (value) => ref
+                      .read(appPreferencesControllerProvider.notifier)
+                      .setBiometricLock(value),
+                ),
+                _SwitchRow(
                   title: 'App lock',
                   subtitle: preferences.appLockEnabled
                       ? 'PIN lock is active for app launch and return.'
