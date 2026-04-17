@@ -5,20 +5,35 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/providers/biometric_provider.dart';
 
-class BiometricLockScreen extends ConsumerWidget {
+class BiometricLockScreen extends ConsumerStatefulWidget {
   const BiometricLockScreen({super.key});
 
-  Future<void> _tryAuthenticate(WidgetRef ref) async {
-    final service = ref.read(biometricServiceProvider);
-    final success = await service.authenticate();
-    if (success) {
-      ref.read(isBiometricLockedProvider.notifier).state = false;
+  @override
+  ConsumerState<BiometricLockScreen> createState() =>
+      _BiometricLockScreenState();
+}
+
+class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+  }
+
+  Future<void> _authenticate() async {
+    try {
+      final service = ref.read(biometricServiceProvider);
+      final success = await service.authenticate();
+      if (success) {
+        ref.read(isBiometricLockedProvider.notifier).state = false;
+      }
+    } catch (_) {
+      // stay locked on any error
     }
-    // if false: stay locked, do nothing
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -51,7 +66,7 @@ class BiometricLockScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 32),
                 FilledButton.icon(
-                  onPressed: () => _tryAuthenticate(ref),
+                  onPressed: _authenticate,
                   icon: const Icon(Icons.lock_open_outlined),
                   label: const Text('Unlock'),
                 ),
