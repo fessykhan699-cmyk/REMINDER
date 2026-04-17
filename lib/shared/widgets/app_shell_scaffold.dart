@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../adaptive/adaptive_system_controller.dart';
 import '../../core/constants/app_routes.dart';
+import '../../data/providers/biometric_provider.dart';
+import '../../features/settings/presentation/widgets/biometric_lock_screen.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/invoices/presentation/controllers/invoice_creation_learning_controller.dart';
 import '../../features/invoices/presentation/controllers/invoice_prediction_engine.dart';
@@ -374,7 +376,18 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
     return Scaffold(
       extendBody: true,
       resizeToAvoidBottomInset: true,
-      body: widget.navigationShell,
+      body: Stack(
+        children: [
+          widget.navigationShell,
+          Consumer(
+            builder: (context, ref, _) {
+              final isLocked = ref.watch(isBiometricLockedProvider);
+              if (!isLocked) return const SizedBox.shrink();
+              return const BiometricLockScreen();
+            },
+          ),
+        ],
+      ),
       floatingActionButton: _buildFloatingActionButton(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
