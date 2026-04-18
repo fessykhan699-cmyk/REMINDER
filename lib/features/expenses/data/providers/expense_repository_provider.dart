@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
+import '../../../../data/services/workspace/workspace_provider.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../domain/repositories/expense_repository.dart';
 import '../../domain/usecases/add_expense_usecase.dart';
@@ -12,17 +13,16 @@ final expensesLocalDatasourceProvider = Provider<ExpensesLocalDatasource>(
   (ref) => ExpensesLocalDatasource(),
 );
 
-final expenseRepositoryProvider = Provider<ExpenseRepository>(
-  (ref) {
-    final datasource = ref.watch(expensesLocalDatasourceProvider);
-    return ExpenseRepositoryImpl(
-      datasource,
-      syncService: ref.watch(firestoreSyncServiceProvider),
-      userId: ref.watch(currentUserIdProvider),
-      isPro: ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
-    );
-  },
-);
+final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
+  final datasource = ref.watch(expensesLocalDatasourceProvider);
+  return ExpenseRepositoryImpl(
+    datasource,
+    syncService: ref.watch(firestoreSyncServiceProvider),
+    userId: ref.watch(activeWorkspaceOwnerIdProvider),
+    isPro:
+        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+  );
+});
 
 final getExpensesUseCaseProvider = Provider<GetExpensesUseCase>(
   (ref) => GetExpensesUseCase(ref.watch(expenseRepositoryProvider)),

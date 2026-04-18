@@ -1,6 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+abstract final class AppRoutes {
+  static const String teamMembers = '/team-members';
+}
+
 sealed class AppRouteSpec {
   const AppRouteSpec();
 
@@ -212,6 +216,18 @@ final class AddExpenseRoute extends AppRouteSpec {
   const AddExpenseRoute();
 
   static const String routePath = '/expenses/add';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
+final class TeamMembersRoute extends AppRouteSpec {
+  const TeamMembersRoute();
+
+  static const String routePath = AppRoutes.teamMembers;
 
   @override
   String get path => routePath;

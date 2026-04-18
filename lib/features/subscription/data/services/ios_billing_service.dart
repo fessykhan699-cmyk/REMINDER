@@ -1,16 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import '../../domain/entities/subscription_state.dart';
 import '../../domain/services/billing_service_interface.dart';
 
 class IOSBillingService implements BillingServiceInterface {
   IOSBillingService({InAppPurchase? inAppPurchase})
-      : _inAppPurchase = inAppPurchase;
+    : _inAppPurchase = inAppPurchase;
 
   final InAppPurchase? _inAppPurchase;
   InAppPurchase get _billingClient => _inAppPurchase ?? InAppPurchase.instance;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseStream => _billingClient.purchaseStream;
+  Stream<List<PurchaseDetails>> get purchaseStream =>
+      _billingClient.purchaseStream;
 
   @override
   Future<bool> isAvailable() async {
@@ -22,7 +24,9 @@ class IOSBillingService implements BillingServiceInterface {
   Future<List<ProductDetails>> loadProducts(Set<String> productIds) async {
     final response = await _billingClient.queryProductDetails(productIds);
     if (response.error != null) {
-      debugPrint('[IOSBillingService] Error loading products: ${response.error}');
+      debugPrint(
+        '[IOSBillingService] Error loading products: ${response.error}',
+      );
     }
     return response.productDetails;
   }
@@ -45,9 +49,15 @@ class IOSBillingService implements BillingServiceInterface {
 
   @override
   Future<bool?> syncOwnedProState(Set<String> proProductIds) async {
-    // Note: On iOS, we typically rely on restorePurchases() to populate the stream 
+    // Note: On iOS, we typically rely on restorePurchases() to populate the stream
     // or use platform-specific additions for receipt validation.
     // For this implementation, we will return false and rely on the restore flow.
     return false;
+  }
+
+  @override
+  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
+    // iOS plan state is resolved through the purchase/restore stream in this app.
+    return InvoiceFlowPlan.free;
   }
 }

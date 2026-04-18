@@ -1,4 +1,4 @@
-enum InvoiceFlowPlan { free, pro }
+enum InvoiceFlowPlan { free, pro, business }
 
 enum SubscriptionGateFeature {
   createInvoice,
@@ -10,26 +10,35 @@ enum SubscriptionGateFeature {
   advancedTotals,
   partialPayments,
   exportCsv,
+  teamMembers,
 }
 
 enum SubscriptionGateReason { limitReached, premiumFeature }
 
 class SubscriptionState {
-  const SubscriptionState({required this.isPro});
+  const SubscriptionState({required this.isPro, this.isBusiness = false});
 
-  const SubscriptionState.free() : isPro = false;
+  const SubscriptionState.free() : isPro = false, isBusiness = false;
 
-  const SubscriptionState.pro() : isPro = true;
+  const SubscriptionState.pro() : isPro = true, isBusiness = false;
+
+  const SubscriptionState.business() : isPro = true, isBusiness = true;
 
   static const int freeClientLimit = 3;
   static const int freeMonthlyInvoiceLimit = 5;
 
   final bool isPro;
+  final bool isBusiness;
 
-  InvoiceFlowPlan get plan =>
-      isPro ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free;
+  InvoiceFlowPlan get plan => isBusiness
+      ? InvoiceFlowPlan.business
+      : (isPro ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free);
 
-  String get planLabel => isPro ? 'Pro' : 'Free';
+  String get planLabel => switch (plan) {
+    InvoiceFlowPlan.free => 'Free',
+    InvoiceFlowPlan.pro => 'Pro',
+    InvoiceFlowPlan.business => 'Business',
+  };
 
   bool get shouldWatermarkPdf => !isPro;
 }

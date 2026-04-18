@@ -8,6 +8,7 @@ import '../../data/services/billing_service.dart';
 import '../../domain/services/billing_service_interface.dart';
 import '../../domain/entities/subscription_state.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
+import '../../../../data/services/workspace/workspace_provider.dart';
 
 final subscriptionLocalDatasourceProvider =
     Provider<SubscriptionLocalDatasource>(
@@ -30,25 +31,34 @@ final subscriptionGatekeeperProvider = Provider<SubscriptionGatekeeper>(
 );
 
 class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+  /// Set to true to bypass subscription gates during testing.
+  /// Has zero effect in release builds — kDebugMode is false.
+  /// MUST be set back to false before Play Store submission.
+  static const bool _debugBypassSubscription = true;
+
   @override
   Future<SubscriptionState> build() async {
+    if (kDebugMode && _debugBypassSubscription) {
+      return const SubscriptionState.business();
+    }
+
     final datasource = ref.read(subscriptionLocalDatasourceProvider);
     final localState = await datasource.loadState();
 
     try {
-      final syncedIsPro = await ref
+      final syncedPlan = await ref
           .read(billingServiceProvider)
-          .syncOwnedProState(BillingServiceInterface.allProductIds);
+          .syncOwnedPlanState(BillingServiceInterface.allProductIds);
       // Only upgrade (free → pro). Never downgrade from sync — queryPastPurchases
       // can return an empty list when Store is offline, which is not a
       // confirmed cancellation. Downgrades happen via the purchase stream only.
-      if (syncedIsPro != true) {
+      if (syncedPlan == null || syncedPlan == InvoiceFlowPlan.free) {
         return localState;
       }
-      if (localState.isPro) {
+      if (localState.plan == syncedPlan) {
         return localState;
       }
-      return datasource.savePlan(isPro: true);
+      return datasource.savePlanTier(syncedPlan);
     } catch (e, st) {
       debugPrint('[SubscriptionController] syncOwnedProState failed: $e\n$st');
       return localState;
@@ -66,15 +76,17 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
     await setPlan(isPro: true);
 
     // Upload any existing local Hive data to Firestore now that user is Pro.
-    final userId = ref.read(currentUserIdProvider);
+    final userId = ref.read(activeWorkspaceOwnerIdProvider);
     if (userId != null) {
       ref
           .read(firestoreSyncServiceProvider)
           .uploadLocalDataToCloud(userId)
           .catchError((Object e) {
-        debugPrint('[SubscriptionController] uploadLocalDataToCloud error: $e');
-        return null;
-      });
+            debugPrint(
+              '[SubscriptionController] uploadLocalDataToCloud error: $e',
+            );
+            return null;
+          });
     }
   }
 }
@@ -198,6 +210,18 @@ class SubscriptionGatekeeper {
           promptTitle: 'Unlock CSV Export',
           promptMessage:
               'Upgrade to export your entire invoice list as a CSV file, perfect for your records or sharing with your accountant.',
+        );
+      case SubscriptionGateFeature.teamMembers:
+        if (subscription.isBusiness) {
+          return SubscriptionGateDecision.allowed(feature, isPro: true);
+        }
+
+        return SubscriptionGateDecision.blocked(
+          feature: feature,
+          reason: SubscriptionGateReason.premiumFeature,
+          promptTitle: 'Unlock Team Members',
+          promptMessage:
+              'Team collaboration is available on Business Plan. Upgrade to add up to 2 additional members.',
         );
     }
   }

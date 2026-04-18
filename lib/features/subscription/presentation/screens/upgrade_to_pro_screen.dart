@@ -74,19 +74,28 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
         const SubscriptionState.free();
     final usage = ref.watch(subscriptionUsageProvider);
     final billingAsync = ref.watch(billingControllerProvider);
-    final billing =
-        billingAsync.valueOrNull ?? const BillingState.initial();
+    final billing = billingAsync.valueOrNull ?? const BillingState.initial();
     final selectedPlan = _effectiveSelectedPlan(billing);
     final monthlyPriceLabel = billing.monthlyProduct?.price ?? r'$4.91 / month';
     final yearlyPriceLabel = billing.yearlyProduct?.price ?? r'$39.99 / year';
+    final businessPriceLabel = billing.businessProduct?.price ?? 'AED 99/mo';
     final canPurchase = switch (selectedPlan) {
       _UpgradePlan.monthly => billing.canPurchaseMonthly,
       _UpgradePlan.yearly => billing.canPurchaseYearly,
     };
-    final ctaLabel = subscription.isPro ? 'Pro Active' : 'Upgrade Now';
+    final ctaLabel = subscription.isBusiness
+        ? 'Business Active'
+        : (subscription.isPro ? 'Pro Active' : 'Upgrade Now');
     final ctaAction = subscription.isPro || !canPurchase
         ? null
         : () => _startPurchase(selectedPlan);
+    final businessCtaLabel = subscription.isBusiness
+        ? 'Business Active'
+        : 'Upgrade to Business';
+    final businessCtaAction =
+        subscription.isBusiness || !billing.canPurchaseBusiness
+        ? null
+        : _startBusinessPurchase;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -228,12 +237,57 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
 
                       const SizedBox(height: spacingMD),
 
+                      GlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Business',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: spacingXS),
+                            Text(
+                              businessPriceLabel,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: spacingSM + 2),
+                            const _BenefitRow(text: 'Everything in Pro'),
+                            const SizedBox(height: spacingSM + 2),
+                            const _BenefitRow(text: 'Up to 3 users'),
+                            const SizedBox(height: spacingSM + 2),
+                            const _BenefitRow(text: 'Shared workspace'),
+                            const SizedBox(height: spacingSM + 2),
+                            const _BenefitRow(
+                              text: 'Centralized invoices & expenses',
+                            ),
+                            const SizedBox(height: spacingMD),
+                            SizedBox(
+                              width: double.infinity,
+                              child: PremiumPrimaryButton(
+                                label: businessCtaLabel,
+                                isLoading: billing.isPurchasePending,
+                                onPressed: businessCtaAction,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: spacingMD),
+
                       // ── Trust section ──
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _TrustChip(text: 'Secure ${defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store'} billing'),
+                          _TrustChip(
+                            text:
+                                'Secure ${defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store'} billing',
+                          ),
                           _TrustChip(text: 'Cancel anytime'),
                           _TrustChip(text: 'No hidden fees'),
                         ],
@@ -361,15 +415,16 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
     switch (plan) {
       case _UpgradePlan.monthly:
         AnalyticsService.instance.logUpgradeTapped('monthly');
-        await ref
-            .read(billingControllerProvider.notifier)
-            .purchaseMonthlyPro();
+        await ref.read(billingControllerProvider.notifier).purchaseMonthlyPro();
       case _UpgradePlan.yearly:
         AnalyticsService.instance.logUpgradeTapped('yearly');
-        await ref
-            .read(billingControllerProvider.notifier)
-            .purchaseYearlyPro();
+        await ref.read(billingControllerProvider.notifier).purchaseYearlyPro();
     }
+  }
+
+  Future<void> _startBusinessPurchase() async {
+    AnalyticsService.instance.logUpgradeTapped('business');
+    await ref.read(billingControllerProvider.notifier).purchaseBusiness();
   }
 
   Future<void> _handleBillingFeedback(BillingFeedback feedback) async {
@@ -474,8 +529,10 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
     BillingState billing,
     _UpgradePlan selectedPlan,
   ) {
-    final storeName = defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store';
-    
+    final storeName = defaultTargetPlatform == TargetPlatform.android
+        ? 'Google Play'
+        : 'App Store';
+
     if (billingAsync.isLoading) {
       return 'Connecting to $storeName Billing...';
     }

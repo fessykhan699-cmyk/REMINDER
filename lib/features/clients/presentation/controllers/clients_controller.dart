@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/utils/id_generator.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
+import '../../../../data/services/workspace/workspace_provider.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
@@ -28,7 +29,7 @@ final clientRepositoryProvider = Provider<ClientRepository>((ref) {
   return ClientRepositoryImpl(
     datasource,
     syncService: ref.watch(firestoreSyncServiceProvider),
-    userId: ref.watch(currentUserIdProvider),
+    userId: ref.watch(activeWorkspaceOwnerIdProvider),
     isPro:
         ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
   );

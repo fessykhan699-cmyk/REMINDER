@@ -77,6 +77,16 @@ class _FakeSubscriptionLocalDatasource extends SubscriptionLocalDatasource {
         : const SubscriptionState.free();
     return _state;
   }
+
+  @override
+  Future<SubscriptionState> savePlanTier(InvoiceFlowPlan plan) async {
+    _state = switch (plan) {
+      InvoiceFlowPlan.free => const SubscriptionState.free(),
+      InvoiceFlowPlan.pro => const SubscriptionState.pro(),
+      InvoiceFlowPlan.business => const SubscriptionState.business(),
+    };
+    return _state;
+  }
 }
 
 class _FakeBillingService implements BillingServiceInterface {
@@ -92,6 +102,14 @@ class _FakeBillingService implements BillingServiceInterface {
 
   @override
   Future<bool?> syncOwnedProState(Set<String> productIds) async => syncedIsPro;
+
+  @override
+  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
+    if (syncedIsPro == null) {
+      return null;
+    }
+    return syncedIsPro! ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free;
+  }
 
   @override
   Future<bool> isAvailable() async => true;

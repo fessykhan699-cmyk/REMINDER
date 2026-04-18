@@ -443,7 +443,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onUpgrade: subscription.isPro
                   ? null
                   : () {
-                      AnalyticsService.instance.logUpgradeTapped('settings_plan_card');
+                      AnalyticsService.instance.logUpgradeTapped(
+                        'settings_plan_card',
+                      );
                       const UpgradeToProRoute().push(context);
                     },
             ),
@@ -458,10 +460,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   enabled: subscription.isPro,
                   onChanged: subscription.isPro
                       ? (value) => _togglePreference(
-                            (current) => current.copyWith(
-                              pushNotificationsEnabled: value,
-                            ),
-                          )
+                          (current) =>
+                              current.copyWith(pushNotificationsEnabled: value),
+                        )
                       : null,
                 ),
                 _SwitchRow(
@@ -471,10 +472,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   enabled: subscription.isPro,
                   onChanged: subscription.isPro
                       ? (value) => _togglePreference(
-                            (current) => current.copyWith(
-                              whatsAppRemindersEnabled: value,
-                            ),
-                          )
+                          (current) =>
+                              current.copyWith(whatsAppRemindersEnabled: value),
+                        )
                       : null,
                 ),
                 _SwitchRow(
@@ -484,44 +484,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   enabled: subscription.isPro,
                   onChanged: subscription.isPro
                       ? (value) => _togglePreference(
-                            (current) =>
-                                current.copyWith(smsRemindersEnabled: value),
-                          )
+                          (current) =>
+                              current.copyWith(smsRemindersEnabled: value),
+                        )
                       : null,
                 ),
                 _SwitchRow(
                   title: '24h before',
                   subtitle: 'Schedule a reminder one day before the due date.',
                   value: preferences.remind24HoursBefore,
-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                  enabled:
+                      subscription.isPro &&
+                      preferences.pushNotificationsEnabled,
+                  onChanged:
+                      (subscription.isPro &&
+                          preferences.pushNotificationsEnabled)
                       ? (value) => _togglePreference(
-                            (current) =>
-                                current.copyWith(remind24HoursBefore: value),
-                          )
+                          (current) =>
+                              current.copyWith(remind24HoursBefore: value),
+                        )
                       : null,
                 ),
                 _SwitchRow(
                   title: '3h before',
                   subtitle: 'Schedule a final heads-up three hours before due.',
                   value: preferences.remind3HoursBefore,
-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                  enabled:
+                      subscription.isPro &&
+                      preferences.pushNotificationsEnabled,
+                  onChanged:
+                      (subscription.isPro &&
+                          preferences.pushNotificationsEnabled)
                       ? (value) => _togglePreference(
-                            (current) =>
-                                current.copyWith(remind3HoursBefore: value),
-                          )
+                          (current) =>
+                              current.copyWith(remind3HoursBefore: value),
+                        )
                       : null,
                 ),
                 _SwitchRow(
                   title: 'On due date',
                   subtitle: 'Notify when the invoice becomes due.',
                   value: preferences.remindOnDueDate,
-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
+                  enabled:
+                      subscription.isPro &&
+                      preferences.pushNotificationsEnabled,
+                  onChanged:
+                      (subscription.isPro &&
+                          preferences.pushNotificationsEnabled)
                       ? (value) => _togglePreference(
-                            (current) => current.copyWith(remindOnDueDate: value),
-                          )
+                          (current) => current.copyWith(remindOnDueDate: value),
+                        )
                       : null,
                   isLast: true,
                 ),
@@ -533,7 +545,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 _SwitchRow(
                   title: 'Biometric App Lock',
-                  subtitle: 'Require fingerprint or Face ID when opening the app',
+                  subtitle:
+                      'Require fingerprint or Face ID when opening the app',
                   value: preferences.biometricLockEnabled,
                   onChanged: (value) => ref
                       .read(appPreferencesControllerProvider.notifier)
@@ -622,6 +635,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     (current) =>
                         current.copyWith(smartPredictionEnabled: value),
                   ),
+                  isLast: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              title: 'Collaboration',
+              children: [
+                _ActionRow(
+                  title: 'Team Members',
+                  subtitle: 'Business Plan',
+                  icon: Icons.group_outlined,
+                  onTap: () => const TeamMembersRoute().push(context),
                   isLast: true,
                 ),
               ],
@@ -815,16 +841,25 @@ class _PlanSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPro = subscription.isPro;
-    final title = isPro ? 'Pro Plan' : 'Free Plan';
-    final badgeLabel = isPro ? 'Active' : 'Current Plan';
-    final clientUsage = isPro
+    final isPaidTier = subscription.isPro;
+    final isBusiness = subscription.isBusiness;
+    final title = isBusiness
+        ? 'Business Plan'
+        : (isPaidTier ? 'Pro Plan' : 'Free Plan');
+    final badgeLabel = isPaidTier ? 'Active' : 'Current Plan';
+    final clientUsage = isPaidTier
         ? '${usage.clientCount} / Unlimited'
         : '${usage.clientCount} / ${SubscriptionState.freeClientLimit}';
-    final invoiceUsage = isPro
+    final invoiceUsage = isPaidTier
         ? '${usage.monthlyInvoiceCount} / Unlimited'
         : '${usage.monthlyInvoiceCount} / ${SubscriptionState.freeMonthlyInvoiceLimit}';
-    final highlights = isPro
+    final highlights = isBusiness
+        ? const <String>[
+            'Everything in Pro',
+            'Up to 3 users',
+            'Shared workspace',
+          ]
+        : isPaidTier
         ? const <String>[
             'Unlimited clients',
             'Unlimited invoices',
@@ -897,7 +932,7 @@ class _PlanSectionCard extends StatelessWidget {
           ],
           const SizedBox(height: 20),
           Text(
-            isPro ? 'Usage' : 'Usage this month',
+            isPaidTier ? 'Usage' : 'Usage this month',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
@@ -907,7 +942,7 @@ class _PlanSectionCard extends StatelessWidget {
           _UsageStatRow(label: 'Clients', value: clientUsage),
           const SizedBox(height: 12),
           _UsageStatRow(label: 'Invoices', value: invoiceUsage),
-          if (!isPro && onUpgrade != null) ...[
+          if (!isPaidTier && onUpgrade != null) ...[
             const SizedBox(height: 12),
             GestureDetector(
               onTap: onUpgrade,
@@ -931,10 +966,12 @@ class _PlanSectionCard extends StatelessWidget {
                 onUpgrade!.call();
               },
             ),
-          ] else if (isPro) ...[
+          ] else if (isPaidTier) ...[
             const SizedBox(height: 16),
             Text(
-              'Invoice Flow Pro is active on this device.',
+              isBusiness
+                  ? 'Invoice Flow Business is active on this device.'
+                  : 'Invoice Flow Pro is active on this device.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

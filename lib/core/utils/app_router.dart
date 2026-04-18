@@ -19,6 +19,7 @@ import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/reminders/presentation/screens/reminder_flow_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/team_members_screen.dart';
 import '../../features/subscription/presentation/screens/upgrade_to_pro_screen.dart';
 import '../../shared/widgets/app_shell_scaffold.dart';
 import '../constants/app_routes.dart';
@@ -44,6 +45,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: UpgradeToProRoute.routePath,
         builder: (context, state) => const UpgradeToProScreen(),
+      ),
+      GoRoute(
+        path: TeamMembersRoute.routePath,
+        builder: (context, state) => const TeamMembersScreen(),
       ),
       GoRoute(
         path: EmailVerificationRoute.routePath,
@@ -164,8 +169,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return atLogin ? null : LoginRoute.routePath;
       }
 
-      final atEmailVerification =
-          location == EmailVerificationRoute.routePath;
+      final atEmailVerification = location == EmailVerificationRoute.routePath;
       final isEmailVerified = authState.session?.isEmailVerified ?? false;
 
       if (authState.status == AuthStatus.authenticated && !isEmailVerified) {

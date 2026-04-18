@@ -17,13 +17,17 @@ class FreeTierLimitService {
   /// If an error occurs, it returns true (fail-open).
   Future<bool> canCreateInvoice() async {
     try {
-      final subscription = await _ref.read(subscriptionControllerProvider.future);
+      final subscription = await _ref.read(
+        subscriptionControllerProvider.future,
+      );
       if (subscription.isPro) return true;
 
       final usage = _ref.read(subscriptionUsageProvider);
       return !usage.hasReachedMonthlyInvoiceLimit;
     } catch (e) {
-      debugPrint('[FreeTierLimitService] canCreateInvoice error (fail-open): $e');
+      debugPrint(
+        '[FreeTierLimitService] canCreateInvoice error (fail-open): $e',
+      );
       return true;
     }
   }
@@ -32,7 +36,9 @@ class FreeTierLimitService {
   /// If an error occurs, it returns true (fail-open).
   Future<bool> canAddClient() async {
     try {
-      final subscription = await _ref.read(subscriptionControllerProvider.future);
+      final subscription = await _ref.read(
+        subscriptionControllerProvider.future,
+      );
       if (subscription.isPro) return true;
 
       final usage = _ref.read(subscriptionUsageProvider);
@@ -47,7 +53,9 @@ class FreeTierLimitService {
   /// If an error occurs, it returns true (fail-open).
   Future<bool> isFeatureAllowed(SubscriptionGateFeature feature) async {
     try {
-      final subscription = await _ref.read(subscriptionControllerProvider.future);
+      final subscription = await _ref.read(
+        subscriptionControllerProvider.future,
+      );
       if (subscription.isPro) return true;
 
       // Some features are strictly Pro-only
@@ -58,6 +66,7 @@ class FreeTierLimitService {
         case SubscriptionGateFeature.advancedTotals:
         case SubscriptionGateFeature.partialPayments:
         case SubscriptionGateFeature.exportCsv:
+        case SubscriptionGateFeature.teamMembers:
           return false;
         case SubscriptionGateFeature.createInvoice:
           return await canCreateInvoice();
@@ -67,7 +76,9 @@ class FreeTierLimitService {
           return true; // PDF export is allowed on free (with watermark, handled elsewhere)
       }
     } catch (e) {
-      debugPrint('[FreeTierLimitService] isFeatureAllowed error (fail-open): $e');
+      debugPrint(
+        '[FreeTierLimitService] isFeatureAllowed error (fail-open): $e',
+      );
       return true;
     }
   }

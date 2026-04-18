@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
+import '../../../../data/services/workspace/workspace_provider.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/datasources/settings_local_datasource.dart';
 import '../../data/repositories/settings_repository_impl.dart';
@@ -15,18 +16,16 @@ final settingsLocalDatasourceProvider = Provider<SettingsLocalDatasource>(
   (ref) => SettingsLocalDatasource(),
 );
 
-final settingsRepositoryProvider = Provider<SettingsRepository>(
-  (ref) {
-    final datasource = ref.watch(settingsLocalDatasourceProvider);
-    return SettingsRepositoryImpl(
-      datasource,
-      syncService: ref.watch(firestoreSyncServiceProvider),
-      userId: ref.watch(currentUserIdProvider),
-      isPro:
-          ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
-    );
-  },
-);
+final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
+  final datasource = ref.watch(settingsLocalDatasourceProvider);
+  return SettingsRepositoryImpl(
+    datasource,
+    syncService: ref.watch(firestoreSyncServiceProvider),
+    userId: ref.watch(activeWorkspaceOwnerIdProvider),
+    isPro:
+        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+  );
+});
 
 final getProfileUseCaseProvider = Provider<GetProfileUseCase>(
   (ref) => GetProfileUseCase(ref.watch(settingsRepositoryProvider)),

@@ -1,0 +1,933 @@
+FIX 026 Added Lines Report
+Generated: 2026-04-18T23:14:47.5579267+04:00
+
+Created files:
+- android/build/
+- lib/data/services/workspace/
+- lib/features/settings/presentation/screens/team_members_screen.dart
+
+Added lines per modified/created file:
+diff --git a/lib/core/constants/app_routes.dart b/lib/core/constants/app_routes.dart
+index d3289ca..c2df7c5 100644
+--- a/lib/core/constants/app_routes.dart
++++ b/lib/core/constants/app_routes.dart
+@@ -3,0 +4,4 @@ import 'package:go_router/go_router.dart';
++abstract final class AppRoutes {
++  static const String teamMembers = '/team-members';
++}
++
+@@ -221,0 +226,12 @@ final class AddExpenseRoute extends AppRouteSpec {
++
++final class TeamMembersRoute extends AppRouteSpec {
++  const TeamMembersRoute();
++
++  static const String routePath = AppRoutes.teamMembers;
++
++  @override
++  String get path => routePath;
++
++  @override
++  String get location => routePath;
++}
+diff --git a/lib/core/utils/app_router.dart b/lib/core/utils/app_router.dart
+index 137dc6b..8be8b68 100644
+--- a/lib/core/utils/app_router.dart
++++ b/lib/core/utils/app_router.dart
+@@ -21,0 +22 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
++import '../../features/settings/presentation/screens/team_members_screen.dart';
+@@ -47,0 +49,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
++      GoRoute(
++        path: TeamMembersRoute.routePath,
++        builder: (context, state) => const TeamMembersScreen(),
++      ),
+@@ -167,2 +172 @@ final appRouterProvider = Provider<GoRouter>((ref) {
+-      final atEmailVerification =
+-          location == EmailVerificationRoute.routePath;
++      final atEmailVerification = location == EmailVerificationRoute.routePath;
+diff --git a/lib/data/services/free_tier_limit_service.dart b/lib/data/services/free_tier_limit_service.dart
+index 111563a..8462779 100644
+--- a/lib/data/services/free_tier_limit_service.dart
++++ b/lib/data/services/free_tier_limit_service.dart
+@@ -20 +20,3 @@ class FreeTierLimitService {
+-      final subscription = await _ref.read(subscriptionControllerProvider.future);
++      final subscription = await _ref.read(
++        subscriptionControllerProvider.future,
++      );
+@@ -26 +28,3 @@ class FreeTierLimitService {
+-      debugPrint('[FreeTierLimitService] canCreateInvoice error (fail-open): $e');
++      debugPrint(
++        '[FreeTierLimitService] canCreateInvoice error (fail-open): $e',
++      );
+@@ -35 +39,3 @@ class FreeTierLimitService {
+-      final subscription = await _ref.read(subscriptionControllerProvider.future);
++      final subscription = await _ref.read(
++        subscriptionControllerProvider.future,
++      );
+@@ -50 +56,3 @@ class FreeTierLimitService {
+-      final subscription = await _ref.read(subscriptionControllerProvider.future);
++      final subscription = await _ref.read(
++        subscriptionControllerProvider.future,
++      );
+@@ -60,0 +69 @@ class FreeTierLimitService {
++        case SubscriptionGateFeature.teamMembers:
+@@ -70 +79,3 @@ class FreeTierLimitService {
+-      debugPrint('[FreeTierLimitService] isFeatureAllowed error (fail-open): $e');
++      debugPrint(
++        '[FreeTierLimitService] isFeatureAllowed error (fail-open): $e',
++      );
+diff --git a/lib/features/auth/presentation/controllers/auth_controller.dart b/lib/features/auth/presentation/controllers/auth_controller.dart
+index c55b717..7253bad 100644
+--- a/lib/features/auth/presentation/controllers/auth_controller.dart
++++ b/lib/features/auth/presentation/controllers/auth_controller.dart
+@@ -12,0 +13 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -110,0 +112 @@ class AuthController extends Notifier<AuthViewState> {
++      await _clearWorkspaceOwner();
+@@ -128,0 +131,4 @@ class AuthController extends Notifier<AuthViewState> {
++      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
++        user.uid,
++      );
++      if (_disposed) return;
+@@ -139,0 +146 @@ class AuthController extends Notifier<AuthViewState> {
++      _triggerCloudRestore(workspaceOwnerId);
+@@ -147,0 +155,8 @@ class AuthController extends Notifier<AuthViewState> {
++      String? workspaceOwnerId;
++      if (session != null) {
++        workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
++          session.userId,
++        );
++      } else {
++        await _clearWorkspaceOwner();
++      }
+@@ -157,0 +173,3 @@ class AuthController extends Notifier<AuthViewState> {
++      if (workspaceOwnerId != null) {
++        _triggerCloudRestore(workspaceOwnerId);
++      }
+@@ -180 +198,4 @@ class AuthController extends Notifier<AuthViewState> {
+-      _triggerCloudRestore(session.userId);
++      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
++        session.userId,
++      );
++      _triggerCloudRestore(workspaceOwnerId);
+@@ -203 +224,4 @@ class AuthController extends Notifier<AuthViewState> {
+-      _triggerCloudRestore(session.userId);
++      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
++        session.userId,
++      );
++      _triggerCloudRestore(workspaceOwnerId);
+@@ -217,0 +242 @@ class AuthController extends Notifier<AuthViewState> {
++      await _clearWorkspaceOwner();
+@@ -247,4 +272 @@ class AuthController extends Notifier<AuthViewState> {
+-      state = state.copyWith(
+-        session: session,
+-        isSubmitting: false,
+-      );
++      state = state.copyWith(session: session, isSubmitting: false);
+@@ -271,7 +293,33 @@ class AuthController extends Notifier<AuthViewState> {
+-  void _triggerCloudRestore(String userId) {
+-    ref.read(firestoreSyncServiceProvider).restoreAllFromCloud(userId).catchError(
+-      (Object e) {
+-        debugPrint('[AuthController] cloud restore error: $e');
+-        return null;
+-      },
+-    );
++  void _triggerCloudRestore(String ownerId) {
++    ref
++        .read(firestoreSyncServiceProvider)
++        .restoreAllFromCloud(ownerId)
++        .catchError((Object e) {
++          debugPrint('[AuthController] cloud restore error: $e');
++          return null;
++        });
++  }
++
++  Future<String> _resolveAndActivateWorkspaceOwner(String userId) async {
++    try {
++      final resolvedOwnerId = await ref
++          .read(workspaceServiceProvider)
++          .resolveWorkspaceOwner(userId);
++      final ownerId = resolvedOwnerId ?? userId;
++      ref.read(workspaceOwnerIdStateProvider.notifier).state = ownerId;
++      await WorkspaceOwnerStorage.save(ownerId);
++      if (ownerId == userId) {
++        await ref.read(workspaceServiceProvider).createWorkspace(userId);
++      }
++      return ownerId;
++    } catch (e, st) {
++      debugPrint('[AuthController] workspace owner resolve failed: $e\n$st');
++      ref.read(workspaceOwnerIdStateProvider.notifier).state = userId;
++      await WorkspaceOwnerStorage.save(userId);
++      return userId;
++    }
++  }
++
++  Future<void> _clearWorkspaceOwner() async {
++    ref.read(workspaceOwnerIdStateProvider.notifier).state = null;
++    await WorkspaceOwnerStorage.clear();
+diff --git a/lib/features/clients/presentation/controllers/clients_controller.dart b/lib/features/clients/presentation/controllers/clients_controller.dart
+index e30e01e..97127cb 100644
+--- a/lib/features/clients/presentation/controllers/clients_controller.dart
++++ b/lib/features/clients/presentation/controllers/clients_controller.dart
+@@ -7,0 +8 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -31 +32 @@ final clientRepositoryProvider = Provider<ClientRepository>((ref) {
+-    userId: ref.watch(currentUserIdProvider),
++    userId: ref.watch(activeWorkspaceOwnerIdProvider),
+diff --git a/lib/features/expenses/data/providers/expense_repository_provider.dart b/lib/features/expenses/data/providers/expense_repository_provider.dart
+index 65967a2..1312bb4 100644
+--- a/lib/features/expenses/data/providers/expense_repository_provider.dart
++++ b/lib/features/expenses/data/providers/expense_repository_provider.dart
+@@ -2,0 +3 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -15,11 +16,10 @@ final expensesLocalDatasourceProvider = Provider<ExpensesLocalDatasource>(
+-final expenseRepositoryProvider = Provider<ExpenseRepository>(
+-  (ref) {
+-    final datasource = ref.watch(expensesLocalDatasourceProvider);
+-    return ExpenseRepositoryImpl(
+-      datasource,
+-      syncService: ref.watch(firestoreSyncServiceProvider),
+-      userId: ref.watch(currentUserIdProvider),
+-      isPro: ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+-    );
+-  },
+-);
++final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
++  final datasource = ref.watch(expensesLocalDatasourceProvider);
++  return ExpenseRepositoryImpl(
++    datasource,
++    syncService: ref.watch(firestoreSyncServiceProvider),
++    userId: ref.watch(activeWorkspaceOwnerIdProvider),
++    isPro:
++        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
++  );
++});
+diff --git a/lib/features/invoices/presentation/controllers/invoices_controller.dart b/lib/features/invoices/presentation/controllers/invoices_controller.dart
+index 5ab2776..b08b257 100644
+--- a/lib/features/invoices/presentation/controllers/invoices_controller.dart
++++ b/lib/features/invoices/presentation/controllers/invoices_controller.dart
+@@ -5,0 +6 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -35 +36 @@ final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
+-    userId: ref.watch(currentUserIdProvider),
++    userId: ref.watch(activeWorkspaceOwnerIdProvider),
+@@ -150 +150,0 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
+-
+@@ -156 +156 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
+-    
++
+@@ -188 +188 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
+-    
++
+@@ -304,2 +304 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
+-    } catch (_) {
+-    }
++    } catch (_) {}
+diff --git a/lib/features/reminders/data/providers/reminder_repository_provider.dart b/lib/features/reminders/data/providers/reminder_repository_provider.dart
+index 49cba12..243292d 100644
+--- a/lib/features/reminders/data/providers/reminder_repository_provider.dart
++++ b/lib/features/reminders/data/providers/reminder_repository_provider.dart
+@@ -3,0 +4 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -14,12 +15,10 @@ final remindersLocalDatasourceProvider = Provider<RemindersLocalDatasource>(
+-final reminderRepositoryProvider = Provider<ReminderRepository>(
+-  (ref) {
+-    final datasource = ref.watch(remindersLocalDatasourceProvider);
+-    return ReminderRepositoryImpl(
+-      datasource,
+-      syncService: ref.watch(firestoreSyncServiceProvider),
+-      userId: ref.watch(currentUserIdProvider),
+-      isPro:
+-          ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+-    );
+-  },
+-);
++final reminderRepositoryProvider = Provider<ReminderRepository>((ref) {
++  final datasource = ref.watch(remindersLocalDatasourceProvider);
++  return ReminderRepositoryImpl(
++    datasource,
++    syncService: ref.watch(firestoreSyncServiceProvider),
++    userId: ref.watch(activeWorkspaceOwnerIdProvider),
++    isPro:
++        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
++  );
++});
+diff --git a/lib/features/settings/presentation/controllers/settings_controller.dart b/lib/features/settings/presentation/controllers/settings_controller.dart
+index cb9aa59..0d324d6 100644
+--- a/lib/features/settings/presentation/controllers/settings_controller.dart
++++ b/lib/features/settings/presentation/controllers/settings_controller.dart
+@@ -4,0 +5 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -18,12 +19,10 @@ final settingsLocalDatasourceProvider = Provider<SettingsLocalDatasource>(
+-final settingsRepositoryProvider = Provider<SettingsRepository>(
+-  (ref) {
+-    final datasource = ref.watch(settingsLocalDatasourceProvider);
+-    return SettingsRepositoryImpl(
+-      datasource,
+-      syncService: ref.watch(firestoreSyncServiceProvider),
+-      userId: ref.watch(currentUserIdProvider),
+-      isPro:
+-          ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
+-    );
+-  },
+-);
++final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
++  final datasource = ref.watch(settingsLocalDatasourceProvider);
++  return SettingsRepositoryImpl(
++    datasource,
++    syncService: ref.watch(firestoreSyncServiceProvider),
++    userId: ref.watch(activeWorkspaceOwnerIdProvider),
++    isPro:
++        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
++  );
++});
+diff --git a/lib/features/settings/presentation/screens/settings_screen.dart b/lib/features/settings/presentation/screens/settings_screen.dart
+index 0e5c12e..54c4c52 100644
+--- a/lib/features/settings/presentation/screens/settings_screen.dart
++++ b/lib/features/settings/presentation/screens/settings_screen.dart
+@@ -446 +446,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                      AnalyticsService.instance.logUpgradeTapped('settings_plan_card');
++                      AnalyticsService.instance.logUpgradeTapped(
++                        'settings_plan_card',
++                      );
+@@ -461,4 +463,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) => current.copyWith(
+-                              pushNotificationsEnabled: value,
+-                            ),
+-                          )
++                          (current) =>
++                              current.copyWith(pushNotificationsEnabled: value),
++                        )
+@@ -474,4 +475,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) => current.copyWith(
+-                              whatsAppRemindersEnabled: value,
+-                            ),
+-                          )
++                          (current) =>
++                              current.copyWith(whatsAppRemindersEnabled: value),
++                        )
+@@ -487,3 +487,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) =>
+-                                current.copyWith(smsRemindersEnabled: value),
+-                          )
++                          (current) =>
++                              current.copyWith(smsRemindersEnabled: value),
++                        )
+@@ -496,2 +496,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
++                  enabled:
++                      subscription.isPro &&
++                      preferences.pushNotificationsEnabled,
++                  onChanged:
++                      (subscription.isPro &&
++                          preferences.pushNotificationsEnabled)
+@@ -499,3 +503,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) =>
+-                                current.copyWith(remind24HoursBefore: value),
+-                          )
++                          (current) =>
++                              current.copyWith(remind24HoursBefore: value),
++                        )
+@@ -508,2 +512,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
++                  enabled:
++                      subscription.isPro &&
++                      preferences.pushNotificationsEnabled,
++                  onChanged:
++                      (subscription.isPro &&
++                          preferences.pushNotificationsEnabled)
+@@ -511,3 +519,3 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) =>
+-                                current.copyWith(remind3HoursBefore: value),
+-                          )
++                          (current) =>
++                              current.copyWith(remind3HoursBefore: value),
++                        )
+@@ -520,2 +528,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                  enabled: subscription.isPro && preferences.pushNotificationsEnabled,
+-                  onChanged: (subscription.isPro && preferences.pushNotificationsEnabled)
++                  enabled:
++                      subscription.isPro &&
++                      preferences.pushNotificationsEnabled,
++                  onChanged:
++                      (subscription.isPro &&
++                          preferences.pushNotificationsEnabled)
+@@ -523,2 +535,2 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                            (current) => current.copyWith(remindOnDueDate: value),
+-                          )
++                          (current) => current.copyWith(remindOnDueDate: value),
++                        )
+@@ -536 +548,2 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+-                  subtitle: 'Require fingerprint or Face ID when opening the app',
++                  subtitle:
++                      'Require fingerprint or Face ID when opening the app',
+@@ -629,0 +643,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
++            _SectionCard(
++              title: 'Collaboration',
++              children: [
++                _ActionRow(
++                  title: 'Team Members',
++                  subtitle: 'Business Plan',
++                  icon: Icons.group_outlined,
++                  onTap: () => const TeamMembersRoute().push(context),
++                  isLast: true,
++                ),
++              ],
++            ),
++            const SizedBox(height: 20),
+@@ -818,4 +844,7 @@ class _PlanSectionCard extends StatelessWidget {
+-    final isPro = subscription.isPro;
+-    final title = isPro ? 'Pro Plan' : 'Free Plan';
+-    final badgeLabel = isPro ? 'Active' : 'Current Plan';
+-    final clientUsage = isPro
++    final isPaidTier = subscription.isPro;
++    final isBusiness = subscription.isBusiness;
++    final title = isBusiness
++        ? 'Business Plan'
++        : (isPaidTier ? 'Pro Plan' : 'Free Plan');
++    final badgeLabel = isPaidTier ? 'Active' : 'Current Plan';
++    final clientUsage = isPaidTier
+@@ -824 +853 @@ class _PlanSectionCard extends StatelessWidget {
+-    final invoiceUsage = isPro
++    final invoiceUsage = isPaidTier
+@@ -827 +856,7 @@ class _PlanSectionCard extends StatelessWidget {
+-    final highlights = isPro
++    final highlights = isBusiness
++        ? const <String>[
++            'Everything in Pro',
++            'Up to 3 users',
++            'Shared workspace',
++          ]
++        : isPaidTier
+@@ -900 +935 @@ class _PlanSectionCard extends StatelessWidget {
+-            isPro ? 'Usage' : 'Usage this month',
++            isPaidTier ? 'Usage' : 'Usage this month',
+@@ -910 +945 @@ class _PlanSectionCard extends StatelessWidget {
+-          if (!isPro && onUpgrade != null) ...[
++          if (!isPaidTier && onUpgrade != null) ...[
+@@ -934 +969 @@ class _PlanSectionCard extends StatelessWidget {
+-          ] else if (isPro) ...[
++          ] else if (isPaidTier) ...[
+@@ -937 +972,3 @@ class _PlanSectionCard extends StatelessWidget {
+-              'Invoice Flow Pro is active on this device.',
++              isBusiness
++                  ? 'Invoice Flow Business is active on this device.'
++                  : 'Invoice Flow Pro is active on this device.',
+diff --git a/lib/features/subscription/data/datasources/subscription_local_datasource.dart b/lib/features/subscription/data/datasources/subscription_local_datasource.dart
+index f5d6f46..df4e797 100644
+--- a/lib/features/subscription/data/datasources/subscription_local_datasource.dart
++++ b/lib/features/subscription/data/datasources/subscription_local_datasource.dart
+@@ -11,0 +12 @@ class SubscriptionLocalDatasource {
++  static const String planStorageKey = 'invoice_flow_plan_v2';
+@@ -21,0 +23,11 @@ class SubscriptionLocalDatasource {
++    final savedPlanName = _settingsBoxOrNull?.get(planStorageKey) as String?;
++    if (savedPlanName != null) {
++      final savedPlan = InvoiceFlowPlan.values
++          .where((plan) => plan.name == savedPlanName)
++          .cast<InvoiceFlowPlan?>()
++          .firstWhere((plan) => plan != null, orElse: () => null);
++      if (savedPlan != null) {
++        return _stateFromPlan(savedPlan);
++      }
++    }
++
+@@ -31,0 +44,4 @@ class SubscriptionLocalDatasource {
++      await settingsBox.put(
++        planStorageKey,
++        isPro ? InvoiceFlowPlan.pro.name : InvoiceFlowPlan.free.name,
++      );
+@@ -38,0 +55,17 @@ class SubscriptionLocalDatasource {
++  Future<SubscriptionState> savePlanTier(InvoiceFlowPlan plan) async {
++    final settingsBox = _settingsBoxOrNull;
++    if (settingsBox != null) {
++      await settingsBox.put(storageKey, plan != InvoiceFlowPlan.free);
++      await settingsBox.put(planStorageKey, plan.name);
++    }
++    return _stateFromPlan(plan);
++  }
++
++  SubscriptionState _stateFromPlan(InvoiceFlowPlan plan) {
++    return switch (plan) {
++      InvoiceFlowPlan.free => const SubscriptionState.free(),
++      InvoiceFlowPlan.pro => const SubscriptionState.pro(),
++      InvoiceFlowPlan.business => const SubscriptionState.business(),
++    };
++  }
++
+diff --git a/lib/features/subscription/data/services/android_billing_service.dart b/lib/features/subscription/data/services/android_billing_service.dart
+index 4061b70..37aeddc 100644
+--- a/lib/features/subscription/data/services/android_billing_service.dart
++++ b/lib/features/subscription/data/services/android_billing_service.dart
+@@ -3,0 +4 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
++import '../../domain/entities/subscription_state.dart';
+@@ -8 +9 @@ class AndroidBillingService implements BillingServiceInterface {
+-      : _inAppPurchase = inAppPurchase;
++    : _inAppPurchase = inAppPurchase;
+@@ -14 +15,2 @@ class AndroidBillingService implements BillingServiceInterface {
+-  Stream<List<PurchaseDetails>> get purchaseStream => _billingClient.purchaseStream;
++  Stream<List<PurchaseDetails>> get purchaseStream =>
++      _billingClient.purchaseStream;
+@@ -26 +28,3 @@ class AndroidBillingService implements BillingServiceInterface {
+-      debugPrint('[AndroidBillingService] Error loading products: ${response.error}');
++      debugPrint(
++        '[AndroidBillingService] Error loading products: ${response.error}',
++      );
+@@ -50 +54 @@ class AndroidBillingService implements BillingServiceInterface {
+-    
++
+@@ -55 +59,2 @@ class AndroidBillingService implements BillingServiceInterface {
+-      final addition = _billingClient.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
++      final addition = _billingClient
++          .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+@@ -57 +62 @@ class AndroidBillingService implements BillingServiceInterface {
+-      
++
+@@ -64 +69 @@ class AndroidBillingService implements BillingServiceInterface {
+-          if (purchase.status == PurchaseStatus.purchased || 
++          if (purchase.status == PurchaseStatus.purchased ||
+@@ -75,0 +81,47 @@ class AndroidBillingService implements BillingServiceInterface {
++
++  @override
++  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
++    if (defaultTargetPlatform != TargetPlatform.android) {
++      return null;
++    }
++
++    final available = await isAvailable();
++    if (!available) {
++      return null;
++    }
++
++    try {
++      final addition = _billingClient
++          .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
++      final response = await addition.queryPastPurchases();
++
++      if (response.error != null) {
++        throw StateError(response.error!.message);
++      }
++
++      var hasPro = false;
++      for (final purchase in response.pastPurchases) {
++        if (!productIds.contains(purchase.productID)) {
++          continue;
++        }
++        final isOwned =
++            purchase.status == PurchaseStatus.purchased ||
++            purchase.status == PurchaseStatus.restored;
++        if (!isOwned) {
++          continue;
++        }
++
++        if (BillingServiceInterface.isBusinessProduct(purchase.productID)) {
++          return InvoiceFlowPlan.business;
++        }
++        if (BillingServiceInterface.isProProduct(purchase.productID)) {
++          hasPro = true;
++        }
++      }
++
++      return hasPro ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free;
++    } catch (e) {
++      debugPrint('[AndroidBillingService] syncOwnedPlanState error: $e');
++      return null;
++    }
++  }
+diff --git a/lib/features/subscription/data/services/ios_billing_service.dart b/lib/features/subscription/data/services/ios_billing_service.dart
+index fc1ac73..33f0f07 100644
+--- a/lib/features/subscription/data/services/ios_billing_service.dart
++++ b/lib/features/subscription/data/services/ios_billing_service.dart
+@@ -2,0 +3 @@ import 'package:in_app_purchase/in_app_purchase.dart';
++import '../../domain/entities/subscription_state.dart';
+@@ -7 +8 @@ class IOSBillingService implements BillingServiceInterface {
+-      : _inAppPurchase = inAppPurchase;
++    : _inAppPurchase = inAppPurchase;
+@@ -13 +14,2 @@ class IOSBillingService implements BillingServiceInterface {
+-  Stream<List<PurchaseDetails>> get purchaseStream => _billingClient.purchaseStream;
++  Stream<List<PurchaseDetails>> get purchaseStream =>
++      _billingClient.purchaseStream;
+@@ -25 +27,3 @@ class IOSBillingService implements BillingServiceInterface {
+-      debugPrint('[IOSBillingService] Error loading products: ${response.error}');
++      debugPrint(
++        '[IOSBillingService] Error loading products: ${response.error}',
++      );
+@@ -48 +52 @@ class IOSBillingService implements BillingServiceInterface {
+-    // Note: On iOS, we typically rely on restorePurchases() to populate the stream 
++    // Note: On iOS, we typically rely on restorePurchases() to populate the stream
+@@ -52,0 +57,6 @@ class IOSBillingService implements BillingServiceInterface {
++
++  @override
++  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
++    // iOS plan state is resolved through the purchase/restore stream in this app.
++    return InvoiceFlowPlan.free;
++  }
+diff --git a/lib/features/subscription/domain/entities/subscription_state.dart b/lib/features/subscription/domain/entities/subscription_state.dart
+index 31f8397..ebc8f3e 100644
+--- a/lib/features/subscription/domain/entities/subscription_state.dart
++++ b/lib/features/subscription/domain/entities/subscription_state.dart
+@@ -1 +1 @@
+-enum InvoiceFlowPlan { free, pro }
++enum InvoiceFlowPlan { free, pro, business }
+@@ -12,0 +13 @@ enum SubscriptionGateFeature {
++  teamMembers,
+@@ -18 +19 @@ class SubscriptionState {
+-  const SubscriptionState({required this.isPro});
++  const SubscriptionState({required this.isPro, this.isBusiness = false});
+@@ -20 +21 @@ class SubscriptionState {
+-  const SubscriptionState.free() : isPro = false;
++  const SubscriptionState.free() : isPro = false, isBusiness = false;
+@@ -22 +23,3 @@ class SubscriptionState {
+-  const SubscriptionState.pro() : isPro = true;
++  const SubscriptionState.pro() : isPro = true, isBusiness = false;
++
++  const SubscriptionState.business() : isPro = true, isBusiness = true;
+@@ -27,0 +31 @@ class SubscriptionState {
++  final bool isBusiness;
+@@ -29,2 +33,3 @@ class SubscriptionState {
+-  InvoiceFlowPlan get plan =>
+-      isPro ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free;
++  InvoiceFlowPlan get plan => isBusiness
++      ? InvoiceFlowPlan.business
++      : (isPro ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free);
+@@ -32 +37,5 @@ class SubscriptionState {
+-  String get planLabel => isPro ? 'Pro' : 'Free';
++  String get planLabel => switch (plan) {
++    InvoiceFlowPlan.free => 'Free',
++    InvoiceFlowPlan.pro => 'Pro',
++    InvoiceFlowPlan.business => 'Business',
++  };
+diff --git a/lib/features/subscription/domain/services/billing_service_interface.dart b/lib/features/subscription/domain/services/billing_service_interface.dart
+index 6330db2..52eebb4 100644
+--- a/lib/features/subscription/domain/services/billing_service_interface.dart
++++ b/lib/features/subscription/domain/services/billing_service_interface.dart
+@@ -2,0 +3 @@ import 'package:in_app_purchase/in_app_purchase.dart';
++import '../entities/subscription_state.dart';
+@@ -7 +8,3 @@ abstract class BillingServiceInterface {
+-  
++  static const String androidBusinessMonthlyId = 'invoiceflow_business_monthly';
++  static const String androidBusinessYearlyId = 'invoiceflow_business_yearly';
++
+@@ -8,0 +12 @@ abstract class BillingServiceInterface {
++  static const String iosBusinessId = 'com.apexmobilelabs.reminder.business';
+@@ -12 +16,6 @@ abstract class BillingServiceInterface {
+-      return {androidProMonthlyId, androidProYearlyId};
++      return {
++        androidProMonthlyId,
++        androidProYearlyId,
++        androidBusinessMonthlyId,
++        androidBusinessYearlyId,
++      };
+@@ -14 +23 @@ abstract class BillingServiceInterface {
+-      return {iosProId};
++      return {iosProId, iosBusinessId};
+@@ -19,3 +28,13 @@ abstract class BillingServiceInterface {
+-    return productId == androidProMonthlyId || 
+-           productId == androidProYearlyId || 
+-           productId == iosProId;
++    return productId == androidProMonthlyId ||
++        productId == androidProYearlyId ||
++        productId == iosProId;
++  }
++
++  static bool isBusinessProduct(String productId) {
++    return productId == androidBusinessMonthlyId ||
++        productId == androidBusinessYearlyId ||
++        productId == iosBusinessId;
++  }
++
++  static bool isPaidTierProduct(String productId) {
++    return isProProduct(productId) || isBusinessProduct(productId);
+@@ -25 +44 @@ abstract class BillingServiceInterface {
+-  
++
+@@ -31,0 +51 @@ abstract class BillingServiceInterface {
++  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds);
+diff --git a/lib/features/subscription/presentation/controllers/billing_controller.dart b/lib/features/subscription/presentation/controllers/billing_controller.dart
+index 9f8879c..07d0f9f 100644
+--- a/lib/features/subscription/presentation/controllers/billing_controller.dart
++++ b/lib/features/subscription/presentation/controllers/billing_controller.dart
+@@ -4,0 +5 @@ import '../../data/services/billing_service.dart';
++import '../../domain/entities/subscription_state.dart';
+@@ -37,0 +39 @@ class BillingState {
++    this.businessProduct,
+@@ -39,0 +42 @@ class BillingState {
++    this.businessProductNotFound = false,
+@@ -52,0 +56 @@ class BillingState {
++  final ProductDetails? businessProduct;
+@@ -54,0 +59 @@ class BillingState {
++  final bool businessProductNotFound;
+@@ -60 +65,2 @@ class BillingState {
+-  bool get canPurchase => (canPurchaseMonthly || canPurchaseYearly);
++  bool get canPurchase =>
++      (canPurchaseMonthly || canPurchaseYearly || canPurchaseBusiness);
+@@ -73,0 +80,6 @@ class BillingState {
++  bool get canPurchaseBusiness =>
++      storeAvailable &&
++      businessProduct != null &&
++      !isPurchasePending &&
++      !isRestoring;
++
+@@ -79,0 +92 @@ class BillingState {
++    ProductDetails? businessProduct,
+@@ -81,0 +95 @@ class BillingState {
++    bool? businessProductNotFound,
+@@ -90,0 +105 @@ class BillingState {
++      businessProduct: businessProduct ?? this.businessProduct,
+@@ -94,0 +110,2 @@ class BillingState {
++      businessProductNotFound:
++          businessProductNotFound ?? this.businessProductNotFound,
+@@ -117,4 +134,6 @@ class BillingController extends AsyncNotifier<BillingState> {
+-    
+-    _purchaseSubscription ??= billingService.purchaseStream.listen((purchases) async {
+-          await _handlePurchaseUpdates(purchases);
+-        }, onError: _handlePurchaseStreamError);
++
++    _purchaseSubscription ??= billingService.purchaseStream.listen((
++      purchases,
++    ) async {
++      await _handlePurchaseUpdates(purchases);
++    }, onError: _handlePurchaseStreamError);
+@@ -136,2 +155,4 @@ class BillingController extends AsyncNotifier<BillingState> {
+-      final products = await billingService.loadProducts(BillingServiceInterface.allProductIds);
+-      
++      final products = await billingService.loadProducts(
++        BillingServiceInterface.allProductIds,
++      );
++
+@@ -139,0 +161 @@ class BillingController extends AsyncNotifier<BillingState> {
++      ProductDetails? business;
+@@ -141,0 +164 @@ class BillingController extends AsyncNotifier<BillingState> {
++      bool businessNotFound = true;
+@@ -144 +167,2 @@ class BillingController extends AsyncNotifier<BillingState> {
+-        if (p.id == BillingServiceInterface.androidProMonthlyId || p.id == BillingServiceInterface.iosProId) {
++        if (p.id == BillingServiceInterface.androidProMonthlyId ||
++            p.id == BillingServiceInterface.iosProId) {
+@@ -151,0 +176,4 @@ class BillingController extends AsyncNotifier<BillingState> {
++        if (BillingServiceInterface.isBusinessProduct(p.id)) {
++          business ??= p;
++          businessNotFound = false;
++        }
+@@ -157,0 +186 @@ class BillingController extends AsyncNotifier<BillingState> {
++        businessProduct: business,
+@@ -159 +188,6 @@ class BillingController extends AsyncNotifier<BillingState> {
+-        yearlyProductNotFound: yearlyNotFound && BillingServiceInterface.allProductIds.contains(BillingServiceInterface.androidProYearlyId),
++        yearlyProductNotFound:
++            yearlyNotFound &&
++            BillingServiceInterface.allProductIds.contains(
++              BillingServiceInterface.androidProYearlyId,
++            ),
++        businessProductNotFound: businessNotFound,
+@@ -180,0 +215,6 @@ class BillingController extends AsyncNotifier<BillingState> {
++  Future<void> purchaseBusiness() async {
++    final current = state.valueOrNull;
++    if (current == null || !current.canPurchaseBusiness) return;
++    await _purchasePro(current.businessProduct!, fallbackState: current);
++  }
++
+@@ -223 +263 @@ class BillingController extends AsyncNotifier<BillingState> {
+-      final restoredIsPro = await _syncPlanFromStore();
++      final restoredPlan = await _syncPlanFromStore();
+@@ -227 +267 @@ class BillingController extends AsyncNotifier<BillingState> {
+-      if (restoredIsPro == true) {
++      if (restoredPlan != null && restoredPlan != InvoiceFlowPlan.free) {
+@@ -256 +296,3 @@ class BillingController extends AsyncNotifier<BillingState> {
+-      if (!BillingServiceInterface.isProProduct(purchase.productID)) continue;
++      if (!BillingServiceInterface.isPaidTierProduct(purchase.productID)) {
++        continue;
++      }
+@@ -269 +311 @@ class BillingController extends AsyncNotifier<BillingState> {
+-            await _handleSuccessfulPurchase(purchase);
++            await _handleSuccessfulPurchase(purchase.productID);
+@@ -283,2 +325,5 @@ class BillingController extends AsyncNotifier<BillingState> {
+-  Future<void> _handleSuccessfulPurchase(PurchaseDetails purchase) async {
+-    await _persistPlan(isPro: true);
++  Future<void> _handleSuccessfulPurchase(String productId) async {
++    final purchasedPlan = BillingServiceInterface.isBusinessProduct(productId)
++        ? InvoiceFlowPlan.business
++        : InvoiceFlowPlan.pro;
++    await _persistPlanTier(purchasedPlan);
+@@ -337 +382,3 @@ class BillingController extends AsyncNotifier<BillingState> {
+-    final subscriptionState = ref.read(subscriptionControllerProvider).valueOrNull;
++    final subscriptionState = ref
++        .read(subscriptionControllerProvider)
++        .valueOrNull;
+@@ -392,2 +439,2 @@ class BillingController extends AsyncNotifier<BillingState> {
+-  Future<bool?> _syncPlanFromStore() async {
+-    final syncedIsPro = await ref
++  Future<InvoiceFlowPlan?> _syncPlanFromStore() async {
++    final syncedPlan = await ref
+@@ -395,2 +442,2 @@ class BillingController extends AsyncNotifier<BillingState> {
+-        .syncOwnedProState(BillingServiceInterface.allProductIds);
+-    if (syncedIsPro == null) return null;
++        .syncOwnedPlanState(BillingServiceInterface.allProductIds);
++    if (syncedPlan == null) return null;
+@@ -398,2 +445,2 @@ class BillingController extends AsyncNotifier<BillingState> {
+-    await _persistPlan(isPro: syncedIsPro);
+-    return syncedIsPro;
++    await _persistPlanTier(syncedPlan);
++    return syncedPlan;
+@@ -406,0 +454,5 @@ class BillingController extends AsyncNotifier<BillingState> {
++  Future<void> _persistPlanTier(InvoiceFlowPlan plan) async {
++    await ref.read(subscriptionLocalDatasourceProvider).savePlanTier(plan);
++    ref.invalidate(subscriptionControllerProvider);
++  }
++
+diff --git a/lib/features/subscription/presentation/controllers/subscription_controller.dart b/lib/features/subscription/presentation/controllers/subscription_controller.dart
+index 382a2f7..d6707ce 100644
+--- a/lib/features/subscription/presentation/controllers/subscription_controller.dart
++++ b/lib/features/subscription/presentation/controllers/subscription_controller.dart
+@@ -10,0 +11 @@ import '../../../../data/providers/firestore_sync_provider.dart';
++import '../../../../data/services/workspace/workspace_provider.dart';
+@@ -39 +40 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-      final syncedIsPro = await ref
++      final syncedPlan = await ref
+@@ -41 +42 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-          .syncOwnedProState(BillingServiceInterface.allProductIds);
++          .syncOwnedPlanState(BillingServiceInterface.allProductIds);
+@@ -45 +46 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-      if (syncedIsPro != true) {
++      if (syncedPlan == null || syncedPlan == InvoiceFlowPlan.free) {
+@@ -48 +49 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-      if (localState.isPro) {
++      if (localState.plan == syncedPlan) {
+@@ -51 +52 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-      return datasource.savePlan(isPro: true);
++      return datasource.savePlanTier(syncedPlan);
+@@ -69 +70 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-    final userId = ref.read(currentUserIdProvider);
++    final userId = ref.read(activeWorkspaceOwnerIdProvider);
+@@ -75,3 +76,5 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
+-        debugPrint('[SubscriptionController] uploadLocalDataToCloud error: $e');
+-        return null;
+-      });
++            debugPrint(
++              '[SubscriptionController] uploadLocalDataToCloud error: $e',
++            );
++            return null;
++          });
+@@ -201,0 +205,12 @@ class SubscriptionGatekeeper {
++      case SubscriptionGateFeature.teamMembers:
++        if (subscription.isBusiness) {
++          return SubscriptionGateDecision.allowed(feature, isPro: true);
++        }
++
++        return SubscriptionGateDecision.blocked(
++          feature: feature,
++          reason: SubscriptionGateReason.premiumFeature,
++          promptTitle: 'Unlock Team Members',
++          promptMessage:
++              'Team collaboration is available on Business Plan. Upgrade to add up to 2 additional members.',
++        );
+diff --git a/lib/features/subscription/presentation/screens/upgrade_to_pro_screen.dart b/lib/features/subscription/presentation/screens/upgrade_to_pro_screen.dart
+index 40a20a9..1131f88 100644
+--- a/lib/features/subscription/presentation/screens/upgrade_to_pro_screen.dart
++++ b/lib/features/subscription/presentation/screens/upgrade_to_pro_screen.dart
+@@ -77,2 +77 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-    final billing =
+-        billingAsync.valueOrNull ?? const BillingState.initial();
++    final billing = billingAsync.valueOrNull ?? const BillingState.initial();
+@@ -81,0 +81 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
++    final businessPriceLabel = billing.businessProduct?.price ?? 'AED 99/mo';
+@@ -86 +86,3 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-    final ctaLabel = subscription.isPro ? 'Pro Active' : 'Upgrade Now';
++    final ctaLabel = subscription.isBusiness
++        ? 'Business Active'
++        : (subscription.isPro ? 'Pro Active' : 'Upgrade Now');
+@@ -89,0 +92,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
++    final businessCtaLabel = subscription.isBusiness
++        ? 'Business Active'
++        : 'Upgrade to Business';
++    final businessCtaAction =
++        subscription.isBusiness || !billing.canPurchaseBusiness
++        ? null
++        : _startBusinessPurchase;
+@@ -230,0 +240,42 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
++                      GlassCard(
++                        child: Column(
++                          crossAxisAlignment: CrossAxisAlignment.start,
++                          children: [
++                            Text(
++                              'Business',
++                              style: theme.textTheme.titleLarge?.copyWith(
++                                fontWeight: FontWeight.w800,
++                              ),
++                            ),
++                            const SizedBox(height: spacingXS),
++                            Text(
++                              businessPriceLabel,
++                              style: theme.textTheme.titleMedium?.copyWith(
++                                fontWeight: FontWeight.w700,
++                              ),
++                            ),
++                            const SizedBox(height: spacingSM + 2),
++                            const _BenefitRow(text: 'Everything in Pro'),
++                            const SizedBox(height: spacingSM + 2),
++                            const _BenefitRow(text: 'Up to 3 users'),
++                            const SizedBox(height: spacingSM + 2),
++                            const _BenefitRow(text: 'Shared workspace'),
++                            const SizedBox(height: spacingSM + 2),
++                            const _BenefitRow(
++                              text: 'Centralized invoices & expenses',
++                            ),
++                            const SizedBox(height: spacingMD),
++                            SizedBox(
++                              width: double.infinity,
++                              child: PremiumPrimaryButton(
++                                label: businessCtaLabel,
++                                isLoading: billing.isPurchasePending,
++                                onPressed: businessCtaAction,
++                              ),
++                            ),
++                          ],
++                        ),
++                      ),
++
++                      const SizedBox(height: spacingMD),
++
+@@ -236 +287,4 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-                          _TrustChip(text: 'Secure ${defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store'} billing'),
++                          _TrustChip(
++                            text:
++                                'Secure ${defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store'} billing',
++                          ),
+@@ -364,3 +418 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-        await ref
+-            .read(billingControllerProvider.notifier)
+-            .purchaseMonthlyPro();
++        await ref.read(billingControllerProvider.notifier).purchaseMonthlyPro();
+@@ -369,3 +421 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-        await ref
+-            .read(billingControllerProvider.notifier)
+-            .purchaseYearlyPro();
++        await ref.read(billingControllerProvider.notifier).purchaseYearlyPro();
+@@ -374,0 +425,5 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
++  Future<void> _startBusinessPurchase() async {
++    AnalyticsService.instance.logUpgradeTapped('business');
++    await ref.read(billingControllerProvider.notifier).purchaseBusiness();
++  }
++
+@@ -477,2 +532,4 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
+-    final storeName = defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store';
+-    
++    final storeName = defaultTargetPlatform == TargetPlatform.android
++        ? 'Google Play'
++        : 'App Store';
++
+diff --git a/test/features/subscription/presentation/controllers/subscription_controller_test.dart b/test/features/subscription/presentation/controllers/subscription_controller_test.dart
+index 2219d73..e6330a1 100644
+--- a/test/features/subscription/presentation/controllers/subscription_controller_test.dart
++++ b/test/features/subscription/presentation/controllers/subscription_controller_test.dart
+@@ -95,0 +96,8 @@ class _FakeBillingService implements BillingServiceInterface {
++  @override
++  Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
++    if (syncedIsPro == null) {
++      return null;
++    }
++    return syncedIsPro! ? InvoiceFlowPlan.pro : InvoiceFlowPlan.free;
++  }
++
+
+Final flutter analyze output:
+Analyzing reminder...
+No issues found! (ran in 11.7s)

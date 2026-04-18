@@ -9,6 +9,7 @@ class SubscriptionLocalDatasource {
   const SubscriptionLocalDatasource();
 
   static const String storageKey = 'invoice_flow_is_pro_v1';
+  static const String planStorageKey = 'invoice_flow_plan_v2';
 
   Box<dynamic>? get _settingsBoxOrNull {
     if (!Hive.isBoxOpen(HiveStorage.settingsBoxName)) {
@@ -19,6 +20,17 @@ class SubscriptionLocalDatasource {
   }
 
   Future<SubscriptionState> loadState() async {
+    final savedPlanName = _settingsBoxOrNull?.get(planStorageKey) as String?;
+    if (savedPlanName != null) {
+      final savedPlan = InvoiceFlowPlan.values
+          .where((plan) => plan.name == savedPlanName)
+          .cast<InvoiceFlowPlan?>()
+          .firstWhere((plan) => plan != null, orElse: () => null);
+      if (savedPlan != null) {
+        return _stateFromPlan(savedPlan);
+      }
+    }
+
     final isPro = _settingsBoxOrNull?.get(storageKey) as bool? ?? false;
     return isPro
         ? const SubscriptionState.pro()
@@ -29,11 +41,32 @@ class SubscriptionLocalDatasource {
     final settingsBox = _settingsBoxOrNull;
     if (settingsBox != null) {
       await settingsBox.put(storageKey, isPro);
+      await settingsBox.put(
+        planStorageKey,
+        isPro ? InvoiceFlowPlan.pro.name : InvoiceFlowPlan.free.name,
+      );
     }
 
     return isPro
         ? const SubscriptionState.pro()
         : const SubscriptionState.free();
+  }
+
+  Future<SubscriptionState> savePlanTier(InvoiceFlowPlan plan) async {
+    final settingsBox = _settingsBoxOrNull;
+    if (settingsBox != null) {
+      await settingsBox.put(storageKey, plan != InvoiceFlowPlan.free);
+      await settingsBox.put(planStorageKey, plan.name);
+    }
+    return _stateFromPlan(plan);
+  }
+
+  SubscriptionState _stateFromPlan(InvoiceFlowPlan plan) {
+    return switch (plan) {
+      InvoiceFlowPlan.free => const SubscriptionState.free(),
+      InvoiceFlowPlan.pro => const SubscriptionState.pro(),
+      InvoiceFlowPlan.business => const SubscriptionState.business(),
+    };
   }
 
   SubscriptionUsage loadUsage({DateTime? now}) {

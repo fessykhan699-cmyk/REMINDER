@@ -6,6 +6,8 @@ import 'package:reminder/features/clients/data/datasources/clients_local_datasou
 import 'package:reminder/features/clients/data/models/client_model.dart';
 import 'package:reminder/features/clients/presentation/controllers/clients_controller.dart';
 import 'package:reminder/features/clients/presentation/screens/add_client_screen.dart';
+import 'package:reminder/features/clients/domain/entities/client.dart';
+import 'package:reminder/features/clients/domain/repositories/client_repository.dart';
 import 'package:reminder/features/subscription/domain/entities/subscription_state.dart';
 import 'package:reminder/features/subscription/presentation/controllers/subscription_controller.dart';
 import 'package:reminder/shared/adaptive/adaptive_system_controller.dart';
@@ -22,6 +24,9 @@ void main() {
       ProviderScope(
         overrides: [
           clientsLocalDatasourceProvider.overrideWithValue(datasource),
+          clientRepositoryProvider.overrideWithValue(
+            _LocalClientRepository(datasource),
+          ),
           subscriptionGatekeeperProvider.overrideWith(
             (ref) => _AlwaysAllowSubscriptionGatekeeper(ref),
           ),
@@ -248,6 +253,41 @@ class _InMemoryClientsLocalDatasource extends ClientsLocalDatasource {
   @override
   Future<ClientModel?> getClientById(String id) async {
     return _clients[id];
+  }
+}
+
+class _LocalClientRepository implements ClientRepository {
+  _LocalClientRepository(this._datasource);
+
+  final ClientsLocalDatasource _datasource;
+
+  @override
+  Future<Client> addClient(Client client) async {
+    return _datasource.addClient(ClientModel.fromEntity(client));
+  }
+
+  @override
+  Future<void> deleteClient(String id) => _datasource.deleteClient(id);
+
+  @override
+  Future<Client?> getClientById(String id) => _datasource.getClientById(id);
+
+  @override
+  Future<List<Client>> getClients({
+    int page = 1,
+    int pageSize = 20,
+    bool forceRefresh = false,
+  }) {
+    return _datasource.fetchClients(
+      page: page,
+      pageSize: pageSize,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  @override
+  Future<Client> updateClient(Client client) {
+    return _datasource.updateClient(ClientModel.fromEntity(client));
   }
 }
 

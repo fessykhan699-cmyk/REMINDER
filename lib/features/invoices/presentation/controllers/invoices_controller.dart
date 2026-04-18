@@ -3,6 +3,7 @@ import '../../../../data/services/analytics_service.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
+import '../../../../data/services/workspace/workspace_provider.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/invoice_status_service.dart';
@@ -32,7 +33,7 @@ final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
   return InvoiceRepositoryImpl(
     datasource,
     syncService: ref.watch(firestoreSyncServiceProvider),
-    userId: ref.watch(currentUserIdProvider),
+    userId: ref.watch(activeWorkspaceOwnerIdProvider),
     isPro:
         ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
   );
@@ -147,13 +148,12 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   Future<Invoice> createInvoice(Invoice invoice) async {
     final numberingService = ref.read(invoiceNumberingServiceProvider);
 
-
     await ref
         .read(subscriptionGatekeeperProvider)
         .ensureAllowed(SubscriptionGateFeature.createInvoice);
 
     final draftInvoice = _invoiceStatusService.prepareForCreate(invoice);
-    
+
     final created = await ref
         .read(createInvoiceUseCaseProvider)
         .call(draftInvoice);
@@ -185,7 +185,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       'increment invoice number',
       () => numberingService.incrementNextInvoiceNumber(),
     );
-    
+
     return created;
   }
 
@@ -301,7 +301,6 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   ) async {
     try {
       await task();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 }
