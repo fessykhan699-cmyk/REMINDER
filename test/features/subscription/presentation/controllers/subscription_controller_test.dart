@@ -5,8 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import 'package:reminder/features/subscription/data/datasources/subscription_local_datasource.dart';
-import 'package:reminder/features/subscription/data/services/play_billing_service.dart';
+import 'package:reminder/features/subscription/data/services/billing_service.dart';
 import 'package:reminder/features/subscription/domain/entities/subscription_state.dart';
+import 'package:reminder/features/subscription/domain/services/billing_service_interface.dart';
 import 'package:reminder/features/subscription/presentation/controllers/subscription_controller.dart';
 
 void main() {
@@ -14,13 +15,13 @@ void main() {
 
   group('SubscriptionController', () {
     test('syncs active Play Billing ownership into local pro state', () async {
-      final billingService = _FakePlayBillingService(syncedIsPro: true);
+      final billingService = _FakeBillingService(syncedIsPro: true);
       final datasource = _FakeSubscriptionLocalDatasource(
         const SubscriptionState.free(),
       );
       final container = ProviderContainer(
         overrides: [
-          playBillingServiceProvider.overrideWithValue(billingService),
+          billingServiceProvider.overrideWithValue(billingService),
           subscriptionLocalDatasourceProvider.overrideWithValue(datasource),
         ],
       );
@@ -37,13 +38,13 @@ void main() {
     });
 
     test('keeps the local plan when store sync is unavailable', () async {
-      final billingService = _FakePlayBillingService(syncedIsPro: null);
+      final billingService = _FakeBillingService(syncedIsPro: null);
       final datasource = _FakeSubscriptionLocalDatasource(
         const SubscriptionState.pro(),
       );
       final container = ProviderContainer(
         overrides: [
-          playBillingServiceProvider.overrideWithValue(billingService),
+          billingServiceProvider.overrideWithValue(billingService),
           subscriptionLocalDatasourceProvider.overrideWithValue(datasource),
         ],
       );
@@ -78,10 +79,9 @@ class _FakeSubscriptionLocalDatasource extends SubscriptionLocalDatasource {
   }
 }
 
-class _FakePlayBillingService extends PlayBillingService {
-  _FakePlayBillingService({this.syncedIsPro})
-    : _purchaseController = StreamController<List<PurchaseDetails>>.broadcast(),
-      super();
+class _FakeBillingService implements BillingServiceInterface {
+  _FakeBillingService({this.syncedIsPro})
+    : _purchaseController = StreamController<List<PurchaseDetails>>.broadcast();
 
   final bool? syncedIsPro;
   final StreamController<List<PurchaseDetails>> _purchaseController;
@@ -91,12 +91,22 @@ class _FakePlayBillingService extends PlayBillingService {
       _purchaseController.stream;
 
   @override
-  Future<BillingCatalogResult> loadCatalog() async {
-    return const BillingCatalogResult.unavailable();
-  }
+  Future<bool?> syncOwnedProState(Set<String> productIds) async => syncedIsPro;
 
   @override
-  Future<bool?> syncOwnedProState() async => syncedIsPro;
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<List<ProductDetails>> loadProducts(Set<String> productIds) async => [];
+
+  @override
+  Future<bool> purchase(ProductDetails product) async => true;
+
+  @override
+  Future<void> restorePurchases() async {}
+
+  @override
+  Future<void> completePurchase(PurchaseDetails purchase) async {}
 
   Future<void> dispose() {
     return _purchaseController.close();

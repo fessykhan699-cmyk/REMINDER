@@ -6,6 +6,7 @@ import '../../features/clients/data/models/client_model.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
 import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
+import '../../features/expenses/data/models/expense_model.dart';
 import '../../core/storage/hive_storage.dart';
 
 /// Firestore cloud backup/restore service.
@@ -34,6 +35,9 @@ class FirestoreSyncService {
 
   DocumentReference<Map<String, dynamic>> _profile(String userId) =>
       _db.collection('users').doc(userId).collection('profile').doc('data');
+
+  CollectionReference<Map<String, dynamic>> _expenses(String userId) =>
+      _db.collection('users').doc(userId).collection('expenses');
 
   // ── Write operations (fire-and-forget, never throws to caller) ────────────
 
@@ -89,6 +93,19 @@ class FirestoreSyncService {
     }
   }
 
+  Future<void> syncExpenseToCloud({
+    required String userId,
+    required bool isPro,
+    required ExpenseModel expense,
+  }) async {
+    if (!isPro) return;
+    try {
+      await _expenses(userId).doc(expense.id).set(expense.toJson());
+    } catch (e, st) {
+      debugPrint('[FirestoreSync] syncExpenseToCloud failed: $e\n$st');
+    }
+  }
+
   Future<void> deleteInvoiceFromCloud({
     required String userId,
     required bool isPro,
@@ -115,6 +132,19 @@ class FirestoreSyncService {
     }
   }
 
+  Future<void> deleteExpenseFromCloud({
+    required String userId,
+    required bool isPro,
+    required String expenseId,
+  }) async {
+    if (!isPro) return;
+    try {
+      await _expenses(userId).doc(expenseId).delete();
+    } catch (e, st) {
+      debugPrint('[FirestoreSync] deleteExpenseFromCloud failed: $e\n$st');
+    }
+  }
+
   // ── Restore (pull from Firestore → write to Hive) ─────────────────────────
 
   /// Pulls all data for [userId] from Firestore into local Hive boxes.
@@ -134,6 +164,7 @@ class FirestoreSyncService {
         _restoreClients(userId, clientsBox),
         _restoreReminders(userId),
         _restoreProfile(userId),
+        _restoreExpenses(userId),
       ]);
 
       debugPrint('[FirestoreSync] restoreAllFromCloud complete for $userId');
@@ -198,6 +229,19 @@ class FirestoreSyncService {
     }
   }
 
+  Future<void> _restoreExpenses(String userId) async {
+    final box = Hive.box<ExpenseModel>(HiveStorage.expensesBoxName);
+    final snapshot = await _expenses(userId).get();
+    for (final doc in snapshot.docs) {
+      try {
+        final model = ExpenseModel.fromJson(doc.data());
+        await box.put(model.id, model);
+      } catch (e) {
+        debugPrint('[FirestoreSync] skipping malformed expense ${doc.id}: $e');
+      }
+    }
+  }
+
   // ── Upload local Hive data to Firestore (used on Pro upgrade) ────────────
 
   /// Reads every local Hive record and writes to Firestore.
@@ -229,6 +273,11 @@ class FirestoreSyncService {
       }
       for (final reminder in remindersBox.values) {
         batch.set(_reminders(userId).doc(reminder.id), reminder.toJson());
+        if (++opCount >= 490) await flush();
+      }
+      final expensesBox = Hive.box<ExpenseModel>(HiveStorage.expensesBoxName);
+      for (final expense in expensesBox.values) {
+        batch.set(_expenses(userId).doc(expense.id), expense.toJson());
         if (++opCount >= 490) await flush();
       }
       await flush();

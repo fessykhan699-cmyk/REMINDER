@@ -108,6 +108,18 @@ final class SettingsTabRoute extends AppRouteSpec {
   String get location => routePath;
 }
 
+final class ExpensesTabRoute extends AppRouteSpec {
+  const ExpensesTabRoute();
+
+  static const String routePath = '/expenses';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
 final class AddClientRoute extends AppRouteSpec {
   const AddClientRoute();
 
@@ -188,6 +200,18 @@ final class UpgradeToProRoute extends AppRouteSpec {
   const UpgradeToProRoute();
 
   static const String routePath = '/upgrade';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
+final class AddExpenseRoute extends AppRouteSpec {
+  const AddExpenseRoute();
+
+  static const String routePath = '/expenses/add';
 
   @override
   String get path => routePath;

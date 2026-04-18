@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum AdaptiveTabKey { dashboard, invoices, clients, settings }
+enum AdaptiveTabKey { dashboard, invoices, expenses, clients, settings }
 
 enum AdaptiveActionKey {
   newInvoice,
@@ -141,6 +141,7 @@ class AdaptiveSystemState {
   List<AdaptiveTabKey> get orderedTabs => const [
         AdaptiveTabKey.dashboard,
         AdaptiveTabKey.invoices,
+        AdaptiveTabKey.expenses,
         AdaptiveTabKey.clients,
         AdaptiveTabKey.settings,
       ];

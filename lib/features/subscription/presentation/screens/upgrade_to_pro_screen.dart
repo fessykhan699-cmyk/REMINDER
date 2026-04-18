@@ -9,9 +9,10 @@ import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/premium_frosted_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../domain/entities/subscription_state.dart';
-import '../controllers/play_billing_controller.dart';
+import '../controllers/billing_controller.dart';
 import '../controllers/subscription_controller.dart';
 import '../../../../data/services/analytics_service.dart';
+import 'package:flutter/foundation.dart';
 
 enum _UpgradePlan { monthly, yearly }
 
@@ -54,7 +55,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<PlayBillingState>>(playBillingControllerProvider, (
+    ref.listen<AsyncValue<BillingState>>(billingControllerProvider, (
       previous,
       next,
     ) {
@@ -72,11 +73,11 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
     final usage = ref.watch(subscriptionUsageProvider);
-    final billingAsync = ref.watch(playBillingControllerProvider);
+    final billingAsync = ref.watch(billingControllerProvider);
     final billing =
-        billingAsync.valueOrNull ?? const PlayBillingState.initial();
+        billingAsync.valueOrNull ?? const BillingState.initial();
     final selectedPlan = _effectiveSelectedPlan(billing);
-    final monthlyPriceLabel = billing.monthlyProduct?.price ?? r'$4.99 / month';
+    final monthlyPriceLabel = billing.monthlyProduct?.price ?? r'$4.91 / month';
     final yearlyPriceLabel = billing.yearlyProduct?.price ?? r'$39.99 / year';
     final canPurchase = switch (selectedPlan) {
       _UpgradePlan.monthly => billing.canPurchaseMonthly,
@@ -228,11 +229,11 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                       const SizedBox(height: spacingMD),
 
                       // ── Trust section ──
-                      const Wrap(
+                      Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _TrustChip(text: 'Secure Google Play billing'),
+                          _TrustChip(text: 'Secure ${defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store'} billing'),
                           _TrustChip(text: 'Cancel anytime'),
                           _TrustChip(text: 'No hidden fees'),
                         ],
@@ -324,7 +325,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                       TextButton(
                         onPressed: billing.canRestore
                             ? () => ref
-                                  .read(playBillingControllerProvider.notifier)
+                                  .read(billingControllerProvider.notifier)
                                   .restorePurchases()
                             : null,
                         child: Text(
@@ -346,7 +347,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
     );
   }
 
-  _UpgradePlan _effectiveSelectedPlan(PlayBillingState billing) {
+  _UpgradePlan _effectiveSelectedPlan(BillingState billing) {
     if (_selectedPlan == _UpgradePlan.yearly &&
         billing.yearlyProduct == null &&
         billing.monthlyProduct != null) {
@@ -361,24 +362,24 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
       case _UpgradePlan.monthly:
         AnalyticsService.instance.logUpgradeTapped('monthly');
         await ref
-            .read(playBillingControllerProvider.notifier)
+            .read(billingControllerProvider.notifier)
             .purchaseMonthlyPro();
       case _UpgradePlan.yearly:
         AnalyticsService.instance.logUpgradeTapped('yearly');
         await ref
-            .read(playBillingControllerProvider.notifier)
+            .read(billingControllerProvider.notifier)
             .purchaseYearlyPro();
     }
   }
 
-  Future<void> _handleBillingFeedback(PlayBillingFeedback feedback) async {
+  Future<void> _handleBillingFeedback(BillingFeedback feedback) async {
     if (!mounted) {
       return;
     }
 
     final isSuccess =
-        feedback.type == PlayBillingFeedbackType.purchaseSuccess ||
-        feedback.type == PlayBillingFeedbackType.restoreSuccess;
+        feedback.type == BillingFeedbackType.purchaseSuccess ||
+        feedback.type == BillingFeedbackType.restoreSuccess;
 
     if (!isSuccess) {
       ScaffoldMessenger.of(
@@ -469,36 +470,41 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
   }
 
   String _billingCaption(
-    AsyncValue<PlayBillingState> billingAsync,
-    PlayBillingState billing,
+    AsyncValue<BillingState> billingAsync,
+    BillingState billing,
     _UpgradePlan selectedPlan,
   ) {
+    final storeName = defaultTargetPlatform == TargetPlatform.android ? 'Google Play' : 'App Store';
+    
     if (billingAsync.isLoading) {
-      return 'Connecting to Google Play Billing...';
+      return 'Connecting to $storeName Billing...';
     }
 
     if (!billing.storeAvailable) {
-      return 'Google Play Billing is unavailable on this device.';
+      return '$storeName Billing is unavailable on this device.';
     }
 
     if (billing.monthlyProduct == null && billing.yearlyProduct == null) {
-      return 'The Pro plans are not available in Google Play right now.';
+      return 'The Pro plans are not available in $storeName right now.';
     }
 
     if (selectedPlan == _UpgradePlan.yearly && billing.yearlyProduct == null) {
-      return 'Yearly billing is not live in Google Play yet. Monthly is still available.';
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        return 'Standard billing live in $storeName. Yearly discount not available.';
+      }
+      return 'Yearly billing is not live in $storeName yet. Monthly is still available.';
     }
 
     if (selectedPlan == _UpgradePlan.monthly &&
         billing.monthlyProduct == null) {
-      return 'Monthly billing is not live in Google Play yet. Yearly is available.';
+      return 'Monthly billing is not live in $storeName yet. Yearly is available.';
     }
 
     if (billing.errorMessage != null && billing.errorMessage!.isNotEmpty) {
       return billing.errorMessage!;
     }
 
-    return 'Secure payment via Google Play. Cancel anytime.';
+    return 'Secure payment via $storeName. Cancel anytime.';
   }
 
   String _usageHeadline(SubscriptionUsage usage) {

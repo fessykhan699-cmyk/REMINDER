@@ -32,9 +32,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Allow camera access to capture your profile photo.</string>
+	<string>Invoice Flow needs camera access to capture your business logo and signature.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Allow photo library access to choose your profile photo.</string>
+	<string>Invoice Flow needs photo library access to upload your business logo and signature.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Invoice Flow uses Face ID to protect your invoices.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

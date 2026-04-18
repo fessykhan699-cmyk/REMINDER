@@ -8,6 +8,8 @@ import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/app_preferences_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
 import '../../data/models/payment_model.dart';
+import '../../features/expenses/data/models/expense_model.dart';
+
 
 /// Known demo/seed data identifiers that must be purged.
 const _demoClientIds = {'client-1', 'client-2'};
@@ -22,6 +24,7 @@ class HiveStorage {
   static const String remindersBoxName = 'remindersBox';
   static const String userProfileBoxName = 'userProfileBox';
   static const String appPreferencesBoxName = 'appPreferencesBox';
+  static const String expensesBoxName = 'expensesBox';
 
   static const String _demoCleanupFlag = '_demoCleanupDone';
   static const String _reminderPruneFlag = '_reminderPruneDone_v1';
@@ -63,6 +66,12 @@ class HiveStorage {
     }
     if (!Hive.isAdapterRegistered(11)) {
       Hive.registerAdapter(LineItemModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(13)) {
+      Hive.registerAdapter(ExpenseModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(14)) {
+      Hive.registerAdapter(ExpenseCategoryAdapter());
     }
   }
 

@@ -1,17 +1,16 @@
 import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-
-import '../../data/services/play_billing_service.dart';
+import '../../data/services/billing_service.dart';
+import '../../domain/services/billing_service_interface.dart';
 import 'subscription_controller.dart';
 
-final playBillingControllerProvider =
-    AsyncNotifierProvider<PlayBillingController, PlayBillingState>(
-      PlayBillingController.new,
+final billingControllerProvider =
+    AsyncNotifierProvider<BillingController, BillingState>(
+      BillingController.new,
     );
 
-enum PlayBillingFeedbackType {
+enum BillingFeedbackType {
   purchaseSuccess,
   purchaseCancelled,
   restoreSuccess,
@@ -19,20 +18,20 @@ enum PlayBillingFeedbackType {
   restoreFailed,
 }
 
-class PlayBillingFeedback {
-  const PlayBillingFeedback({
+class BillingFeedback {
+  const BillingFeedback({
     required this.id,
     required this.type,
     required this.message,
   });
 
   final int id;
-  final PlayBillingFeedbackType type;
+  final BillingFeedbackType type;
   final String message;
 }
 
-class PlayBillingState {
-  const PlayBillingState({
+class BillingState {
+  const BillingState({
     required this.storeAvailable,
     this.monthlyProduct,
     this.yearlyProduct,
@@ -44,7 +43,7 @@ class PlayBillingState {
     this.feedback,
   });
 
-  const PlayBillingState.initial() : this(storeAvailable: false);
+  const BillingState.initial() : this(storeAvailable: false);
 
   static const Object _sentinel = Object();
 
@@ -56,7 +55,7 @@ class PlayBillingState {
   final String? errorMessage;
   final bool isPurchasePending;
   final bool isRestoring;
-  final PlayBillingFeedback? feedback;
+  final BillingFeedback? feedback;
 
   bool get canPurchase => (canPurchaseMonthly || canPurchaseYearly);
 
@@ -74,7 +73,7 @@ class PlayBillingState {
 
   bool get canRestore => storeAvailable && !isPurchasePending && !isRestoring;
 
-  PlayBillingState copyWith({
+  BillingState copyWith({
     bool? storeAvailable,
     ProductDetails? monthlyProduct,
     ProductDetails? yearlyProduct,
@@ -85,7 +84,7 @@ class PlayBillingState {
     bool? isRestoring,
     Object? feedback = _sentinel,
   }) {
-    return PlayBillingState(
+    return BillingState(
       storeAvailable: storeAvailable ?? this.storeAvailable,
       monthlyProduct: monthlyProduct ?? this.monthlyProduct,
       yearlyProduct: yearlyProduct ?? this.yearlyProduct,
@@ -100,24 +99,23 @@ class PlayBillingState {
       isRestoring: isRestoring ?? this.isRestoring,
       feedback: identical(feedback, _sentinel)
           ? this.feedback
-          : feedback as PlayBillingFeedback?,
+          : feedback as BillingFeedback?,
     );
   }
 }
 
 enum _BillingAction { none, purchase, restore }
 
-class PlayBillingController extends AsyncNotifier<PlayBillingState> {
+class BillingController extends AsyncNotifier<BillingState> {
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   _BillingAction _currentAction = _BillingAction.none;
   int _feedbackCounter = 0;
 
   @override
-  Future<PlayBillingState> build() async {
-    _purchaseSubscription ??= ref
-        .read(playBillingServiceProvider)
-        .purchaseStream
-        .listen((purchases) async {
+  Future<BillingState> build() async {
+    final billingService = ref.read(billingServiceProvider);
+    
+    _purchaseSubscription ??= billingService.purchaseStream.listen((purchases) async {
           await _handlePurchaseUpdates(purchases);
         }, onError: _handlePurchaseStreamError);
 
@@ -127,44 +125,62 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     });
 
     try {
-      final catalog = await ref.read(playBillingServiceProvider).loadCatalog();
-      return PlayBillingState(
-        storeAvailable: catalog.storeAvailable,
-        monthlyProduct: catalog.monthlyProduct,
-        yearlyProduct: catalog.yearlyProduct,
-        monthlyProductNotFound: catalog.monthlyProductNotFound,
-        yearlyProductNotFound: catalog.yearlyProductNotFound,
-        errorMessage: catalog.errorMessage,
+      final available = await billingService.isAvailable();
+      if (!available) {
+        return const BillingState(
+          storeAvailable: false,
+          errorMessage: 'Store is currently unavailable.',
+        );
+      }
+
+      final products = await billingService.loadProducts(BillingServiceInterface.allProductIds);
+      
+      ProductDetails? monthly;
+      ProductDetails? yearly;
+      bool monthlyNotFound = true;
+      bool yearlyNotFound = true;
+
+      for (final p in products) {
+        if (p.id == BillingServiceInterface.androidProMonthlyId || p.id == BillingServiceInterface.iosProId) {
+          monthly = p;
+          monthlyNotFound = false;
+        }
+        if (p.id == BillingServiceInterface.androidProYearlyId) {
+          yearly = p;
+          yearlyNotFound = false;
+        }
+      }
+
+      return BillingState(
+        storeAvailable: true,
+        monthlyProduct: monthly,
+        yearlyProduct: yearly,
+        monthlyProductNotFound: monthlyNotFound,
+        yearlyProductNotFound: yearlyNotFound && BillingServiceInterface.allProductIds.contains(BillingServiceInterface.androidProYearlyId),
       );
-    } catch (_) {
-      return const PlayBillingState(
+    } catch (e) {
+      return BillingState(
         storeAvailable: false,
-        errorMessage: 'Unable to connect to Google Play Billing right now.',
+        errorMessage: 'Unable to connect to the store right now: $e',
       );
     }
   }
 
   Future<void> purchaseMonthlyPro() async {
     final current = state.valueOrNull;
-    if (current == null || !current.canPurchaseMonthly) {
-      return;
-    }
-
+    if (current == null || !current.canPurchaseMonthly) return;
     await _purchasePro(current.monthlyProduct!, fallbackState: current);
   }
 
   Future<void> purchaseYearlyPro() async {
     final current = state.valueOrNull;
-    if (current == null || !current.canPurchaseYearly) {
-      return;
-    }
-
+    if (current == null || !current.canPurchaseYearly) return;
     await _purchasePro(current.yearlyProduct!, fallbackState: current);
   }
 
   Future<void> _purchasePro(
     ProductDetails product, {
-    required PlayBillingState fallbackState,
+    required BillingState fallbackState,
   }) async {
     _currentAction = _BillingAction.purchase;
     state = AsyncValue.data(
@@ -172,14 +188,12 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     );
 
     try {
-      final started = await ref
-          .read(playBillingServiceProvider)
-          .purchase(product);
+      final started = await ref.read(billingServiceProvider).purchase(product);
       if (!started) {
         _currentAction = _BillingAction.none;
         _emitFeedback(
           state.valueOrNull ?? fallbackState,
-          type: PlayBillingFeedbackType.purchaseCancelled,
+          type: BillingFeedbackType.purchaseCancelled,
           message: 'Purchase cancelled',
           isPurchasePending: false,
         );
@@ -188,7 +202,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
       _currentAction = _BillingAction.none;
       _emitFeedback(
         state.valueOrNull ?? fallbackState,
-        type: PlayBillingFeedbackType.purchaseCancelled,
+        type: BillingFeedbackType.purchaseCancelled,
         message: 'Purchase cancelled',
         isPurchasePending: false,
       );
@@ -197,9 +211,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
 
   Future<void> restorePurchases() async {
     final current = state.valueOrNull;
-    if (current == null || !current.canRestore) {
-      return;
-    }
+    if (current == null || !current.canRestore) return;
 
     _currentAction = _BillingAction.restore;
     state = AsyncValue.data(
@@ -207,7 +219,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     );
 
     try {
-      await ref.read(playBillingServiceProvider).restorePurchases();
+      await ref.read(billingServiceProvider).restorePurchases();
       final restoredIsPro = await _syncPlanFromStore();
       _currentAction = _BillingAction.none;
 
@@ -215,7 +227,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
       if (restoredIsPro == true) {
         _emitFeedback(
           latest,
-          type: PlayBillingFeedbackType.restoreSuccess,
+          type: BillingFeedbackType.restoreSuccess,
           message: 'Purchases restored.',
           isRestoring: false,
         );
@@ -224,7 +236,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
 
       _emitFeedback(
         latest,
-        type: PlayBillingFeedbackType.restoreNotFound,
+        type: BillingFeedbackType.restoreNotFound,
         message: 'No purchases to restore.',
         isRestoring: false,
       );
@@ -232,7 +244,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
       _currentAction = _BillingAction.none;
       _emitFeedback(
         state.valueOrNull ?? current,
-        type: PlayBillingFeedbackType.restoreFailed,
+        type: BillingFeedbackType.restoreFailed,
         message: 'Unable to restore purchases right now.',
         isRestoring: false,
       );
@@ -241,9 +253,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
 
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
-      if (!PlayBillingService.isProProduct(purchase.productID)) {
-        continue;
-      }
+      if (!BillingServiceInterface.isProProduct(purchase.productID)) continue;
 
       try {
         switch (purchase.status) {
@@ -264,7 +274,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
         }
       } finally {
         if (purchase.pendingCompletePurchase) {
-          await ref.read(playBillingServiceProvider).completePurchase(purchase);
+          await ref.read(billingServiceProvider).completePurchase(purchase);
         }
       }
     }
@@ -273,15 +283,15 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
   Future<void> _handleSuccessfulPurchase(PurchaseDetails purchase) async {
     await _persistPlan(isPro: true);
 
-    final current = state.valueOrNull ?? const PlayBillingState.initial();
+    final current = state.valueOrNull ?? const BillingState.initial();
     final next = current.copyWith(isPurchasePending: false, isRestoring: false);
 
     if (_currentAction == _BillingAction.purchase) {
       _currentAction = _BillingAction.none;
       _emitFeedback(
         next,
-        type: PlayBillingFeedbackType.purchaseSuccess,
-        message: 'Invoice Flow Pro is now active.',
+        type: BillingFeedbackType.purchaseSuccess,
+        message: 'Pro features are now active.',
       );
       return;
     }
@@ -289,7 +299,6 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     state = AsyncValue.data(next);
   }
 
-  // Transient billing error — not a confirmed cancellation; do not revoke Pro.
   void _handleErrorPurchase() {
     final current = state.valueOrNull;
     if (current == null) {
@@ -303,7 +312,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     if (action == _BillingAction.purchase) {
       _emitFeedback(
         current,
-        type: PlayBillingFeedbackType.purchaseCancelled,
+        type: BillingFeedbackType.purchaseCancelled,
         message: 'Purchase cancelled',
         isPurchasePending: false,
       );
@@ -315,7 +324,6 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     );
   }
 
-  // Explicit user cancellation — reliable downgrade signal; revoke Pro.
   Future<void> _handleCancelledPurchase() async {
     final current = state.valueOrNull;
     if (current == null) {
@@ -326,9 +334,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     final action = _currentAction;
     _currentAction = _BillingAction.none;
 
-    // User explicitly cancelled — revoke Pro if the user currently has it.
-    final subscriptionState =
-        ref.read(subscriptionControllerProvider).valueOrNull;
+    final subscriptionState = ref.read(subscriptionControllerProvider).valueOrNull;
     if (subscriptionState?.isPro == true) {
       await _persistPlan(isPro: false);
     }
@@ -336,7 +342,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     if (action == _BillingAction.purchase) {
       _emitFeedback(
         current,
-        type: PlayBillingFeedbackType.purchaseCancelled,
+        type: BillingFeedbackType.purchaseCancelled,
         message: 'Purchase cancelled',
         isPurchasePending: false,
       );
@@ -361,7 +367,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     if (action == _BillingAction.purchase) {
       _emitFeedback(
         current,
-        type: PlayBillingFeedbackType.purchaseCancelled,
+        type: BillingFeedbackType.purchaseCancelled,
         message: 'Purchase cancelled',
         isPurchasePending: false,
       );
@@ -371,7 +377,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
     if (action == _BillingAction.restore) {
       _emitFeedback(
         current,
-        type: PlayBillingFeedbackType.restoreFailed,
+        type: BillingFeedbackType.restoreFailed,
         message: 'Unable to restore purchases right now.',
         isRestoring: false,
       );
@@ -385,11 +391,9 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
 
   Future<bool?> _syncPlanFromStore() async {
     final syncedIsPro = await ref
-        .read(playBillingServiceProvider)
-        .syncOwnedProState();
-    if (syncedIsPro == null) {
-      return null;
-    }
+        .read(billingServiceProvider)
+        .syncOwnedProState(BillingServiceInterface.allProductIds);
+    if (syncedIsPro == null) return null;
 
     await _persistPlan(isPro: syncedIsPro);
     return syncedIsPro;
@@ -401,8 +405,8 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
   }
 
   void _emitFeedback(
-    PlayBillingState base, {
-    required PlayBillingFeedbackType type,
+    BillingState base, {
+    required BillingFeedbackType type,
     required String message,
     bool? isPurchasePending,
     bool? isRestoring,
@@ -412,7 +416,7 @@ class PlayBillingController extends AsyncNotifier<PlayBillingState> {
       base.copyWith(
         isPurchasePending: isPurchasePending,
         isRestoring: isRestoring,
-        feedback: PlayBillingFeedback(
+        feedback: BillingFeedback(
           id: _feedbackCounter,
           type: type,
           message: message,

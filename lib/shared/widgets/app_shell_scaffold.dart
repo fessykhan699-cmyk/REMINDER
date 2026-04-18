@@ -104,8 +104,10 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
       case 1:
         return AdaptiveTabKey.invoices;
       case 2:
-        return AdaptiveTabKey.clients;
+        return AdaptiveTabKey.expenses;
       case 3:
+        return AdaptiveTabKey.clients;
+      case 4:
         return AdaptiveTabKey.settings;
       default:
         return AdaptiveTabKey.dashboard;
@@ -118,10 +120,12 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return 0;
       case AdaptiveTabKey.invoices:
         return 1;
-      case AdaptiveTabKey.clients:
+      case AdaptiveTabKey.expenses:
         return 2;
-      case AdaptiveTabKey.settings:
+      case AdaptiveTabKey.clients:
         return 3;
+      case AdaptiveTabKey.settings:
+        return 4;
     }
   }
 
@@ -165,6 +169,16 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long_rounded),
             label: 'Invoices',
+          ),
+        );
+      case AdaptiveTabKey.expenses:
+        return _AdaptiveNavItem(
+          tab: tab,
+          branchIndex: _branchIndexForTab(tab),
+          destination: const NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'Expenses',
           ),
         );
       case AdaptiveTabKey.clients:

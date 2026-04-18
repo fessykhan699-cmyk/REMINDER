@@ -9,6 +9,8 @@ import '../../features/clients/presentation/screens/add_client_screen.dart';
 import '../../features/clients/presentation/screens/client_detail_screen.dart';
 import '../../features/clients/presentation/screens/clients_list_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/expenses/presentation/screens/expenses_list_screen.dart';
+import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/invoices/presentation/screens/create_invoice_screen.dart';
 import '../../features/invoices/presentation/screens/edit_invoice_screen.dart';
 import '../../features/invoices/presentation/screens/invoice_detail_screen.dart';
@@ -93,6 +95,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       final invoiceId = state.pathParameters['invoiceId'] ?? '';
                       return InvoiceDetailScreen(invoiceId: invoiceId);
                     },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ExpensesTabRoute.routePath,
+                builder: (context, state) => const ExpensesListScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'add',
+                    builder: (context, state) => const AddExpenseScreen(),
                   ),
                 ],
               ),

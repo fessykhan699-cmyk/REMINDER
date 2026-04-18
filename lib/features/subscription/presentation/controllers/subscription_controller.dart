@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 import '../../data/datasources/subscription_local_datasource.dart';
-import '../../data/services/play_billing_service.dart';
+import '../../data/services/billing_service.dart';
+import '../../domain/services/billing_service_interface.dart';
 import '../../domain/entities/subscription_state.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
 
@@ -36,10 +37,10 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
 
     try {
       final syncedIsPro = await ref
-          .read(playBillingServiceProvider)
-          .syncOwnedProState();
+          .read(billingServiceProvider)
+          .syncOwnedProState(BillingServiceInterface.allProductIds);
       // Only upgrade (free → pro). Never downgrade from sync — queryPastPurchases
-      // can return an empty list when Play Store is offline, which is not a
+      // can return an empty list when Store is offline, which is not a
       // confirmed cancellation. Downgrades happen via the purchase stream only.
       if (syncedIsPro != true) {
         return localState;

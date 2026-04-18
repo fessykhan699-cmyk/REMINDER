@@ -10,6 +10,7 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/hive_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/components/glass_card.dart';
@@ -24,6 +25,7 @@ import '../../../subscription/presentation/controllers/subscription_controller.d
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../../data/services/cash_flow_service.dart';
 import '../../../../presentation/widgets/cash_flow_chart_widget.dart';
+import '../../../expenses/presentation/controllers/expenses_controller.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -331,6 +333,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     SubscriptionState subscription,
     String currencyCode,
     AsyncValue<List<Invoice>> invoicesState,
+    double totalExpenses,
   ) {
     final sections = <Widget>[];
 
@@ -371,7 +374,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
-        addSection('stats', _StatsSection(totals: model.totals));
+        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
         addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
@@ -393,13 +396,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
-        addSection('stats', _StatsSection(totals: model.totals));
+        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
         addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
         if (model.focusMode == _DashboardFocusMode.overview) {
-          addSection('stats', _StatsSection(totals: model.totals));
+          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
@@ -427,7 +430,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
-          addSection('stats', _StatsSection(totals: model.totals));
+          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
         }
       addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
       addSection('recent', _buildRecentActivitySection(context, model));
@@ -500,6 +503,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       reminderCount: reminderCount,
       currencyCode: currencyCode,
     );
+    final totalExpenses = ref.watch(totalExpensesProvider);
     final dashboardSections = <Widget>[
       _staggeredCard(
         index: 0,
@@ -509,7 +513,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           avatar: const DashboardAvatar(),
         ),
       ),
-      _buildDashboardContent(context, dashboard, subscription, currencyCode, invoicesState),
+      _buildDashboardContent(context, dashboard, subscription, currencyCode, invoicesState, totalExpenses),
     ];
 
     return Scaffold(
@@ -761,36 +765,53 @@ class _HeaderSection extends StatelessWidget {
 }
 
 class _StatsSection extends StatelessWidget {
-  const _StatsSection({required this.totals});
+  const _StatsSection({
+    required this.totals,
+    required this.totalExpenses,
+  });
 
   final _DashboardTotals totals;
+  final double totalExpenses;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _StatsCard(
-            value: totals.pendingCount.toString(),
-            label: 'Pending',
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _StatsCard(
+                value: totals.pendingCount.toString(),
+                label: 'Pending',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatsCard(
+                value: totals.overdueCount.toString(),
+                label: 'Overdue',
+                valueColor: AppColors.danger,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatsCard(
+                value: totals.paidCount.toString(),
+                label: 'Paid',
+                valueColor: AppColors.success,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatsCard(
-            value: totals.overdueCount.toString(),
-            label: 'Overdue',
-            valueColor: AppColors.danger,
+        if (totalExpenses > 0) ...[
+          const SizedBox(height: 12),
+          _StatsCard(
+            value: AppFormatters.currency(totalExpenses),
+            label: 'Total Expenses',
+            valueColor: Colors.redAccent,
+            isFullWidth: true,
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatsCard(
-            value: totals.paidCount.toString(),
-            label: 'Paid',
-            valueColor: AppColors.success,
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -801,37 +822,37 @@ class _StatsCard extends StatelessWidget {
     required this.value,
     required this.label,
     this.valueColor,
+    this.isFullWidth = false,
   });
 
   final String value;
   final String label;
   final Color? valueColor;
+  final bool isFullWidth;
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: GlassCard(
-        padding: const EdgeInsets.all(16),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      child: SizedBox(
+        width: isFullWidth ? double.infinity : null,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: valueColor,
-              ),
               textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: valueColor,
+                  ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
             ),
           ],
         ),
@@ -839,6 +860,7 @@ class _StatsCard extends StatelessWidget {
     );
   }
 }
+
 
 class _PriorityFocusSection extends StatelessWidget {
   const _PriorityFocusSection({required this.data});

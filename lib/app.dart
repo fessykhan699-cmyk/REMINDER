@@ -7,9 +7,10 @@ import 'core/utils/app_router.dart';
 import 'data/providers/biometric_provider.dart';
 import 'features/settings/presentation/widgets/app_lock_gate.dart';
 import 'features/settings/presentation/widgets/biometric_lock_screen.dart';
-import 'features/subscription/presentation/controllers/play_billing_controller.dart';
+import 'features/subscription/presentation/controllers/billing_controller.dart';
 import 'features/subscription/presentation/controllers/subscription_controller.dart';
 import 'data/services/recurring_invoice_scheduler.dart';
+
 
 class InvoiceReminderApp extends ConsumerWidget {
   const InvoiceReminderApp({
@@ -28,7 +29,8 @@ class InvoiceReminderApp extends ConsumerWidget {
         });
       }
     });
-    ref.listen(playBillingControllerProvider, (previous, next) {});
+    ref.listen(billingControllerProvider, (previous, next) {});
+
 
     final router = ref.watch(appRouterProvider);
 
