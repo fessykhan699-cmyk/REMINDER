@@ -7,6 +7,10 @@ abstract interface class AuthRepository {
 
   Future<void> logout();
 
+  Future<AuthSession?> reloadUser();
+
+  Future<void> sendEmailVerification();
+
   Future<bool> isOnboardingCompleted();
 
   Future<void> markOnboardingComplete();

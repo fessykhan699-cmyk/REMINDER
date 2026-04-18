@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import './analytics_service.dart';
 
 import '../../core/storage/hive_storage.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
@@ -38,6 +39,9 @@ class EmailInvoiceService {
       try {
         if (await canLaunchUrl(mailtoUri)) {
           mailtoSuccess = await launchUrl(mailtoUri);
+          if (mailtoSuccess) {
+            AnalyticsService.instance.logInvoiceShared('email');
+          }
         }
       } catch (e) {
         debugPrint('EmailInvoiceService mailto error: $e');
@@ -62,6 +66,8 @@ class EmailInvoiceService {
         
         // Log to Hive
         await _logEmailSent(invoice.id, email);
+        
+        AnalyticsService.instance.logInvoiceShared('email');
         
         return true;
       }

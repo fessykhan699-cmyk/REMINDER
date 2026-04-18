@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../data/services/analytics_service.dart';
 
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/clients/domain/entities/client.dart';
@@ -78,6 +79,8 @@ class CsvExportService {
         subject: 'Invoices Export $dateStr',
         text: 'Attached is the exported list of invoices from InvoiceFlow.',
       );
+      
+      AnalyticsService.instance.logCsvExported();
     } catch (e) {
       debugPrint('CsvExportService.exportInvoicesToCsv error: $e');
       rethrow;

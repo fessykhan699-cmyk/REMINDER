@@ -11,6 +11,7 @@ import '../../../../shared/components/premium_primary_button.dart';
 import '../../domain/entities/subscription_state.dart';
 import '../controllers/play_billing_controller.dart';
 import '../controllers/subscription_controller.dart';
+import '../../../../data/services/analytics_service.dart';
 
 enum _UpgradePlan { monthly, yearly }
 
@@ -40,6 +41,9 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
       curve: Curves.easeOut,
     );
     _fadeController.forward();
+
+    // Log to Analytics
+    AnalyticsService.instance.logUpgradePromptShown('generic');
   }
 
   @override
@@ -355,10 +359,12 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
   Future<void> _startPurchase(_UpgradePlan plan) async {
     switch (plan) {
       case _UpgradePlan.monthly:
+        AnalyticsService.instance.logUpgradeTapped('monthly');
         await ref
             .read(playBillingControllerProvider.notifier)
             .purchaseMonthlyPro();
       case _UpgradePlan.yearly:
+        AnalyticsService.instance.logUpgradeTapped('yearly');
         await ref
             .read(playBillingControllerProvider.notifier)
             .purchaseYearlyPro();

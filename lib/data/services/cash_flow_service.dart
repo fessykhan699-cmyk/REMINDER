@@ -26,22 +26,10 @@ class CashFlowService {
         // Calculate total for paid invoices in this calendar month
         double total = 0;
         for (final invoice in invoices) {
-          if (invoice.status == InvoiceStatus.paid) {
-            // Check if invoice.createdAt falls within the monthDate calendar month
-            // The instructions say "invoice.date" but the field is "createdAt" or "dueDate"?
-            // "Each bar represents the total value of all paid invoices in that month."
-            // Usually cash flow is based on when it was PAID, but we don't have a paidDate field in Invoice.
-            // We have payments list though. 
-            // "AND invoice.date falls within that calendar month"
-            // Since the instructions say "invoice.date", and we have "createdAt" and "dueDate".
-            // I'll assume "createdAt" or "dueDate" depending on what "invoice.date" refers to.
-            // Looking at CreateInvoiceScreen previously, users select a date which is likely stored in dueDate or createdAt.
-            // Actually, invoices are usually grouped by date.
-            // I'll check CreateInvoiceScreen again to see what "date" people select.
-            
-            if (invoice.createdAt.year == monthDate.year &&
-                invoice.createdAt.month == monthDate.month) {
-              total += invoice.amount;
+          for (final payment in invoice.payments) {
+            if (payment.date.year == monthDate.year &&
+                payment.date.month == monthDate.month) {
+              total += payment.amount;
             }
           }
         }

@@ -88,4 +88,34 @@ class PaymentService {
       return null;
     }
   }
+
+  double calculateTotalRevenue(List<Invoice> invoices) {
+    double total = 0;
+    for (final invoice in invoices) {
+      for (final payment in invoice.payments) {
+        total += payment.amount;
+      }
+    }
+    return total;
+  }
+
+  double calculatePendingPayments(List<Invoice> invoices) {
+    double total = 0;
+    for (final invoice in invoices) {
+      if (invoice.status != InvoiceStatus.paid) {
+        total += invoice.remainingBalance;
+      }
+    }
+    return total;
+  }
 }
+
+final totalRevenueProvider = Provider<double>((ref) {
+  final invoices = ref.watch(invoicesControllerProvider).valueOrNull ?? [];
+  return ref.read(paymentServiceProvider).calculateTotalRevenue(invoices);
+});
+
+final pendingBalanceProvider = Provider<double>((ref) {
+  final invoices = ref.watch(invoicesControllerProvider).valueOrNull ?? [];
+  return ref.read(paymentServiceProvider).calculatePendingPayments(invoices);
+});

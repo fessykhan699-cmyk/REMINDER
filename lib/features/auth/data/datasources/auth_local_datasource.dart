@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,7 @@ class AuthLocalDatasource {
       email: user.email ?? '',
       token: 'firebase-user',
       createdAt: user.metadata.creationTime ?? DateTime.now(),
+      isEmailVerified: user.emailVerified,
     );
   }
 
@@ -49,7 +51,14 @@ class AuthLocalDatasource {
             email: normalizedEmail,
             password: trimmedPassword,
           );
-          return _sessionFromUser(credential.user!, normalizedEmail);
+          final user = credential.user!;
+          // Trigger email verification for new account
+          try {
+            await user.sendEmailVerification();
+          } catch (e) {
+            debugPrint('Failed to send verification email: $e');
+          }
+          return _sessionFromUser(user, normalizedEmail);
         } on FirebaseAuthException catch (e2) {
           throw Exception(
             'Unable to create account: ${e2.message ?? 'Unknown error.'}',
@@ -74,6 +83,7 @@ class AuthLocalDatasource {
       email: user.email ?? fallbackEmail,
       token: 'firebase-user',
       createdAt: user.metadata.creationTime ?? DateTime.now(),
+      isEmailVerified: user.emailVerified,
     );
   }
 
@@ -100,6 +110,24 @@ class AuthLocalDatasource {
   Future<void> logout() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+  }
+  
+  Future<AuthSessionModel?> reloadUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    
+    await user.reload();
+    final updatedUser = _auth.currentUser;
+    if (updatedUser == null) return null;
+    
+    return _sessionFromUser(updatedUser, updatedUser.email ?? '');
+  }
+  
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
   }
 
   Future<bool> isOnboardingCompleted() async {

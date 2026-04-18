@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/domain/entities/auth_session.dart';
 import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/clients/presentation/screens/add_client_screen.dart';
 import '../../features/clients/presentation/screens/client_detail_screen.dart';
 import '../../features/clients/presentation/screens/clients_list_screen.dart';
@@ -41,6 +42,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: UpgradeToProRoute.routePath,
         builder: (context, state) => const UpgradeToProScreen(),
+      ),
+      GoRoute(
+        path: EmailVerificationRoute.routePath,
+        builder: (context, state) => const EmailVerificationScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -143,8 +148,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return atLogin ? null : LoginRoute.routePath;
       }
 
+      final atEmailVerification =
+          location == EmailVerificationRoute.routePath;
+      final isEmailVerified = authState.session?.isEmailVerified ?? false;
+
+      if (authState.status == AuthStatus.authenticated && !isEmailVerified) {
+        return atEmailVerification ? null : EmailVerificationRoute.routePath;
+      }
+
       if (authState.status == AuthStatus.authenticated &&
-          (atSplash || atOnboarding || atLogin)) {
+          (atSplash || atOnboarding || atLogin || atEmailVerification)) {
         return DashboardTabRoute.routePath;
       }
 

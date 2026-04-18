@@ -1,4 +1,7 @@
+import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -45,6 +48,18 @@ Future<void> main() async {
 
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // 🛡️ Initialize Crashlytics
+  try {
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  } catch (e) {
+    debugPrint('Firebase Crashlytics initialization failed: $e');
+  }
+
   await NotificationService.init();
 
   // Flip overdue invoices on startup

@@ -6,10 +6,12 @@ class AuthSession {
     required this.email,
     required this.token,
     required this.createdAt,
+    this.isEmailVerified = false,
   });
 
   final String userId;
   final String email;
   final String token;
   final DateTime createdAt;
+  final bool isEmailVerified;
 }

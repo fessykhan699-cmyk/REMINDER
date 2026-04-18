@@ -4,6 +4,7 @@ import '../datasources/invoices_local_datasource.dart';
 import '../models/invoice_model.dart';
 import '../../../../data/services/firestore_sync_service.dart';
 import '../../../../data/services/notification_service.dart';
+import '../../../../data/services/analytics_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
   const InvoiceRepositoryImpl(
@@ -43,6 +44,14 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         NotificationService.cancelInvoiceReminders(saved.id);
       }
     } catch (_) {}
+    
+    // Log to Analytics
+    AnalyticsService.instance.logInvoiceCreated(
+      invoiceId: saved.id,
+      amount: saved.amount,
+      currency: saved.currencyCode,
+    );
+
     return saved;
   }
 

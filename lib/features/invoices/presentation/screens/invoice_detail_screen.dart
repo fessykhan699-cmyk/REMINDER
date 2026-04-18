@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../data/services/analytics_service.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_routes.dart';
@@ -8,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/components/glass_card.dart';
+import '../../../../shared/components/premium_primary_button.dart';
 import '../../../../shared/services/invoice_export_service.dart';
 import '../../../../shared/services/whatsapp_service.dart';
 import '../../../../data/services/whatsapp_reminder_service.dart';
@@ -72,6 +74,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isSharingPdf = true);
 
     try {
+      AnalyticsService.instance.logInvoiceShared('share_sheet');
       await ref.read(invoiceExportServiceProvider).shareInvoicePdf(invoice);
       await ref
           .read(invoicesControllerProvider.notifier)
@@ -97,6 +100,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isSendingWhatsApp = true);
 
     try {
+      AnalyticsService.instance.logInvoiceShared('whatsapp');
       final result = await ref
           .read(whatsAppServiceProvider)
           .sendInvoiceReminder(invoice: invoice);
@@ -138,6 +142,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       }
 
       _showSnackBar('Invoice marked as paid');
+      ref.invalidate(invoiceDetailProvider(invoice.id));
     } catch (_) {
       if (!mounted) {
         return;
@@ -403,6 +408,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isSendingEmail = true);
 
     try {
+      AnalyticsService.instance.logInvoiceShared('email');
       final success = await ref.read(emailInvoiceServiceProvider).sendInvoiceEmail(
         invoice: invoice,
         email: email,
@@ -858,7 +864,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   ],
 
                   // ── Payments section ──
-                  if (invoice.payments.isNotEmpty || invoice.totalPaid > 0) ...[
+                  if (invoice.status != InvoiceStatus.draft) ...[
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
                       child: Row(
@@ -871,11 +877,13 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
-                          if (invoice.totalPaid > 0)
+                          if (invoice.status != InvoiceStatus.paid)
                             Text(
                               'Balance: ${AppFormatters.currency(invoice.remainingBalance, currencyCode: invoice.currencyCode)}',
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.danger,
+                                color: invoice.totalPaid > 0
+                                    ? AppColors.danger
+                                    : AppColors.textSecondary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -883,53 +891,102 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: spacingSM),
-                    GlassCard(
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        children: [
-                          ...invoice.payments.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final payment = entry.value;
-                            return Column(
+                    if (subscription.isPro)
+                      GlassCard(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          children: [
+                            if (invoice.payments.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(spacingMD),
+                                child: Text(
+                                  'No payments recorded yet.',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              )
+                            else
+                              ...invoice.payments.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                final payment = entry.value;
+                                return Column(
+                                  children: [
+                                    if (idx > 0)
+                                      Divider(
+                                        height: 1,
+                                        indent: spacingMD,
+                                        endIndent: spacingMD,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                    ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: spacingMD,
+                                        vertical: 4,
+                                      ),
+                                      title: Text(
+                                        AppFormatters.currency(payment.amount,
+                                            currencyCode: invoice.currencyCode),
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      subtitle: Text(
+                                        '${AppFormatters.shortDate(payment.date)}'
+                                        '${payment.paymentMethod != null ? ' • ${payment.paymentMethod!.replaceAll('_', ' ').split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ')}' : ''}'
+                                        '${payment.note != null ? ' • ${payment.note}' : ''}',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete_outline, size: 20),
+                                        onPressed: () => _removePayment(invoice, payment.id),
+                                        color: AppColors.danger.withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                          ],
+                        ),
+                      )
+                    else
+                      GlassCard(
+                        padding: const EdgeInsets.all(spacingMD),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                if (idx > 0)
-                                  Divider(
-                                    height: 1,
-                                    indent: spacingMD,
-                                    endIndent: spacingMD,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .outlineVariant
-                                        .withValues(alpha: 0.5),
-                                  ),
-                                ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: spacingMD,
-                                    vertical: 4,
-                                  ),
-                                  title: Text(
-                                    AppFormatters.currency(payment.amount,
-                                        currencyCode: invoice.currencyCode),
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
-                                  ),
-                                  subtitle: Text(
-                                    '${AppFormatters.shortDate(payment.date)}'
-                                    '${payment.paymentMethod != null ? ' • ${payment.paymentMethod!.replaceAll('_', ' ').split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ')}' : ''}'
-                                    '${payment.note != null ? ' • ${payment.note}' : ''}',
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete_outline, size: 20),
-                                    onPressed: () => _removePayment(invoice, payment.id),
-                                    color: AppColors.danger.withValues(alpha: 0.7),
+                                Icon(Icons.lock_outline,
+                                    size: 18, color: AppColors.accent.withValues(alpha: 0.7)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Partial Payment Tracking',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
-                            );
-                          }),
-                        ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Track multiple partial payments, record payment methods, and see balance history.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            PremiumPrimaryButton(
+                              label: 'Upgrade to Pro',
+                              onPressed: () async {
+                                const UpgradeToProRoute().push(context);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                     const SizedBox(height: spacingMD),
                   ],
 
@@ -1023,10 +1080,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             'Free plan PDFs include a faint Invoice Flow watermark.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          const SizedBox(height: spacingXS),
-                          TextButton(
-                            onPressed: _promptWatermarkUpgrade,
-                            child: const Text('Upgrade to remove watermark'),
+                          const SizedBox(height: spacingSM),
+                          PremiumPrimaryButton(
+                            label: 'Remove Watermark',
+                            onPressed: () async {
+                              await _promptWatermarkUpgrade();
+                            },
                           ),
                         ],
                       ),

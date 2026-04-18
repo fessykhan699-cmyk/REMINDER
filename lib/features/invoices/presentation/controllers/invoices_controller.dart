@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../data/services/analytics_service.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
@@ -12,6 +13,7 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../data/datasources/invoices_local_datasource.dart';
 import '../../data/repositories/invoice_repository_impl.dart';
 import '../../domain/entities/invoice.dart';
+import '../../../../domain/entities/payment.dart';
 import '../../domain/repositories/invoice_repository.dart';
 import '../../../reminders/data/providers/reminder_repository_provider.dart';
 import '../../domain/usecases/create_invoice_usecase.dart';
@@ -250,19 +252,47 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
             .read(adaptiveSystemProvider.notifier)
             .recordAction(AdaptiveActionKey.markPaid),
       );
+      AnalyticsService.instance.logInvoicePaid(
+        invoiceId: updated.id,
+        amount: updated.amount,
+        currency: updated.currencyCode,
+      );
     }
   }
 
   Future<Invoice> markInvoiceSent(Invoice invoice) async {
     final next = _invoiceStatusService.markSent(invoice);
     await updateInvoice(next);
+    AnalyticsService.instance.logInvoiceShared('manual_mark_sent');
     return next;
   }
 
   Future<Invoice> markInvoicePaid(Invoice invoice) async {
-    final next = _invoiceStatusService.markPaid(invoice);
-    await updateInvoice(next);
-    return next;
+    final nextStatus = _invoiceStatusService.markPaid(invoice);
+    var updated = nextStatus;
+
+    // If marking as paid and there's a balance, add a payment record to cover it
+    if (updated.status == InvoiceStatus.paid && updated.remainingBalance > 0) {
+      final payment = Payment(
+        id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
+        amount: updated.remainingBalance,
+        date: DateTime.now(),
+        note: 'Full payment',
+        paymentMethod: 'other',
+      );
+      updated = updated.copyWith(payments: [...updated.payments, payment]);
+    }
+
+    await updateInvoice(updated);
+
+    // Log to Analytics
+    AnalyticsService.instance.logInvoicePaid(
+      invoiceId: updated.id,
+      amount: updated.amount,
+      currency: updated.currencyCode,
+    );
+
+    return updated;
   }
 
   Future<void> _runBestEffortSideEffect(

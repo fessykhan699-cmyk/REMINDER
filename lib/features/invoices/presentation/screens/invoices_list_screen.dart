@@ -19,6 +19,8 @@ import '../../../../data/services/overdue_flip_service.dart';
 import '../widgets/invoice_tile.dart';
 import '../../../../shared/services/csv_export_service.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../../data/services/payment_service.dart';
+import '../../../../shared/components/glass_card.dart';
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
   const InvoicesListScreen({super.key});
@@ -140,6 +142,9 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     final allInvoicesAsync = ref.watch(invoicesControllerProvider);
     final allInvoices = allInvoicesAsync.valueOrNull ?? [];
     
+    final totalRevenue = ref.watch(totalRevenueProvider);
+    final pendingBalance = ref.watch(pendingBalanceProvider);
+    
     final query = ref.watch(invoiceSearchQueryProvider);
     final statusFilter = ref.watch(invoiceStatusFilterProvider);
     final fromDate = ref.watch(invoiceFromDateFilterProvider);
@@ -209,6 +214,25 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                 ),
               ),
             ),
+
+            // ── Revenue Summary (Advanced Totals) ──
+            if (allInvoices.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: spacingMD),
+                  child: _staggeredItem(
+                    index: 1,
+                    child: _RevenueSummary(
+                      revenue: totalRevenue,
+                      pending: pendingBalance,
+                      isPro: subscription.isPro,
+                      onUpgrade: () => const UpgradeToProRoute().push(context),
+                    ),
+                  ),
+                ),
+              ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: spacingLG)),
 
             // ── Search & Filter ──
             SliverToBoxAdapter(
@@ -408,6 +432,128 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RevenueSummary extends StatelessWidget {
+  const _RevenueSummary({
+    required this.revenue,
+    required this.pending,
+    required this.isPro,
+    required this.onUpgrade,
+  });
+
+  final double revenue;
+  final double pending;
+  final bool isPro;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return GlassCard(
+      padding: const EdgeInsets.all(spacingMD),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Financial Overview',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              if (!isPro)
+                GestureDetector(
+                  onTap: onUpgrade,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'PRO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: spacingMD),
+          Row(
+            children: [
+              _StatItem(
+                label: 'Total Revenue',
+                value: isPro ? '\$${revenue.toStringAsFixed(2)}' : '\$ ••••',
+                color: Colors.greenAccent,
+              ),
+              const SizedBox(width: spacingLG),
+              _StatItem(
+                label: 'Pending',
+                value: isPro ? '\$${pending.toStringAsFixed(2)}' : '\$ ••••',
+                color: Colors.orangeAccent,
+              ),
+            ],
+          ),
+          if (!isPro) ...[
+            const SizedBox(height: spacingMD),
+            Text(
+              'Upgrade to Pro to see detailed revenue and pending balance analysis.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: color,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
     );
   }
 }

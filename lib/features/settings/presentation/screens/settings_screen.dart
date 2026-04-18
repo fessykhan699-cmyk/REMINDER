@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../data/services/analytics_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
@@ -442,6 +443,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onUpgrade: subscription.isPro
                   ? null
                   : () {
+                      AnalyticsService.instance.logUpgradeTapped('settings_plan_card');
                       const UpgradeToProRoute().push(context);
                     },
             ),

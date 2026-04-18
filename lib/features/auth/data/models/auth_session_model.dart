@@ -6,6 +6,7 @@ class AuthSessionModel extends AuthSession {
     required super.email,
     required super.token,
     required super.createdAt,
+    super.isEmailVerified = false,
   });
 
   factory AuthSessionModel.fromEntity(AuthSession session) {

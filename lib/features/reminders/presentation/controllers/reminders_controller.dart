@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../data/services/analytics_service.dart';
 
 import '../../../../shared/adaptive/adaptive_system_controller.dart';
 import '../../../../shared/services/whatsapp_service.dart';
@@ -216,6 +217,7 @@ class RemindersController
           phoneNumber: phoneNumber,
           customMessage: message,
         );
+        AnalyticsService.instance.logInvoiceShared('whatsapp');
         reminder = await _reminderRepository.createReminderRecord(
           invoiceId: invoice.id,
           clientId: invoice.clientId,

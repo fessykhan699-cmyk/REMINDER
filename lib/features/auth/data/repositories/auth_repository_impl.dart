@@ -19,6 +19,12 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> logout() => _datasource.logout();
 
   @override
+  Future<AuthSession?> reloadUser() => _datasource.reloadUser();
+
+  @override
+  Future<void> sendEmailVerification() => _datasource.sendEmailVerification();
+
+  @override
   Future<bool> isOnboardingCompleted() => _datasource.isOnboardingCompleted();
 
   @override

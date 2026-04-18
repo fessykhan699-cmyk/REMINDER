@@ -48,6 +48,18 @@ final class LoginRoute extends AppRouteSpec {
   String get location => routePath;
 }
 
+final class EmailVerificationRoute extends AppRouteSpec {
+  const EmailVerificationRoute();
+
+  static const String routePath = '/verify-email';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
 final class DashboardTabRoute extends AppRouteSpec {
   const DashboardTabRoute();
 

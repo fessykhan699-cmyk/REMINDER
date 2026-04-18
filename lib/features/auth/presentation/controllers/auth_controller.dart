@@ -133,6 +133,7 @@ class AuthController extends Notifier<AuthViewState> {
           email: user.email ?? '',
           token: idToken ?? 'firebase-user',
           createdAt: user.metadata.creationTime ?? DateTime.now(),
+          isEmailVerified: user.emailVerified,
         ),
         clearError: true,
       );
@@ -233,6 +234,32 @@ class AuthController extends Notifier<AuthViewState> {
       await ref.read(authRepositoryProvider).markOnboardingComplete();
 
       state = state.copyWith(onboardingCompleted: true);
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString());
+    }
+  }
+
+  Future<void> reloadUser() async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final session = await ref.read(authRepositoryProvider).reloadUser();
+      if (_disposed) return;
+      state = state.copyWith(
+        session: session,
+        isSubmitting: false,
+      );
+    } catch (error) {
+      if (_disposed) return;
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: error.toString(),
+      );
+    }
+  }
+
+  Future<void> resendVerificationEmail() async {
+    try {
+      await ref.read(authRepositoryProvider).sendEmailVerification();
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString());
     }

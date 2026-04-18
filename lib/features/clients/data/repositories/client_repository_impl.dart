@@ -3,6 +3,7 @@ import '../../domain/repositories/client_repository.dart';
 import '../datasources/clients_local_datasource.dart';
 import '../models/client_model.dart';
 import '../../../../data/services/firestore_sync_service.dart';
+import '../../../../data/services/analytics_service.dart';
 
 class ClientRepositoryImpl implements ClientRepository {
   const ClientRepositoryImpl(
@@ -35,6 +36,10 @@ class ClientRepositoryImpl implements ClientRepository {
     final model = ClientModel.fromEntity(client);
     final saved = await _datasource.addClient(model);
     _syncClient(saved);
+    
+    // Log to Analytics
+    AnalyticsService.instance.logClientCreated(clientId: saved.id);
+    
     return saved;
   }
 

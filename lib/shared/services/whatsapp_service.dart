@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../data/services/analytics_service.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../features/clients/domain/repositories/client_repository.dart';
@@ -60,6 +61,7 @@ class WhatsAppService {
         mode: LaunchMode.externalNonBrowserApplication,
       );
       if (openedWhatsApp) {
+        AnalyticsService.instance.logInvoiceShared('whatsapp');
         return const WhatsAppLaunchResult(usedFallbackShareSheet: false);
       }
     } catch (error, stackTrace) {

@@ -7,6 +7,7 @@ import '../../features/invoices/presentation/controllers/invoices_controller.dar
 import '../../features/subscription/presentation/controllers/subscription_controller.dart';
 import '../../data/services/invoice_numbering_service.dart';
 import '../../features/settings/presentation/controllers/app_preferences_controller.dart';
+import '../../data/services/analytics_service.dart';
 
 final recurringInvoiceSchedulerProvider = Provider<RecurringInvoiceScheduler>((ref) {
   return RecurringInvoiceScheduler(ref);
@@ -88,6 +89,12 @@ class RecurringInvoiceScheduler {
 
     await repository.createInvoice(newInvoice);
     await numberingService.incrementNextInvoiceNumber();
+    
+    // Log to Analytics
+    AnalyticsService.instance.logRecurringInvoiceCreated(
+      parentInvoiceId: parent.id,
+      newInvoiceId: newInvoice.id,
+    );
     
     debugPrint('Generated recurring draft ${newInvoice.invoiceNumber} from parent ${parent.invoiceNumber}');
   }
