@@ -1,7 +1,7 @@
 import 'line_item.dart';
 import '../../../../domain/entities/payment.dart';
 
-enum InvoiceStatus { draft, sent, viewed, paid, overdue }
+enum InvoiceStatus { draft, sent, viewed, partiallyPaid, paid, overdue }
 
 enum RecurringInterval { none, weekly, biweekly, monthly, quarterly }
 
@@ -57,13 +57,13 @@ extension InvoiceStatusX on InvoiceStatus {
   String get label {
     switch (this) {
       case InvoiceStatus.draft:
-        return 'Draft';
       case InvoiceStatus.sent:
-        return 'Sent';
       case InvoiceStatus.viewed:
-        return 'Viewed';
+        return 'Pending';
       case InvoiceStatus.paid:
         return 'Paid';
+      case InvoiceStatus.partiallyPaid:
+        return 'Partially Paid';
       case InvoiceStatus.overdue:
         return 'Overdue';
     }
@@ -124,13 +124,17 @@ class Invoice {
   bool get isOverdue =>
       status != InvoiceStatus.paid && dueDate.isBefore(DateTime.now());
 
-  double get totalPaid => payments.fold(0, (sum, p) => sum + p.amount);
+  double get totalPaid => payments.fold(0.0, (sum, p) => sum + p.amount);
+
+  bool get isFullyPaid => totalPaid >= (amount - 0.01);
+
+  bool get isPartiallyPaid => totalPaid > 0.01 && !isFullyPaid;
+
   double get remainingBalance {
     final balance = amount - totalPaid;
     return balance < 0 ? 0.0 : balance;
   }
 
-  bool get isFullyPaid => totalPaid >= amount;
 
   String? get normalizedNotes => notes?.trim().isEmpty == true ? null : notes;
   String? get normalizedPaymentLink =>
@@ -204,5 +208,130 @@ class Invoice {
       recurringParentId: recurringParentId ?? this.recurringParentId,
       payments: payments ?? this.payments,
     );
+  }
+
+  factory Invoice.fromJson(Map<String, dynamic> json) {
+    return Invoice(
+      id: json['id'] as String,
+      clientId: json['clientId'] as String,
+      clientName: json['clientName'] as String,
+      amount: (json['amount'] as num).toDouble(),
+      dueDate: DateTime.parse(json['dueDate'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      status: InvoiceStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => InvoiceStatus.draft,
+      ),
+      service: json['service'] as String? ?? '',
+      currencyCode: json['currencyCode'] as String? ?? 'USD',
+      notes: json['notes'] as String?,
+      paymentLink: json['paymentLink'] as String?,
+      taxPercent: (json['taxPercent'] as num? ?? 0.0).toDouble(),
+      discountAmount: (json['discountAmount'] as num? ?? 0.0).toDouble(),
+      invoiceNumber: json['invoiceNumber'] as String? ?? '',
+      paymentTermsDays: (json['paymentTermsDays'] as num? ?? 0).toInt(),
+      items: (json['items'] as List<dynamic>?)
+              ?.map((e) => LineItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+      isRecurring: json['isRecurring'] as bool? ?? false,
+      recurringInterval: RecurringInterval.values.firstWhere(
+        (e) => e.name == json['recurringInterval'],
+        orElse: () => RecurringInterval.none,
+      ),
+      recurringNextDate: json['recurringNextDate'] != null
+          ? DateTime.parse(json['recurringNextDate'] as String)
+          : null,
+      recurringParentId: json['recurringParentId'] as String?,
+      payments: (json['payments'] as List<dynamic>?)
+              ?.map((e) => Payment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'clientId': clientId,
+      'clientName': clientName,
+      'amount': amount,
+      'dueDate': dueDate.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'status': status.name,
+      'service': service,
+      'currencyCode': currencyCode,
+      'notes': notes,
+      'paymentLink': paymentLink,
+      'taxPercent': taxPercent,
+      'discountAmount': discountAmount,
+      'invoiceNumber': invoiceNumber,
+      'paymentTermsDays': paymentTermsDays,
+      'items': items.map((e) => e.toJson()).toList(),
+      'isRecurring': isRecurring,
+      'recurringInterval': recurringInterval.name,
+      'recurringNextDate': recurringNextDate?.toIso8601String(),
+      'recurringParentId': recurringParentId,
+      'payments': payments.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Invoice &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          clientId == other.clientId &&
+          clientName == other.clientName &&
+          amount == other.amount &&
+          dueDate == other.dueDate &&
+          createdAt == other.createdAt &&
+          status == other.status &&
+          service == other.service &&
+          currencyCode == other.currencyCode &&
+          notes == other.notes &&
+          paymentLink == other.paymentLink &&
+          taxPercent == other.taxPercent &&
+          discountAmount == other.discountAmount &&
+          invoiceNumber == other.invoiceNumber &&
+          paymentTermsDays == other.paymentTermsDays &&
+          _listEquals(items, other.items) &&
+          isRecurring == other.isRecurring &&
+          recurringInterval == other.recurringInterval &&
+          recurringNextDate == other.recurringNextDate &&
+          recurringParentId == other.recurringParentId &&
+          _listEquals(payments, other.payments);
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      clientId.hashCode ^
+      clientName.hashCode ^
+      amount.hashCode ^
+      dueDate.hashCode ^
+      createdAt.hashCode ^
+      status.hashCode ^
+      service.hashCode ^
+      currencyCode.hashCode ^
+      notes.hashCode ^
+      paymentLink.hashCode ^
+      taxPercent.hashCode ^
+      discountAmount.hashCode ^
+      invoiceNumber.hashCode ^
+      paymentTermsDays.hashCode ^
+      items.hashCode ^
+      isRecurring.hashCode ^
+      recurringInterval.hashCode ^
+      recurringNextDate.hashCode ^
+      recurringParentId.hashCode ^
+      payments.hashCode;
+
+  bool _listEquals(List a, List b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }

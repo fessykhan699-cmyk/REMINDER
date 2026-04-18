@@ -29,6 +29,8 @@ class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
         return InvoiceStatus.sent;
       case 4:
         return InvoiceStatus.viewed;
+      case 5:
+        return InvoiceStatus.partiallyPaid;
       default:
         return InvoiceStatus.draft;
     }
@@ -42,6 +44,7 @@ class InvoiceStatusAdapter extends TypeAdapter<InvoiceStatus> {
       InvoiceStatus.overdue => 2,
       InvoiceStatus.sent => 3,
       InvoiceStatus.viewed => 4,
+      InvoiceStatus.partiallyPaid => 5,
     });
   }
 }
@@ -276,6 +279,7 @@ class InvoiceModel extends Invoice {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -370,6 +374,8 @@ class InvoiceModel extends Invoice {
         return InvoiceStatus.viewed;
       case 'paid':
         return InvoiceStatus.paid;
+      case 'partiallyPaid':
+        return InvoiceStatus.partiallyPaid;
       case 'overdue':
         return InvoiceStatus.overdue;
       default:

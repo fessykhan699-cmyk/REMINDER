@@ -14,6 +14,7 @@ import 'features/reminders/data/models/reminder_model.dart';
 import 'features/settings/data/models/app_preferences_model.dart';
 import 'features/settings/data/models/profile_model.dart';
 import 'features/expenses/data/models/expense_model.dart';
+import 'features/invoices/data/models/invoice_template_model.dart';
 
 import 'app.dart';
 import 'core/storage/hive_storage.dart';
@@ -43,6 +44,7 @@ Future<void> main() async {
   await _openBoxSafe<ProfileModel>(HiveStorage.userProfileBoxName);
   await _openBoxSafe<AppPreferencesModel>(HiveStorage.appPreferencesBoxName);
   await _openBoxSafe<ExpenseModel>(HiveStorage.expensesBoxName);
+  await _openBoxSafe<InvoiceTemplateModel>(HiveStorage.invoiceTemplatesBoxName);
 
   // 🔥 One-time cleanup: remove any leftover demo/seed data from previous versions
   await HiveStorage.purgeDemoDataOnce();

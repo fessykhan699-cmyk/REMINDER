@@ -9,6 +9,7 @@ import '../../features/settings/data/models/app_preferences_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
 import '../../data/models/payment_model.dart';
 import '../../features/expenses/data/models/expense_model.dart';
+import '../../features/invoices/data/models/invoice_template_model.dart';
 
 
 /// Known demo/seed data identifiers that must be purged.
@@ -25,6 +26,7 @@ class HiveStorage {
   static const String userProfileBoxName = 'userProfileBox';
   static const String appPreferencesBoxName = 'appPreferencesBox';
   static const String expensesBoxName = 'expensesBox';
+  static const String invoiceTemplatesBoxName = 'invoiceTemplatesBox';
 
   static const String _demoCleanupFlag = '_demoCleanupDone';
   static const String _reminderPruneFlag = '_reminderPruneDone_v1';
@@ -67,6 +69,9 @@ class HiveStorage {
     if (!Hive.isAdapterRegistered(11)) {
       Hive.registerAdapter(LineItemModelAdapter());
     }
+    if (!Hive.isAdapterRegistered(12)) {
+      Hive.registerAdapter(InvoiceTemplateModelAdapter());
+    }
     if (!Hive.isAdapterRegistered(13)) {
       Hive.registerAdapter(ExpenseModelAdapter());
     }
@@ -80,6 +85,9 @@ class HiveStorage {
 
   static Box<InvoiceModel> get invoicesBox =>
       Hive.box<InvoiceModel>(invoicesBoxName);
+
+  static Box<InvoiceTemplateModel> get invoiceTemplatesBox =>
+      Hive.box<InvoiceTemplateModel>(invoiceTemplatesBoxName);
 
   static Box<dynamic> get settingsBox => Hive.box<dynamic>(settingsBoxName);
 

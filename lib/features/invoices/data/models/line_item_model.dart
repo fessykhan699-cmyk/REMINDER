@@ -51,6 +51,7 @@ class LineItemModel extends LineItem {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'id': id,

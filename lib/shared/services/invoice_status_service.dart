@@ -39,10 +39,23 @@ class InvoiceStatusService {
 
   InvoiceStatus resolveStatus(Invoice invoice, {DateTime? now}) {
     final currentTime = now ?? DateTime.now();
-    if (invoice.status.isPaid) {
+    
+    // Final status remains final
+    if (invoice.status == InvoiceStatus.paid) {
       return InvoiceStatus.paid;
     }
 
+    // Auto-resolve to Paid if fully paid
+    if (invoice.isFullyPaid) {
+      return InvoiceStatus.paid;
+    }
+
+    // Auto-resolve to Partially Paid if there are payments
+    if (invoice.isPartiallyPaid) {
+      return InvoiceStatus.partiallyPaid;
+    }
+
+    // Normal business logic for transitions
     if (invoice.dueDate.isBefore(currentTime)) {
       return InvoiceStatus.overdue;
     }

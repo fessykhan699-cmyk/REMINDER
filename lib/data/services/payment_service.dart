@@ -46,6 +46,8 @@ class PaymentService {
 
       if (updatedInvoice.isFullyPaid) {
         updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.paid);
+      } else {
+        updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.partiallyPaid);
       }
 
       final repository = _ref.read(invoiceRepositoryProvider);

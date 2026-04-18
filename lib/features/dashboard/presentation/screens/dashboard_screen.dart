@@ -1321,18 +1321,22 @@ class _DashboardTotals {
       switch (invoice.status) {
         case InvoiceStatus.paid:
           paidCount++;
+          break;
         case InvoiceStatus.draft:
         case InvoiceStatus.sent:
         case InvoiceStatus.viewed:
+        case InvoiceStatus.partiallyPaid:
           pendingCount++;
-          pendingAmount += invoice.amount;
+          pendingAmount += invoice.remainingBalance;
           byCurrency[invoice.currencyCode] =
-              (byCurrency[invoice.currencyCode] ?? 0) + invoice.amount;
+              (byCurrency[invoice.currencyCode] ?? 0) + invoice.remainingBalance;
+          break;
         case InvoiceStatus.overdue:
           overdueCount++;
-          overdueAmount += invoice.amount;
+          overdueAmount += invoice.remainingBalance;
           byCurrency[invoice.currencyCode] =
-              (byCurrency[invoice.currencyCode] ?? 0) + invoice.amount;
+              (byCurrency[invoice.currencyCode] ?? 0) + invoice.remainingBalance;
+          break;
       }
     }
 

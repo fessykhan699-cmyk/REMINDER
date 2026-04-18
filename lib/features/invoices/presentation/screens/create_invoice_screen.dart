@@ -21,6 +21,9 @@ import '../controllers/invoice_creation_learning_controller.dart';
 import '../controllers/invoice_prediction_engine.dart';
 import '../controllers/invoices_controller.dart';
 import '../../../../data/services/invoice_numbering_service.dart';
+import '../controllers/invoice_templates_controller.dart';
+import '../widgets/template_picker_sheet.dart';
+import '../../domain/entities/invoice_template.dart';
 
 class CreateInvoiceScreen extends ConsumerStatefulWidget {
   const CreateInvoiceScreen({super.key});
@@ -54,6 +57,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
   bool _isRecurring = false;
   RecurringInterval _recurringInterval = RecurringInterval.monthly;
+  bool _saveAsTemplate = false;
 
   @override
   void initState() {
@@ -705,6 +709,21 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       }
 
       if (result == true) {
+        if (_saveAsTemplate) {
+          try {
+            await ref.read(invoiceTemplatesControllerProvider.notifier).addTemplate(
+                  name: service,
+                  service: service,
+                  amount: amount,
+                  notes: notes,
+                  paymentLink: paymentLink,
+                  items: _lineItems.isNotEmpty ? _lineItems : null,
+                );
+          } catch (e) {
+            debugPrint('Failed to save template: $e');
+          }
+        }
+
         messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
         shouldResetSavingState = false;
         navigator.pop();
@@ -738,6 +757,28 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
   }
 
+  void _showTemplatePicker() async {
+    final template = await showModalBottomSheet<InvoiceTemplate>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const TemplatePickerSheet(),
+    );
+
+    if (template != null) {
+      setState(() {
+        _serviceController.text = template.service;
+        _amountController.text = _formatAmountInput(template.amount);
+        _notesController.text = template.notes ?? '';
+        _paymentLinkController.text = template.paymentLink ?? '';
+        if (template.items.isNotEmpty) {
+          _lineItems.clear();
+          _lineItems.addAll(template.items);
+        }
+      });
+    }
+  }
+
   Future<void> _showAddLineItemDialog() async {
     final result = await showDialog<LineItem>(
       context: context,
@@ -768,9 +809,24 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
   void _syncFirstItemToControllers() {
     if (_lineItems.isNotEmpty) {
+      // Sync description from first item if service is empty or matches last auto
       final first = _lineItems.first;
-      _serviceController.text = first.description;
-      _amountController.text = _formatAmountInput(first.unitPrice);
+      if (_serviceController.text.trim().isEmpty || _lineItems.length == 1) {
+        _serviceController.text = first.description;
+      }
+
+      // Calculate sum of all line items
+      double subtotal = 0;
+      for (final item in _lineItems) {
+        subtotal += item.unitPrice * item.quantity;
+      }
+      
+      // Apply default tax if available
+      final prefs = ref.read(appPreferencesControllerProvider).valueOrNull;
+      final taxPercent = prefs?.defaultTaxPercent ?? 0.0;
+      final total = subtotal * (1 + taxPercent / 100);
+      
+      _amountController.text = _formatAmountInput(total);
     }
   }
 
@@ -866,7 +922,16 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     _scheduleSmartSync();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Invoice')),
+      appBar: AppBar(
+        title: const Text('Create Invoice'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_rounded),
+            onPressed: _showTemplatePicker,
+            tooltip: 'Templates',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
@@ -1186,6 +1251,19 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                         maxLines: 4,
                       ),
                       const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Checkbox.adaptive(
+                            value: _saveAsTemplate,
+                            onChanged: (value) {
+                              setState(() => _saveAsTemplate = value ?? false);
+                            },
+                            activeColor: AppColors.accent,
+                          ),
+                          const Text('Save as template for future use'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       PremiumPrimaryButton(
                         label: 'Save Invoice',
                         isLoading: _isSaving,

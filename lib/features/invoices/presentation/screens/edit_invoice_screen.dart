@@ -15,6 +15,9 @@ import '../../domain/entities/invoice.dart';
 import '../../domain/entities/line_item.dart';
 import '../controllers/invoices_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../controllers/invoice_templates_controller.dart';
+import '../widgets/template_picker_sheet.dart';
+import '../../domain/entities/invoice_template.dart';
 
 class EditInvoiceScreen extends ConsumerStatefulWidget {
   const EditInvoiceScreen({super.key, required this.invoiceId});
@@ -43,6 +46,9 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   bool _didHydrate = false;
   bool _isRecurring = false;
   RecurringInterval _recurringInterval = RecurringInterval.none;
+  bool _saveAsTemplate = false;
+  double _taxPercent = 0.0;
+
 
   @override
   void initState() {
@@ -84,6 +90,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _paymentLinkController.text = invoice.paymentLink ?? '';
     _isRecurring = invoice.isRecurring;
     _recurringInterval = invoice.recurringInterval;
+    _taxPercent = invoice.taxPercent;
     _lineItems.clear();
     _lineItems.addAll(invoice.items);
   }
@@ -179,6 +186,21 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
       // Invalidate detail provider so detail screen shows fresh data
       ref.invalidate(invoiceDetailProvider(widget.invoiceId));
+
+      if (_saveAsTemplate) {
+        try {
+          await ref.read(invoiceTemplatesControllerProvider.notifier).addTemplate(
+                name: serviceStr,
+                service: serviceStr,
+                amount: amount,
+                notes: _notesController.text.trim(),
+                paymentLink: paymentLink,
+                items: _lineItems.isNotEmpty ? _lineItems : null,
+              );
+        } catch (e) {
+          debugPrint('Failed to save template: $e');
+        }
+      }
 
       if (!mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Invoice saved')));
@@ -386,6 +408,19 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                           ),
                           const SizedBox(height: 16),
                           _buildRecurringSection(theme, isPro),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Checkbox.adaptive(
+                                value: _saveAsTemplate,
+                                onChanged: (value) {
+                                  setState(() => _saveAsTemplate = value ?? false);
+                                },
+                                activeColor: AppColors.accent,
+                              ),
+                              const Text('Save as template for future use'),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -493,11 +528,42 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
         return Scaffold(
           resizeToAvoidBottomInset: true,
-          appBar: AppBar(title: const Text('Edit Invoice')),
+          appBar: AppBar(
+            title: const Text('Edit Invoice'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.copy_rounded),
+                onPressed: _showTemplatePicker,
+                tooltip: 'Templates',
+              ),
+            ],
+          ),
           body: _buildBody(invoice, context),
         );
       },
     );
+  }
+
+  void _showTemplatePicker() async {
+    final template = await showModalBottomSheet<InvoiceTemplate>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const TemplatePickerSheet(),
+    );
+
+    if (template != null) {
+      setState(() {
+        _serviceController.text = template.service;
+        _amountController.text = template.amount.toStringAsFixed(2);
+        _notesController.text = template.notes ?? '';
+        _paymentLinkController.text = template.paymentLink ?? '';
+        if (template.items.isNotEmpty) {
+          _lineItems.clear();
+          _lineItems.addAll(template.items);
+        }
+      });
+    }
   }
 
   Future<void> _showAddLineItemDialog() async {
@@ -531,9 +597,23 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
   void _syncFirstItemToControllers() {
     if (_lineItems.isNotEmpty) {
       final first = _lineItems.first;
-      _serviceController.text = first.description;
-      _amountController.text = first.unitPrice.toStringAsFixed(2);
+      if (_serviceController.text.trim().isEmpty || _lineItems.length == 1) {
+        _serviceController.text = first.description;
+      }
+
+      double subtotal = 0;
+      for (final item in _lineItems) {
+        subtotal += item.unitPrice * item.quantity;
+      }
+      
+      final total = subtotal * (1 + _taxPercent / 100);
+      _amountController.text = _formatAmountInput(total);
     }
+  }
+
+  String _formatAmountInput(double value) {
+    if (value == value.toInt()) return value.toInt().toString();
+    return value.toStringAsFixed(2);
   }
 
   Widget _buildLineItemsSection(ThemeData theme) {

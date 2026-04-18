@@ -12,6 +12,8 @@ class InvoiceStatusBadge extends StatelessWidget {
     switch (status) {
       case InvoiceStatus.paid:
         return AppColors.success;
+      case InvoiceStatus.partiallyPaid:
+        return AppColors.warning;
       case InvoiceStatus.overdue:
         return AppColors.danger;
       case InvoiceStatus.sent:

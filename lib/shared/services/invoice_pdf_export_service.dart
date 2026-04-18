@@ -384,7 +384,7 @@ pw.Widget _buildDetailsRow(Invoice invoice) {
     padding: const pw.EdgeInsets.symmetric(vertical: 14),
     child: pw.Row(
       children: [
-        pw.Expanded(child: _buildDetailCell('Invoice #', invoice.id)),
+        pw.Expanded(child: _buildDetailCell('Invoice #', invoice.invoiceNumber)),
         pw.Container(width: 1, height: 32, color: _pdfBorder),
         pw.Expanded(
           child: _buildDetailCell('Issue Date', _dateLabel(invoice.createdAt)),
