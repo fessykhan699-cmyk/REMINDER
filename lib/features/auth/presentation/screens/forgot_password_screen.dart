@@ -1,203 +1,171 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../widgets/auth_card.dart';
-import '../widgets/auth_route_transition.dart';
-import '../widgets/auth_shell.dart';
-import '../widgets/glass_button.dart';
-import '../widgets/glass_input_field.dart';
-import '../widgets/staggered_reveal.dart';
-import 'email_sent_screen.dart';
-import 'reset_password_screen.dart';
+import '../../../../shared/components/premium_frosted_card.dart';
+import '../../../../shared/components/premium_input_field.dart';
+import '../../../../shared/components/premium_primary_button.dart';
+import '../../../../shared/widgets/premium_galaxy_background.dart';
+import '../controllers/auth_controller.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
-    with SingleTickerProviderStateMixin {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
-  late final AnimationController _entryController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 200),
-  )..forward();
-
-  bool _isSubmitting = false;
-
-  static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+  bool get _isFormValid => _emailController.text.trim().contains('@');
 
   @override
   void dispose() {
-    _entryController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
-  String? _validateEmail(String? value) {
-    final text = (value ?? '').trim();
-    if (text.isEmpty) {
-      return 'Email is required';
-    }
-    if (!_emailRegex.hasMatch(text)) {
-      return 'Enter a valid email';
-    }
-    return null;
-  }
-
-  bool get _isFormValid => _validateEmail(_emailController.text) == null;
-
   Future<void> _sendResetLink() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
-    setState(() => _isSubmitting = true);
-
     final email = _emailController.text.trim();
-    try {
-      // If there is a currently signed-in user, check their providers before
-      // sending a reset link. Google-only accounts have no password to reset.
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final isGoogleOnly = currentUser != null &&
-          currentUser.providerData.any((p) => p.providerId == 'google.com') &&
-          !currentUser.providerData.any((p) => p.providerId == 'password');
-
-      if (isGoogleOnly) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Your account uses Google Sign-In and has no password. Use "Sign in with Google" instead.',
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        buildAuthRoute(EmailSentScreen(email: email)),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      final message = switch (e.code) {
-        'user-not-found' =>
-          'No account found for this email. Check the address or sign up.',
-        'invalid-email' => 'Invalid email address.',
-        'network-request-failed' => 'Network error. Check your connection.',
-        _ => 'Something went wrong. Please try again.',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+    
+    await ref.read(authControllerProvider.notifier).sendPasswordResetEmail(email: email);
+    
+    if (!mounted) return;
+    
+    final authState = ref.read(authControllerProvider);
+    if (authState.errorMessage == null) {
+      EmailSentRoute(email: email).go(context);
     }
-  }
-
-  void _openReset() {
-    final email = _emailController.text.trim();
-    Navigator.of(
-      context,
-    ).push(buildAuthRoute(ResetPasswordScreen(email: email)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final formListenable = Listenable.merge([_emailController]);
+    final authState = ref.watch(authControllerProvider);
 
-    return AuthShell(
-      child: Form(
-        key: _formKey,
-        child: AuthCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0,
-                end: 0.6,
-                child: Text(
-                  'Forgot Password?',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 38,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.7,
+    return Scaffold(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
+          children: [
+            const Positioned.fill(child: PremiumGalaxyBackground()),
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 60),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          onPressed: () async => const LoginRoute().go(context),
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: AppColors.textPrimary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Forgot Password',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.5,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'Enter your email address and we will send you a link to reset your password.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                                height: 1.5,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 48),
+                      PremiumFrostedCard(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            PremiumInputField(
+                              controller: _emailController,
+                              label: 'Email',
+                              hintText: 'name@example.com',
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.done,
+                              autofillHints: const [AutofillHints.email],
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Email is required';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Invalid email address';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 32),
+                            ListenableBuilder(
+                              listenable: _emailController,
+                              builder: (context, _) {
+                                return Column(
+                                  children: [
+                                    PremiumPrimaryButton(
+                                      label: 'Send Reset Link',
+                                      isLoading: authState.isSubmitting,
+                                      onPressed: _isFormValid && !authState.isSubmitting ? _sendResetLink : null,
+                                    ),
+                                    if (authState.errorMessage != null) ...[
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.danger.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: AppColors.danger.withValues(alpha: 0.2)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                authState.errorMessage!,
+                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.10,
-                end: 0.7,
-                child: Text(
-                  'Enter your email to receive reset instructions',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.22,
-                end: 0.86,
-                child: GlassInputField(
-                  controller: _emailController,
-                  label: 'Email',
-                  hintText: 'you@business.com',
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.done,
-                  validator: _validateEmail,
-                ),
-              ),
-              const SizedBox(height: 20),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.32,
-                end: 1,
-                child: AnimatedBuilder(
-                  animation: formListenable,
-                  builder: (context, _) {
-                    return GlassButton(
-                      label: 'Send Reset Link',
-                      isLoading: _isSubmitting,
-                      onPressed: _isFormValid && !_isSubmitting
-                          ? _sendResetLink
-                          : null,
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: TextButton(
-                  onPressed: _openReset,
-                  child: const Text(
-                    'Already have a reset link? Set new password',
-                  ),
-                ),
-              ),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Back to Login'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

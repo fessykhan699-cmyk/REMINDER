@@ -5,6 +5,10 @@ import '../../features/auth/domain/entities/auth_session.dart';
 import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/email_verification_screen.dart';
+import '../../features/auth/presentation/screens/email_sent_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
+import '../../features/auth/presentation/screens/sign_up_screen.dart';
 import '../../features/clients/presentation/screens/add_client_screen.dart';
 import '../../features/clients/presentation/screens/client_detail_screen.dart';
 import '../../features/clients/presentation/screens/clients_list_screen.dart';
@@ -53,6 +57,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: EmailVerificationRoute.routePath,
         builder: (context, state) => const EmailVerificationScreen(),
+      ),
+      GoRoute(
+        path: ForgotPasswordRoute.routePath,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: ResetPasswordRoute.routePath,
+        builder: (context, state) {
+          final code = state.uri.queryParameters['oobCode'];
+          return ResetPasswordScreen(oobCode: code);
+        },
+      ),
+      GoRoute(
+        path: SignUpRoute.routePath,
+        builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: EmailSentRoute.routePath,
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return EmailSentScreen(email: email);
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -153,31 +179,44 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
     redirect: (context, state) {
       final location = state.matchedLocation;
-      final atSplash = location == SplashRoute.routePath;
-      final atOnboarding = location == OnboardingRoute.routePath;
-      final atLogin = location == LoginRoute.routePath;
+
+      // Routes allowed when unauthenticated
+      final publicRoutes = [
+        LoginRoute.routePath,
+        SignUpRoute.routePath,
+        ForgotPasswordRoute.routePath,
+        EmailSentRoute.routePath,
+        ResetPasswordRoute.routePath,
+        EmailVerificationRoute.routePath,
+      ];
+
+      final isPublicRoute = publicRoutes.contains(location);
+      final isAuthRoute = location == LoginRoute.routePath || location == SignUpRoute.routePath;
 
       if (authState.status == AuthStatus.initializing) {
-        return atSplash ? null : SplashRoute.routePath;
+        return location == SplashRoute.routePath ? null : SplashRoute.routePath;
       }
 
       if (!authState.onboardingCompleted) {
-        return atOnboarding ? null : OnboardingRoute.routePath;
+        return location == OnboardingRoute.routePath ? null : OnboardingRoute.routePath;
       }
 
       if (authState.status == AuthStatus.unauthenticated) {
-        return atLogin ? null : LoginRoute.routePath;
+        return isPublicRoute ? null : LoginRoute.routePath;
       }
 
-      final atEmailVerification = location == EmailVerificationRoute.routePath;
+      // Email Verification Check
       final isEmailVerified = authState.session?.isEmailVerified ?? false;
-
       if (authState.status == AuthStatus.authenticated && !isEmailVerified) {
-        return atEmailVerification ? null : EmailVerificationRoute.routePath;
+        return location == EmailVerificationRoute.routePath ? null : EmailVerificationRoute.routePath;
       }
 
+      // Authenticated users shouldn't see onboarding or login/signup
       if (authState.status == AuthStatus.authenticated &&
-          (atSplash || atOnboarding || atLogin || atEmailVerification)) {
+          (location == SplashRoute.routePath ||
+              location == OnboardingRoute.routePath ||
+              isAuthRoute ||
+              location == EmailVerificationRoute.routePath)) {
         return DashboardTabRoute.routePath;
       }
 

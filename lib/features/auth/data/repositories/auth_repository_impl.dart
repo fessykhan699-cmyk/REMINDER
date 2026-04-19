@@ -16,6 +16,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AuthSession> signUp({required String email, required String password}) {
+    return _datasource.signUp(email: email, password: password);
+  }
+
+  @override
   Future<void> logout() => _datasource.logout();
 
   @override
@@ -23,6 +28,18 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> sendEmailVerification() => _datasource.sendEmailVerification();
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) =>
+      _datasource.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> confirmPasswordReset({required String code, required String newPassword}) =>
+      _datasource.confirmPasswordReset(code: code, newPassword: newPassword);
+
+  @override
+  Future<String> verifyPasswordResetCode(String code) =>
+      _datasource.verifyPasswordResetCode(code);
 
   @override
   Future<bool> isOnboardingCompleted() => _datasource.isOnboardingCompleted();

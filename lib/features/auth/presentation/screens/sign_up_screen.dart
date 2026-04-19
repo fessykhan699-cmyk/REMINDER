@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/auth_session.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/components/premium_frosted_card.dart';
+import '../../../../shared/components/premium_input_field.dart';
+import '../../../../shared/components/premium_primary_button.dart';
+import '../../../../shared/widgets/premium_galaxy_background.dart';
 import '../controllers/auth_controller.dart';
-import '../widgets/auth_card.dart';
-import '../widgets/auth_route_transition.dart';
-import '../widgets/auth_shell.dart';
-import '../widgets/glass_button.dart';
-import '../widgets/glass_input_field.dart';
-import '../widgets/staggered_reveal.dart';
-import 'auth_success_screen.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -141,38 +139,40 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
     setState(() {
       _isSubmitting = true;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    if (!mounted) {
-      return;
+
+    try {
+      await ref.read(authControllerProvider.notifier).signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+
+      if (!mounted) return;
+
+      final state = ref.read(authControllerProvider);
+      if (state.status == AuthStatus.authenticated) {
+        // Redirection is handled by the router (to EmailVerificationScreen if unverified)
+        return;
+      }
+
+      if (state.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(state.errorMessage!)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    await Navigator.of(context).push(
-      buildAuthRoute(
-        AuthSuccessScreen(
-          title: "You're all set",
-          subtitle: 'Welcome back',
-          onComplete: () async {
-            await ref
-                .read(authControllerProvider.notifier)
-                .login(email: email, password: password);
-            if (!mounted) {
-              return;
-            }
-            const DashboardTabRoute().go(context);
-          },
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final errorMessage = ref.watch(
+      authControllerProvider.select((state) => state.errorMessage),
+    );
     final formListenable = Listenable.merge([
       _nameController,
       _emailController,
@@ -180,175 +180,163 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
       _confirmPasswordController,
     ]);
 
-    return AuthShell(
-      child: Form(
-        key: _formKey,
-        child: AuthCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0,
-                end: 0.55,
-                child: Text(
-                  'Create Your Account',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 38,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.7,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.10,
-                end: 0.65,
-                child: Text(
-                  'Set up your secure workspace to manage invoices faster.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.18,
-                end: 0.8,
-                child: GlassInputField(
-                  controller: _nameController,
-                  label: 'Name',
-                  hintText: 'Full name',
-                  textInputAction: TextInputAction.next,
-                  validator: _validateName,
-                ),
-              ),
-              const SizedBox(height: 14),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.22,
-                end: 0.84,
-                child: GlassInputField(
-                  controller: _emailController,
-                  label: 'Email',
-                  hintText: 'you@business.com',
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  validator: _validateEmail,
-                ),
-              ),
-              const SizedBox(height: 14),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.26,
-                end: 0.88,
-                child: GlassInputField(
-                  controller: _passwordController,
-                  label: 'Password',
-                  hintText: 'At least 6 characters',
-                  obscureText: _obscurePassword,
-                  textInputAction: TextInputAction.next,
-                  validator: _validatePassword,
-                  suffix: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _passwordController,
-                builder: (context, _, child) {
-                  return Column(
+    return Scaffold(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Stack(
+          children: [
+            const Positioned.fill(child: PremiumGalaxyBackground()),
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      LinearProgressIndicator(
-                        minHeight: 4,
-                        value: _passwordStrength,
-                        borderRadius: BorderRadius.circular(10),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _strengthColor,
-                        ),
-                        backgroundColor: AppColors.backgroundSecondary,
-                      ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 12),
                       Text(
-                        'Password strength: $_strengthLabel',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: _strengthColor,
-                          fontWeight: FontWeight.w600,
+                        'Create Your Account',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontSize: 48,
+                          height: 1.04,
+                          letterSpacing: -0.8,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Set up your secure workspace to manage invoices faster.',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      PremiumFrostedCard(
+                        borderRadius: BorderRadius.circular(20),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            PremiumInputField(
+                              controller: _nameController,
+                              label: 'Name',
+                              hintText: 'Full name',
+                              textInputAction: TextInputAction.next,
+                              validator: _validateName,
+                              autofillHints: const [AutofillHints.name],
+                            ),
+                            const SizedBox(height: 16),
+                            PremiumInputField(
+                              controller: _emailController,
+                              label: 'Email',
+                              hintText: 'you@business.com',
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              validator: _validateEmail,
+                              autofillHints: const [AutofillHints.email],
+                            ),
+                            const SizedBox(height: 16),
+                            PremiumInputField(
+                              controller: _passwordController,
+                              label: 'Password',
+                              hintText: 'At least 6 characters',
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.next,
+                              validator: _validatePassword,
+                              autofillHints: const [AutofillHints.newPassword],
+                              suffix: IconButton(
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _passwordController,
+                              builder: (context, _, child) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    LinearProgressIndicator(
+                                      minHeight: 4,
+                                      value: _passwordStrength,
+                                      borderRadius: BorderRadius.circular(10),
+                                      valueColor: AlwaysStoppedAnimation<Color>(_strengthColor),
+                                      backgroundColor: AppColors.backgroundSecondary,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Password strength: $_strengthLabel',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: _strengthColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            PremiumInputField(
+                              controller: _confirmPasswordController,
+                              label: 'Confirm Password',
+                              hintText: 'Re-enter password',
+                              obscureText: _obscureConfirm,
+                              textInputAction: TextInputAction.done,
+                              validator: _validateConfirmPassword,
+                              suffix: IconButton(
+                                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                                icon: Icon(
+                                  _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          errorMessage,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      AnimatedBuilder(
+                        animation: formListenable,
+                        builder: (context, _) {
+                          return PremiumPrimaryButton(
+                            label: 'Create Account',
+                            isLoading: _isSubmitting,
+                            onPressed: _isFormValid && !_isSubmitting ? _onCreateAccount : null,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => const LoginRoute().go(context),
+                          child: const Text('Already have an account? Login'),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                     ],
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.30,
-                end: 0.92,
-                child: GlassInputField(
-                  controller: _confirmPasswordController,
-                  label: 'Confirm Password',
-                  hintText: 'Re-enter password',
-                  obscureText: _obscureConfirm,
-                  textInputAction: TextInputAction.done,
-                  validator: _validateConfirmPassword,
-                  suffix: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _obscureConfirm = !_obscureConfirm;
-                      });
-                    },
-                    icon: Icon(
-                      _obscureConfirm
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      color: AppColors.textSecondary,
-                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              StaggeredReveal(
-                controller: _entryController,
-                begin: 0.36,
-                end: 1,
-                child: AnimatedBuilder(
-                  animation: formListenable,
-                  builder: (context, _) {
-                    return GlassButton(
-                      label: 'Create Account',
-                      isLoading: _isSubmitting,
-                      onPressed: _isFormValid && !_isSubmitting
-                          ? _onCreateAccount
-                          : null,
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Already have an account? Login'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

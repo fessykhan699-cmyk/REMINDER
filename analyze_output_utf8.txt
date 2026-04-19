@@ -1,0 +1,18 @@
+﻿Analyzing reminder...                                           
+
+warning - Unused import: 'email_sent_screen.dart' - lib\features\auth\presentation\screens\forgot_password_screen.dart:11:8 - unused_import
+  error - Undefined name 'AuthStatus' - lib\features\auth\presentation\screens\login_screen.dart:84:25 - undefined_identifier
+  error - Undefined name 'AuthStatus' - lib\features\auth\presentation\screens\login_screen.dart:103:25 - undefined_identifier
+  error - Undefined name 'math' - lib\features\auth\presentation\screens\login_screen.dart:141:41 - undefined_identifier
+  error - Undefined name 'AuthStatus' - lib\features\auth\presentation\screens\reset_password_screen.dart:101:39 - undefined_identifier
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\screens\reset_password_screen.dart:102:50 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\screens\reset_password_screen.dart:107:37 - use_build_context_synchronously
+   info - Unnecessary braces in a string interpolation - lib\features\auth\presentation\screens\reset_password_screen.dart:151:53 - unnecessary_brace_in_string_interps
+
+flutter : 8 issues found. (ran in 16.0s)
+At line:1 char:1
++ flutter analyze > analyze_output.txt 2>&1; Get-Content analyze_output ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (8 issues found. (ran in 16.0s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

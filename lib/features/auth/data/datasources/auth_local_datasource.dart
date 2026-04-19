@@ -30,48 +30,64 @@ class AuthLocalDatasource {
     required String password,
   }) async {
     final normalizedEmail = email.trim();
-    final trimmedPassword = password.trim();
     if (normalizedEmail.isEmpty) {
       throw Exception('Email is required.');
-    }
-    if (trimmedPassword.length < 6) {
-      throw Exception('Password must be at least 6 characters.');
     }
 
     try {
       final credential = await _auth.signInWithEmailAndPassword(
         email: normalizedEmail,
-        password: trimmedPassword,
+        password: password,
       );
       return _sessionFromUser(credential.user!, normalizedEmail);
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-        try {
-          final credential = await _auth.createUserWithEmailAndPassword(
-            email: normalizedEmail,
-            password: trimmedPassword,
-          );
-          final user = credential.user!;
-          // Trigger email verification for new account
-          try {
-            await user.sendEmailVerification();
-          } catch (e) {
-            debugPrint('Failed to send verification email: $e');
-          }
-          return _sessionFromUser(user, normalizedEmail);
-        } on FirebaseAuthException catch (e2) {
-          throw Exception(
-            'Unable to create account: ${e2.message ?? 'Unknown error.'}',
-          );
-        }
-      }
-
       final message = switch (e.code) {
+        'user-not-found' => 'No account found for this email.',
         'wrong-password' => 'Incorrect password.',
         'invalid-email' => 'Invalid email address.',
         'user-disabled' => 'This account has been disabled.',
         'too-many-requests' => 'Too many failed attempts. Try again later.',
+        'invalid-credential' => 'Invalid credentials.',
         _ => 'Login failed: ${e.message ?? 'Unknown error.'}',
+      };
+      throw Exception(message);
+    }
+  }
+
+  Future<AuthSessionModel> signUp({
+    required String email,
+    required String password,
+  }) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) {
+      throw Exception('Email is required.');
+    }
+    if (password.length < 6) {
+      throw Exception('Password must be at least 6 characters.');
+    }
+
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+      final user = credential.user!;
+      
+      // Trigger email verification for new account
+      try {
+        await user.sendEmailVerification();
+      } catch (e) {
+        debugPrint('Failed to send verification email: $e');
+      }
+      
+      return _sessionFromUser(user, normalizedEmail);
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'email-already-in-use' => 'An account already exists for this email.',
+        'invalid-email' => 'Invalid email address.',
+        'operation-not-allowed' => 'Email/password accounts are not enabled.',
+        'weak-password' => 'The password provided is too weak.',
+        _ => 'Sign up failed: ${e.message ?? 'Unknown error.'}',
       };
       throw Exception(message);
     }
@@ -127,6 +143,48 @@ class AuthLocalDatasource {
     final user = _auth.currentUser;
     if (user != null && !user.emailVerified) {
       await user.sendEmailVerification();
+    }
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) {
+      throw Exception('Email is required.');
+    }
+    await _auth.sendPasswordResetEmail(email: normalizedEmail);
+  }
+
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.confirmPasswordReset(code: code, newPassword: newPassword);
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'expired-action-code' => 'The reset link has expired.',
+        'invalid-action-code' => 'The reset link is invalid.',
+        'user-disabled' => 'This account has been disabled.',
+        'user-not-found' => 'User not found.',
+        'weak-password' => 'The password provided is too weak.',
+        _ => 'Password reset failed: ${e.message ?? 'Unknown error.'}',
+      };
+      throw Exception(message);
+    }
+  }
+
+  Future<String> verifyPasswordResetCode(String code) async {
+    try {
+      return await _auth.verifyPasswordResetCode(code);
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'expired-action-code' => 'The reset link has expired.',
+        'invalid-action-code' => 'The reset link is invalid.',
+        'user-disabled' => 'This account has been disabled.',
+        'user-not-found' => 'User not found.',
+        _ => 'Verification failed: ${e.message ?? 'Unknown error.'}',
+      };
+      throw Exception(message);
     }
   }
 

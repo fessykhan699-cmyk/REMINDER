@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,9 +10,6 @@ import '../../../../shared/components/premium_primary_button.dart';
 import '../../../../shared/widgets/premium_galaxy_background.dart';
 import '../../domain/entities/auth_session.dart';
 import '../controllers/auth_controller.dart';
-import '../widgets/auth_route_transition.dart';
-import 'forgot_password_screen.dart';
-import 'sign_up_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -119,11 +115,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _openForgotPassword() {
-    Navigator.of(context).push(buildAuthRoute(const ForgotPasswordScreen()));
+    const ForgotPasswordRoute().go(context);
   }
 
   void _openSignUp() {
-    Navigator.of(context).push(buildAuthRoute(const SignUpScreen()));
+    const SignUpRoute().go(context);
   }
 
   @override

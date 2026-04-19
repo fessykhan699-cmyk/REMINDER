@@ -9,6 +9,7 @@ import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
+import '../../domain/usecases/sign_up_usecase.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../data/services/workspace/workspace_provider.dart';
 
@@ -70,6 +71,10 @@ final loginUseCaseProvider = Provider<LoginUseCase>(
 
 final logoutUseCaseProvider = Provider<LogoutUseCase>(
   (ref) => LogoutUseCase(ref.watch(authRepositoryProvider)),
+);
+
+final signUpUseCaseProvider = Provider<SignUpUseCase>(
+  (ref) => SignUpUseCase(ref.watch(authRepositoryProvider)),
 );
 
 final authControllerProvider = NotifierProvider<AuthController, AuthViewState>(
@@ -187,6 +192,76 @@ class AuthController extends Notifier<AuthViewState> {
     try {
       final session = await ref
           .read(loginUseCaseProvider)
+          .call(email: email, password: password);
+
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        session: session,
+        isSubmitting: false,
+        clearError: true,
+      );
+      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
+        session.userId,
+      );
+      _triggerCloudRestore(workspaceOwnerId);
+    } catch (error) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isSubmitting: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      await ref.read(authRepositoryProvider).sendPasswordResetEmail(email: email);
+      state = state.copyWith(isSubmitting: false);
+    } catch (error) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> confirmPasswordReset({
+    required String code,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      await ref.read(authRepositoryProvider).confirmPasswordReset(
+            code: code,
+            newPassword: newPassword,
+          );
+      state = state.copyWith(isSubmitting: false);
+    } catch (error) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<String?> verifyPasswordResetCode(String code) async {
+    try {
+      return await ref.read(authRepositoryProvider).verifyPasswordResetCode(code);
+    } catch (error) {
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+      return null;
+    }
+  }
+
+  Future<void> signUp({required String email, required String password}) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+
+    try {
+      final session = await ref
+          .read(signUpUseCaseProvider)
           .call(email: email, password: password);
 
       state = state.copyWith(

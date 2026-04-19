@@ -235,3 +235,58 @@ final class TeamMembersRoute extends AppRouteSpec {
   @override
   String get location => routePath;
 }
+
+final class ForgotPasswordRoute extends AppRouteSpec {
+  const ForgotPasswordRoute();
+
+  static const String routePath = '/forgot-password';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
+final class ResetPasswordRoute extends AppRouteSpec {
+  const ResetPasswordRoute({this.code});
+
+  static const String routePath = '/reset-password';
+  final String? code;
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location {
+    if (code != null) {
+      return '$routePath?oobCode=$code';
+    }
+    return routePath;
+  }
+}
+
+final class SignUpRoute extends AppRouteSpec {
+  const SignUpRoute();
+
+  static const String routePath = '/signup';
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => routePath;
+}
+
+final class EmailSentRoute extends AppRouteSpec {
+  const EmailSentRoute({required this.email});
+
+  static const String routePath = '/email-sent';
+  final String email;
+
+  @override
+  String get path => routePath;
+
+  @override
+  String get location => '$routePath?email=$email';
+}

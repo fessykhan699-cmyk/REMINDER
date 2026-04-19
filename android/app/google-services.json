@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "276742242102-h2b1pr00fdsuv3fn41ddcgm4h3rfiid7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.apexmobilelabs.reminder",
+            "certificate_hash": "0f82e81d054b0d1a7828f53ac6238788d5493c75"
+          }
+        },
+        {
           "client_id": "276742242102-72vd1njot3c71hoobfpv146cajs3d7u7.apps.googleusercontent.com",
           "client_type": 3
         }
