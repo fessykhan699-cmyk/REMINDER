@@ -27,10 +27,7 @@ void main() {
 
   test('copyWith overrides only specified fields', () {
     final expense = buildExpense();
-    final updated = expense.copyWith(
-      amount: 60.0,
-      description: 'Taxi + toll',
-    );
+    final updated = expense.copyWith(amount: 60.0, description: 'Taxi + toll');
 
     expect(updated.amount, 60.0);
     expect(updated.description, 'Taxi + toll');

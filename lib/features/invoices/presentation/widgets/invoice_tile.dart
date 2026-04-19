@@ -123,7 +123,9 @@ class InvoiceTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: spacingSM),
-                      InvoiceStatusBadge(status: invoice.status),
+                      InvoiceStatusBadge(
+                        status: invoice.status,
+                      ),
                       if (invoice.totalPaid > 0) ...[
                         const SizedBox(height: 4),
                         Text(

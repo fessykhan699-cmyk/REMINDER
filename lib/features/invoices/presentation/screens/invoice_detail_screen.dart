@@ -168,11 +168,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       return;
     }
 
-    if (invoice.isFullyPaid) {
-      _showSnackBar('Invoice is already fully paid');
-      return;
-    }
-
     final amountController = TextEditingController(
       text: invoice.remainingBalance.toStringAsFixed(2),
     );
@@ -274,11 +269,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       _showSnackBar('Please enter a valid amount');
                       return;
                     }
-                    if (amount > invoice.remainingBalance + 0.01) {
-                      _showSnackBar('Amount exceeds remaining balance');
-                      return;
-                    }
-
                     Navigator.pop(context);
                     await _addPayment(
                       invoice,
@@ -719,7 +709,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       children: [
                         _InfoRow(
                           label: 'Status',
-                          value: InvoiceStatusBadge(status: invoice.status),
+                          value: InvoiceStatusBadge(
+                            status: invoice.status,
+                          ),
                         ),
                         const SizedBox(height: spacingSM),
                         _InfoRow(
@@ -804,6 +796,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
                   const SizedBox(height: spacingMD),
 
+
                   if (invoice.items.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
@@ -877,16 +870,18 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
-                          if (invoice.status != InvoiceStatus.paid)
-                            Text(
-                              'Balance: ${AppFormatters.currency(invoice.remainingBalance, currencyCode: invoice.currencyCode)}',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: invoice.totalPaid > 0
-                                    ? AppColors.danger
-                                    : AppColors.textSecondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          Text(
+                            'Balance: ${AppFormatters.currency(
+                              invoice.remainingBalance,
+                              currencyCode: invoice.currencyCode,
+                            )}',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: invoice.totalPaid > 0
+                                      ? AppColors.danger
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
                         ],
                       ),
                     ),
@@ -1044,7 +1039,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               ? 'Adding Payment...'
                               : 'Add Partial Payment',
                           isLoading: _isAddingPayment,
-                          onTap: invoice.isFullyPaid || _isAddingPayment
+                          onTap: invoice.status == InvoiceStatus.paid ||
+                                  _isAddingPayment
                               ? null
                               : () => _showAddPaymentSheet(invoice),
                           showTopBorder: true,

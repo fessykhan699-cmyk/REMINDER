@@ -40,10 +40,6 @@ class InvoiceStatusService {
   InvoiceStatus resolveStatus(Invoice invoice, {DateTime? now}) {
     final currentTime = now ?? DateTime.now();
     
-    // Final status remains final
-    if (invoice.status == InvoiceStatus.paid) {
-      return InvoiceStatus.paid;
-    }
 
     // Auto-resolve to Paid if fully paid
     if (invoice.isFullyPaid) {
@@ -60,7 +56,11 @@ class InvoiceStatusService {
       return InvoiceStatus.overdue;
     }
 
-    if (invoice.status == InvoiceStatus.overdue) {
+    // If it was paid or partially paid but no longer is, reset to a pending state.
+    // We default to 'sent' as a safe fallback for previously processed invoices.
+    if (invoice.status == InvoiceStatus.paid || 
+        invoice.status == InvoiceStatus.partiallyPaid ||
+        invoice.status == InvoiceStatus.overdue) {
       return InvoiceStatus.sent;
     }
 

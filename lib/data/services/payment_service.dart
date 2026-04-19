@@ -4,6 +4,7 @@ import '../../features/invoices/domain/entities/invoice.dart';
 import '../../domain/entities/payment.dart';
 import '../../features/invoices/presentation/controllers/invoices_controller.dart';
 import '../../features/subscription/presentation/controllers/subscription_controller.dart';
+import '../../shared/services/invoice_status_service.dart';
 
 final paymentServiceProvider = Provider<PaymentService>((ref) {
   return PaymentService(ref);
@@ -27,7 +28,7 @@ class PaymentService {
         return null;
       }
 
-      if (amount <= 0 || amount > invoice.remainingBalance) {
+      if (amount <= 0) {
         debugPrint('[PaymentService] Invalid payment amount: $amount');
         return null;
       }
@@ -40,15 +41,13 @@ class PaymentService {
         paymentMethod: paymentMethod,
       );
 
+      final statusService = _ref.read(invoiceStatusServiceProvider);
       var updatedInvoice = invoice.copyWith(
         payments: [...invoice.payments, newPayment],
       );
-
-      if (updatedInvoice.isFullyPaid) {
-        updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.paid);
-      } else {
-        updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.partiallyPaid);
-      }
+      updatedInvoice = updatedInvoice.copyWith(
+        status: statusService.resolveStatus(updatedInvoice),
+      );
 
       final repository = _ref.read(invoiceRepositoryProvider);
       final saved = await repository.updateInvoice(updatedInvoice);
@@ -66,20 +65,13 @@ class PaymentService {
   }) async {
     try {
       final updatedPayments = invoice.payments.where((p) => p.id != paymentId).toList();
-      var updatedInvoice = invoice.copyWith(payments: updatedPayments);
-
-      if (invoice.status == InvoiceStatus.paid && !updatedInvoice.isFullyPaid) {
-        // Reset status
-        final now = DateTime.now();
-        if (updatedInvoice.dueDate.isBefore(now)) {
-          updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.overdue);
-        } else {
-          // If not overdue, set to 'sent' or whatever the previous state should be.
-          // The Instructions say: "sent (or the existing pre-paid status)".
-          // We'll use 'sent' as a safe default for a non-paid, non-overdue invoice that was once paid.
-          updatedInvoice = updatedInvoice.copyWith(status: InvoiceStatus.sent);
-        }
-      }
+      final statusService = _ref.read(invoiceStatusServiceProvider);
+      var updatedInvoice = invoice.copyWith(
+        payments: updatedPayments,
+      );
+      updatedInvoice = updatedInvoice.copyWith(
+        status: statusService.resolveStatus(updatedInvoice),
+      );
 
       final repository = _ref.read(invoiceRepositoryProvider);
       final saved = await repository.updateInvoice(updatedInvoice);

@@ -4,7 +4,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/invoice.dart';
 
 class InvoiceStatusBadge extends StatelessWidget {
-  const InvoiceStatusBadge({super.key, required this.status});
+  const InvoiceStatusBadge({
+    super.key,
+    required this.status,
+  });
 
   final InvoiceStatus status;
 
@@ -28,6 +31,7 @@ class InvoiceStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _color;
+    final label = status.label.toUpperCase();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -37,7 +41,7 @@ class InvoiceStatusBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
-        status.label.toUpperCase(),
+        label,
         style: TextStyle(
           color: color,
           fontSize: 11,

@@ -126,13 +126,26 @@ class Invoice {
 
   double get totalPaid => payments.fold(0.0, (sum, p) => sum + p.amount);
 
-  bool get isFullyPaid => totalPaid >= (amount - 0.01);
+  bool get isFullyPaid {
+    // Round to 2 decimal places to avoid floating point precision issues
+    final roundedTotalPaid = double.parse(totalPaid.toStringAsFixed(2));
+    final roundedAmount = double.parse(amount.toStringAsFixed(2));
+    return roundedTotalPaid >= roundedAmount;
+  }
 
-  bool get isPartiallyPaid => totalPaid > 0.01 && !isFullyPaid;
+  bool get isPartiallyPaid {
+    final roundedTotalPaid = double.parse(totalPaid.toStringAsFixed(2));
+    return roundedTotalPaid > 0 && !isFullyPaid;
+  }
 
   double get remainingBalance {
     final balance = amount - totalPaid;
     return balance < 0 ? 0.0 : balance;
+  }
+
+  double get overpaidAmount {
+    final surplus = totalPaid - amount;
+    return surplus < 0 ? 0.0 : surplus;
   }
 
 

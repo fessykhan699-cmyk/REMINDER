@@ -268,11 +268,10 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   }
 
   Future<Invoice> markInvoicePaid(Invoice invoice) async {
-    final nextStatus = _invoiceStatusService.markPaid(invoice);
-    var updated = nextStatus;
+    var updated = invoice;
 
-    // If marking as paid and there's a balance, add a payment record to cover it
-    if (updated.status == InvoiceStatus.paid && updated.remainingBalance > 0) {
+    // If there's a balance, add a payment record to cover it
+    if (updated.remainingBalance > 0) {
       final payment = Payment(
         id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
         amount: updated.remainingBalance,
@@ -283,14 +282,11 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       updated = updated.copyWith(payments: [...updated.payments, payment]);
     }
 
-    await updateInvoice(updated);
+    // Now mark it as paid (this will correctly resolve the status to 'paid' 
+    // because isFullyPaid will now be true)
+    updated = _invoiceStatusService.markPaid(updated);
 
-    // Log to Analytics
-    AnalyticsService.instance.logInvoicePaid(
-      invoiceId: updated.id,
-      amount: updated.amount,
-      currency: updated.currencyCode,
-    );
+    await updateInvoice(updated);
 
     return updated;
   }
