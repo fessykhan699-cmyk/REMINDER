@@ -684,11 +684,13 @@ pw.Widget _buildTotalsBox({
           pw.SizedBox(height: _spaceSm),
           _summaryLine('Discount', '-$discountLabel'),
         ],
-        pw.SizedBox(height: _spaceSm),
-        _summaryLine(
-          'Tax${taxPercent > 0 ? ' (${taxPercent.toStringAsFixed(0)}%)' : ''}',
-          taxLabel,
-        ),
+        if (taxPercent > 0) ...[
+          pw.SizedBox(height: _spaceSm),
+          _summaryLine(
+            'Tax (${taxPercent.toStringAsFixed(0)}%)',
+            taxLabel,
+          ),
+        ],
         pw.SizedBox(height: _spaceSm),
         pw.Divider(color: _pdfBorder, height: 1),
         pw.SizedBox(height: _spaceSm),

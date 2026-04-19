@@ -260,7 +260,7 @@ class _TeamMembersScreenState extends ConsumerState<TeamMembersScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You have reached the 2 member limit.')),
+        const SnackBar(content: Text('You have reached the 3 user limit for the Business plan.')),
       );
     } on MemberNotFoundException {
       if (!mounted) {

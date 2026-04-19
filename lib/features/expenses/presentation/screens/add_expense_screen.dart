@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -111,14 +114,36 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       const SizedBox(height: spacingMD),
                       InkWell(
                         onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
+                          DateTime? picked;
+                          if (Platform.isIOS) {
+                            DateTime iosSelected = _selectedDate;
+                            await showCupertinoModalPopup<void>(
+                              context: context,
+                              builder: (BuildContext ctx) => SizedBox(
+                                height: 260,
+                                child: CupertinoDatePicker(
+                                  mode: CupertinoDatePickerMode.date,
+                                  initialDateTime: iosSelected,
+                                  minimumDate: DateTime(2020),
+                                  maximumDate: DateTime.now()
+                                      .add(const Duration(days: 365)),
+                                  onDateTimeChanged: (date) =>
+                                      iosSelected = date,
+                                ),
+                              ),
+                            );
+                            picked = iosSelected;
+                          } else {
+                            picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now()
+                                  .add(const Duration(days: 365)),
+                            );
+                          }
                           if (picked != null) {
-                            setState(() => _selectedDate = picked);
+                            setState(() => _selectedDate = picked!);
                           }
                         },
                         child: InputDecorator(

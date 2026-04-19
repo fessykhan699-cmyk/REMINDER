@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../components/glass_card.dart';
@@ -154,7 +155,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                                 const Spacer(),
                                 if (option.code == _selectedCountryCode)
                                   const Icon(
-                                    Icons.check,
+                                    RemixIcons.check_line,
                                     color: AppColors.accent,
                                     size: 20,
                                   ),
@@ -205,7 +206,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
               ),
             ),
             const Icon(
-              Icons.arrow_drop_down,
+              RemixIcons.arrow_down_s_line,
               color: AppColors.textSecondary,
               size: 20,
             ),

@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:remixicon/remixicon.dart';
 import '../../../../data/services/analytics_service.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,6 +22,7 @@ import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
 import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+
 import '../../../../data/services/payment_service.dart';
 import '../../domain/entities/invoice.dart';
 import '../controllers/invoices_controller.dart';
@@ -176,115 +181,230 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     String? selectedMethod = 'bank_transfer';
 
     const paymentMethods = [
-      {'id': 'cash', 'label': 'Cash'},
-      {'id': 'bank_transfer', 'label': 'Bank Transfer'},
-      {'id': 'cheque', 'label': 'Cheque'},
-      {'id': 'card', 'label': 'Card'},
-      {'id': 'crypto', 'label': 'Crypto'},
-      {'id': 'other', 'label': 'Other'},
+      {'id': 'bank_transfer', 'label': 'Bank Transfer', 'icon': Icons.account_balance_outlined},
+      {'id': 'cash', 'label': 'Cash', 'icon': Icons.payments_outlined},
+      {'id': 'cheque', 'label': 'Cheque', 'icon': Icons.wallet_outlined},
+      {'id': 'card', 'label': 'Card', 'icon': Icons.credit_card_outlined},
+      {'id': 'crypto', 'label': 'Crypto', 'icon': Icons.currency_bitcoin_outlined},
+      {'id': 'other', 'label': 'Other', 'icon': Icons.more_horiz_outlined},
     ];
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) => Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            color: AppColors.backgroundSecondary,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(color: AppColors.accent.withValues(alpha: 0.2), width: 1),
+            ),
           ),
-          padding: EdgeInsets.fromLTRB(
+          padding: const EdgeInsets.fromLTRB(
             spacingMD,
+            spacingSM,
             spacingMD,
-            spacingMD,
-            MediaQuery.of(context).viewInsets.bottom + spacingMD,
+            spacingLG,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Add Payment',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: spacingMD),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Amount',
-                  prefixText: '${invoice.currencyCode} ',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: spacingSM),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_today_outlined),
-                title: const Text('Date'),
-                trailing: Text(AppFormatters.shortDate(selectedDate)),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setSheetState(() => selectedDate = picked);
-                  }
-                },
-              ),
-              const SizedBox(height: spacingSM),
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Note (Optional)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: spacingSM),
-              DropdownButtonFormField<String>(
-                initialValue: selectedMethod,
-                decoration: const InputDecoration(
-                  labelText: 'Payment Method',
-                  border: OutlineInputBorder(),
-                ),
-                items: paymentMethods.map((m) {
-                  return DropdownMenuItem(
-                    value: m['id'],
-                    child: Text(m['label']!),
-                  );
-                }).toList(),
-                onChanged: (val) => setSheetState(() => selectedMethod = val),
-              ),
-              const SizedBox(height: spacingLG),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final amount = double.tryParse(amountController.text) ?? 0;
-                    if (amount <= 0) {
-                      _showSnackBar('Please enter a valid amount');
-                      return;
-                    }
-                    Navigator.pop(context);
-                    await _addPayment(
-                      invoice,
-                      amount,
-                      selectedDate,
-                      noteController.text,
-                      selectedMethod,
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.all(spacingMD),
-                    child: Text('Record Payment'),
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: spacingMD),
+                      decoration: BoxDecoration(
+                        color: AppColors.textMuted.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
-                ),
+                  Row(
+                    children: [
+                      const Icon(Icons.add_card_rounded, color: AppColors.accent, size: 24),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Record Payment',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: spacingLG),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: '${invoice.currencyCode} ',
+                      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent),
+                    ),
+                  ),
+                  const SizedBox(height: spacingMD),
+                  InkWell(
+                    onTap: () async {
+                      DateTime? picked;
+                      if (Platform.isIOS) {
+                        DateTime iosSelected = selectedDate;
+                        await showCupertinoModalPopup<void>(
+                          context: context,
+                          builder: (BuildContext ctx) => SizedBox(
+                            height: 260,
+                            child: CupertinoDatePicker(
+                              mode: CupertinoDatePickerMode.date,
+                              initialDateTime: iosSelected,
+                              minimumDate: DateTime(2000),
+                              maximumDate: DateTime(2100),
+                              onDateTimeChanged: (date) =>
+                                  iosSelected = date,
+                            ),
+                          ),
+                        );
+                        picked = iosSelected;
+                      } else {
+                        picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                      }
+                      if (picked != null) {
+                        setSheetState(() => selectedDate = picked!);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(spacingMD),
+                      decoration: BoxDecoration(
+                        color: AppColors.glassFill,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.glassBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined, size: 20, color: AppColors.accent),
+                          const SizedBox(width: 12),
+                          const Expanded(child: Text('Payment Date')),
+                          Text(
+                            AppFormatters.shortDate(selectedDate),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: spacingMD),
+                  if (Platform.isIOS)
+                    InkWell(
+                      onTap: () async {
+                        await showCupertinoModalPopup<void>(
+                          context: context,
+                          builder: (_) => CupertinoActionSheet(
+                            title: const Text('Payment Method'),
+                            actions: paymentMethods
+                                .map(
+                                  (m) => CupertinoActionSheetAction(
+                                    onPressed: () {
+                                      setSheetState(
+                                        () => selectedMethod =
+                                            m['id'] as String,
+                                      );
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text(m['label'] as String),
+                                  ),
+                                )
+                                .toList(),
+                            cancelButton: CupertinoActionSheetAction(
+                              onPressed: () => Navigator.pop(context),
+                              isDefaultAction: true,
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                        );
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Method',
+                        ),
+                        child: Text(
+                          paymentMethods.firstWhere(
+                            (m) => m['id'] == selectedMethod,
+                            orElse: () => paymentMethods.first,
+                          )['label'] as String,
+                        ),
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedMethod,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Method',
+                      ),
+                      dropdownColor: AppColors.backgroundSecondary,
+                      items: paymentMethods.map((m) {
+                        return DropdownMenuItem(
+                          value: m['id'] as String,
+                          child: Row(
+                            children: [
+                              Icon(m['icon'] as IconData,
+                                  size: 18,
+                                  color: AppColors.textSecondary),
+                              const SizedBox(width: 12),
+                              Text(m['label'] as String),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) =>
+                          setSheetState(() => selectedMethod = val),
+                    ),
+                  const SizedBox(height: spacingMD),
+                  TextField(
+                    controller: noteController,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Note (Optional)',
+                      hintText: 'e.g. Reference #12345',
+                    ),
+                  ),
+                  const SizedBox(height: spacingLG),
+                  PremiumPrimaryButton(
+                    label: 'Record Payment',
+                    onPressed: () async {
+                      final amount = double.tryParse(amountController.text) ?? 0;
+                      if (amount <= 0) {
+                        _showSnackBar('Please enter a valid amount');
+                        return;
+                      }
+                      Navigator.pop(context);
+                      await _addPayment(
+                        invoice,
+                        amount,
+                        selectedDate,
+                        noteController.text,
+                        selectedMethod,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -859,28 +979,42 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   // ── Payments section ──
                   if (invoice.status != InvoiceStatus.draft) ...[
                     Padding(
-                      padding: const EdgeInsets.only(left: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
                             'Payments',
                             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          Text(
-                            'Balance: ${AppFormatters.currency(
-                              invoice.remainingBalance,
-                              currencyCode: invoice.currencyCode,
-                            )}',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: invoice.totalPaid > 0
-                                      ? AppColors.danger
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.accent,
                                 ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Remaining Balance',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                              ),
+                              Text(
+                                AppFormatters.currency(
+                                  invoice.remainingBalance,
+                                  currencyCode: invoice.currencyCode,
+                                ),
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      color: invoice.remainingBalance > 0
+                                          ? AppColors.danger
+                                          : AppColors.success,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14,
+                                    ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -893,18 +1027,38 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           children: [
                             if (invoice.payments.isEmpty)
                               Padding(
-                                padding: const EdgeInsets.all(spacingMD),
-                                child: Text(
-                                  'No payments recorded yet.',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontStyle: FontStyle.italic,
-                                  ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: spacingMD,
+                                  vertical: spacingLG,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.payments_outlined,
+                                        size: 40, color: AppColors.textMuted.withValues(alpha: 0.3)),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'No payments recorded yet.',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               )
                             else
                               ...invoice.payments.asMap().entries.map((entry) {
                                 final idx = entry.key;
                                 final payment = entry.value;
+                                
+                                // Map payment method to icon
+                                IconData methodIcon = Icons.payment_outlined;
+                                final method = payment.paymentMethod?.toLowerCase() ?? '';
+                                if (method.contains('bank')) methodIcon = Icons.account_balance_outlined;
+                                if (method.contains('cash')) methodIcon = Icons.payments_outlined;
+                                if (method.contains('cheque')) methodIcon = Icons.wallet_outlined;
+                                if (method.contains('card')) methodIcon = Icons.credit_card_outlined;
+                                if (method.contains('crypto')) methodIcon = Icons.currency_bitcoin_outlined;
+
                                 return Column(
                                   children: [
                                     if (idx > 0)
@@ -912,31 +1066,42 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                                         height: 1,
                                         indent: spacingMD,
                                         endIndent: spacingMD,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .outlineVariant
-                                            .withValues(alpha: 0.5),
+                                        color: AppColors.glassBorder,
                                       ),
                                     ListTile(
                                       contentPadding: const EdgeInsets.symmetric(
                                         horizontal: spacingMD,
                                         vertical: 4,
                                       ),
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(methodIcon, size: 20, color: AppColors.accent),
+                                      ),
                                       title: Text(
                                         AppFormatters.currency(payment.amount,
                                             currencyCode: invoice.currencyCode),
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                          color: AppColors.textPrimary,
+                                        ),
                                       ),
                                       subtitle: Text(
                                         '${AppFormatters.shortDate(payment.date)}'
                                         '${payment.paymentMethod != null ? ' • ${payment.paymentMethod!.replaceAll('_', ' ').split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ')}' : ''}'
-                                        '${payment.note != null ? ' • ${payment.note}' : ''}',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        '${payment.note != null && payment.note!.isNotEmpty ? '\n${payment.note}' : ''}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          height: 1.2,
+                                        ),
                                       ),
                                       trailing: IconButton(
                                         icon: const Icon(Icons.delete_outline, size: 20),
                                         onPressed: () => _removePayment(invoice, payment.id),
-                                        color: AppColors.danger.withValues(alpha: 0.7),
+                                        color: AppColors.danger.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
@@ -960,6 +1125,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                                     'Partial Payment Tracking',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -972,7 +1138,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                                 color: AppColors.textSecondary,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             PremiumPrimaryButton(
                               label: 'Upgrade to Pro',
                               onPressed: () async {
@@ -982,7 +1148,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           ],
                         ),
                       ),
-                    const SizedBox(height: spacingMD),
+                    const SizedBox(height: spacingLG),
                   ],
 
                   // ── Actions card ──
@@ -1001,7 +1167,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                               : () => _sendViaWhatsApp(invoice),
                         ),
                         _ActionRow(
-                          icon: Icons.share_outlined,
+                          icon: RemixIcons.share_line,
                           label: _isSharingPdf ? 'Sharing PDF...' : 'Share PDF',
                           isLoading: _isSharingPdf,
                           onTap: _isPdfBusy
@@ -1010,7 +1176,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           showTopBorder: true,
                         ),
                         _ActionRow(
-                          icon: Icons.picture_as_pdf_outlined,
+                          icon: RemixIcons.file_pdf_line,
                           label: _isOpeningPdfPreview
                               ? 'Opening PDF...'
                               : 'Open PDF',
@@ -1021,7 +1187,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           showTopBorder: true,
                         ),
                         _ActionRow(
-                          icon: Icons.check_circle_outline,
+                          icon: RemixIcons.checkbox_circle_line,
                           label: _isMarkingPaid
                               ? 'Marking Paid...'
                               : 'Mark as Paid',
@@ -1034,7 +1200,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           showTopBorder: true,
                         ),
                         _ActionRow(
-                          icon: Icons.add_card_outlined,
+                          icon: RemixIcons.bank_card_line,
                           label: _isAddingPayment
                               ? 'Adding Payment...'
                               : 'Add Partial Payment',
@@ -1046,13 +1212,13 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                           showTopBorder: true,
                         ),
                         _ActionRow(
-                          icon: Icons.message,
+                          icon: RemixIcons.message_3_line,
                           label: 'Send WhatsApp Reminder',
                           onTap: () => _showWhatsAppReminderSheet(invoice),
                           showTopBorder: true,
                         ),
                         _ActionRow(
-                          icon: Icons.email_outlined,
+                          icon: RemixIcons.mail_line,
                           label: _isSendingEmail ? 'Opening Email...' : 'Email Invoice',
                           isLoading: _isSendingEmail,
                           onTap: _isPdfBusy
@@ -1095,7 +1261,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       ),
     );
   }
-}
+  }
+
 
 bool subscriptionIsPro(WidgetRef ref) {
   final subscription = ref.read(subscriptionControllerProvider).valueOrNull;
@@ -1186,7 +1353,7 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.arrow_forward_ios,
+                RemixIcons.arrow_right_s_line,
                 size: 14,
                 color: onTap == null
                     ? theme.disabledColor
@@ -1213,30 +1380,51 @@ class _ReminderOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(spacingMD),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.12)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(
-              preview,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: spacingMD, vertical: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(spacingLG),
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.04),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.12)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accent,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      preview,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                RemixIcons.arrow_right_s_line,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
         ),
       ),
     );

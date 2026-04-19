@@ -1,3 +1,6 @@
+@Tags(['native'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:reminder/features/subscription/domain/entities/subscription_state.dart';

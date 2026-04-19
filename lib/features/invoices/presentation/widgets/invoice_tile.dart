@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -71,7 +72,7 @@ class InvoiceTile extends StatelessWidget {
                             if (invoice.isRecurring) ...[
                               const SizedBox(width: 4),
                               const Icon(
-                                Icons.sync_rounded,
+                                RemixIcons.refresh_line,
                                 size: 14,
                                 color: AppColors.accent,
                               ),

@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -99,8 +103,27 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     );
   }
 
-  Future<DateTime?> _showDueDatePicker() {
+  Future<DateTime?> _showDueDatePicker() async {
     FocusScope.of(context).unfocus();
+
+    if (Platform.isIOS) {
+      DateTime iosSelected =
+          _selectedDueDate ?? DateTime.now().add(const Duration(days: 7));
+      await showCupertinoModalPopup<void>(
+        context: context,
+        builder: (BuildContext ctx) => SizedBox(
+          height: 260,
+          child: CupertinoDatePicker(
+            mode: CupertinoDatePickerMode.date,
+            initialDateTime: iosSelected,
+            minimumDate: DateTime.now().subtract(const Duration(days: 365)),
+            maximumDate: DateTime.now().add(const Duration(days: 3650)),
+            onDateTimeChanged: (date) => iosSelected = date,
+          ),
+        ),
+      );
+      return iosSelected;
+    }
 
     return showDatePicker(
       context: context,
@@ -845,7 +868,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             ),
             TextButton.icon(
               onPressed: _showAddLineItemDialog,
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(RemixIcons.add_line, size: 18),
               label: const Text('Add Item'),
             ),
           ],
@@ -883,11 +906,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
+                      icon: const Icon(RemixIcons.edit_line, size: 20),
                       onPressed: () => _showEditLineItemDialog(index),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      icon: const Icon(RemixIcons.delete_bin_line, size: 20, color: Colors.red),
                       onPressed: () {
                         setState(() {
                           _lineItems.removeAt(index);
@@ -926,7 +949,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         title: const Text('Create Invoice'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.copy_rounded),
+            icon: const Icon(RemixIcons.file_copy_line),
             onPressed: _showTemplatePicker,
             tooltip: 'Templates',
           ),
@@ -1116,7 +1139,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   const Icon(
-                                    Icons.expand_more_rounded,
+                                    RemixIcons.arrow_down_s_line,
                                     color: AppColors.textSecondary,
                                   ),
                                 ],
@@ -1206,7 +1229,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                                   ),
                                   const SizedBox(width: 12),
                                   const Icon(
-                                    Icons.calendar_today_outlined,
+                                    RemixIcons.calendar_line,
                                     size: 18,
                                     color: AppColors.textSecondary,
                                   ),
@@ -1356,7 +1379,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                     ),
                   ),
                   const Icon(
-                    Icons.expand_more_rounded,
+                    RemixIcons.arrow_down_s_line,
                     color: AppColors.textSecondary,
                   ),
                 ],
@@ -1402,7 +1425,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                   .map((interval) => ListTile(
                         title: Text(interval.label),
                         trailing: _recurringInterval == interval
-                            ? const Icon(Icons.check, color: AppColors.accent)
+                            ? const Icon(RemixIcons.check_line, color: AppColors.accent)
                             : null,
                         onTap: () {
                           setState(() {
@@ -1824,7 +1847,7 @@ class _ClientPickerSheetState extends ConsumerState<_ClientPickerSheet> {
             child: PremiumPrimaryButton(
               label: 'Add New Client',
               variant: PremiumButtonVariant.secondary,
-              leading: const Icon(Icons.add_rounded, size: 18),
+              leading: const Icon(RemixIcons.add_line, size: 18),
               onPressed: () async {
                 setState(() => _showAddForm = true);
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1979,7 +2002,7 @@ class _BottomSheetHeader extends StatelessWidget {
                 IconButton(
                   onPressed: onBack,
                   visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.arrow_back_rounded),
+                  icon: const Icon(RemixIcons.arrow_left_line),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -2081,8 +2104,8 @@ class _ClientListTile extends StatelessWidget {
               const SizedBox(width: 12),
               Icon(
                 isSelected
-                    ? Icons.check_circle_rounded
-                    : Icons.chevron_right_rounded,
+                    ? RemixIcons.checkbox_circle_line
+                    : RemixIcons.arrow_right_s_line,
                 color: isSelected ? AppColors.accent : AppColors.textSecondary,
               ),
             ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../adaptive/adaptive_system_controller.dart';
 import '../../core/constants/app_routes.dart';
@@ -12,6 +13,8 @@ import '../../features/settings/presentation/controllers/app_preferences_control
 import '../../features/subscription/domain/entities/subscription_state.dart';
 import '../../features/subscription/presentation/controllers/subscription_controller.dart';
 import '../../features/subscription/presentation/widgets/upgrade_prompt_sheet.dart';
+import '../providers/ui_providers.dart';
+
 
 class AppShellScaffold extends ConsumerStatefulWidget {
   const AppShellScaffold({
@@ -153,9 +156,9 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return _AdaptiveNavItem(
           tab: tab,
           branchIndex: _branchIndexForTab(tab),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.space_dashboard_outlined),
-            selectedIcon: Icon(Icons.space_dashboard_rounded),
+          destination: NavigationDestination(
+            icon: Icon(RemixIcons.dashboard_3_line),
+            selectedIcon: Icon(RemixIcons.dashboard_3_fill),
             label: 'Dashboard',
           ),
         );
@@ -163,9 +166,9 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return _AdaptiveNavItem(
           tab: tab,
           branchIndex: _branchIndexForTab(tab),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long_rounded),
+          destination: NavigationDestination(
+            icon: Icon(RemixIcons.file_list_3_line),
+            selectedIcon: Icon(RemixIcons.file_list_3_fill),
             label: 'Invoices',
           ),
         );
@@ -173,9 +176,9 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return _AdaptiveNavItem(
           tab: tab,
           branchIndex: _branchIndexForTab(tab),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+          destination: NavigationDestination(
+            icon: Icon(RemixIcons.wallet_3_line),
+            selectedIcon: Icon(RemixIcons.wallet_3_fill),
             label: 'Expenses',
           ),
         );
@@ -183,9 +186,9 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return _AdaptiveNavItem(
           tab: tab,
           branchIndex: _branchIndexForTab(tab),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups_rounded),
+          destination: NavigationDestination(
+            icon: Icon(RemixIcons.group_line),
+            selectedIcon: Icon(RemixIcons.group_fill),
             label: 'Clients',
           ),
         );
@@ -193,9 +196,9 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         return _AdaptiveNavItem(
           tab: tab,
           branchIndex: _branchIndexForTab(tab),
-          destination: const NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings_rounded),
+          destination: NavigationDestination(
+            icon: Icon(RemixIcons.settings_3_line),
+            selectedIcon: Icon(RemixIcons.settings_3_fill),
             label: 'Settings',
           ),
         );
@@ -269,21 +272,21 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.add_rounded),
+                leading: const Icon(RemixIcons.add_line),
                 title: const Text('Create Invoice'),
                 onTap: () {
                   Navigator.of(sheetContext).pop(_FabSheetAction.createInvoice);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.person_add_alt_1_rounded),
+                leading: const Icon(RemixIcons.user_add_line),
                 title: const Text('Add Client'),
                 onTap: () {
                   Navigator.of(sheetContext).pop(_FabSheetAction.addClient);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.notifications_active_rounded),
+                leading: const Icon(RemixIcons.notification_4_line),
                 title: const Text('Send Reminder'),
                 onTap: () {
                   Navigator.of(sheetContext).pop(_FabSheetAction.sendReminder);
@@ -357,7 +360,12 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
     }
   }
 
-  Widget? _buildFloatingActionButton(BuildContext context) {
+  Widget? _buildFloatingActionButton(BuildContext context, WidgetRef ref) {
+    final isVisible = ref.watch(isGloballyFabVisibleProvider);
+    if (!isVisible) {
+      return null;
+    }
+
     if (widget.currentLocation.startsWith(SettingsTabRoute.routePath)) {
       return null;
     }
@@ -374,7 +382,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
         shape: const CircleBorder(),
         backgroundColor: AppColors.accent,
         foregroundColor: AppColors.textPrimary,
-        child: const Icon(Icons.add),
+        child: const Icon(RemixIcons.add_line),
       ),
     );
   }
@@ -394,7 +402,7 @@ class _AppShellScaffoldState extends ConsumerState<AppShellScaffold> {
       extendBody: true,
       resizeToAvoidBottomInset: true,
       body: widget.navigationShell,
-      floatingActionButton: _buildFloatingActionButton(context),
+      floatingActionButton: _buildFloatingActionButton(context, ref),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: SafeArea(
         top: false,

@@ -8,6 +8,7 @@ import '../../features/subscription/presentation/controllers/subscription_contro
 import '../../data/services/invoice_numbering_service.dart';
 import '../../features/settings/presentation/controllers/app_preferences_controller.dart';
 import '../../data/services/analytics_service.dart';
+import '../../shared/services/notification_service.dart';
 
 final recurringInvoiceSchedulerProvider = Provider<RecurringInvoiceScheduler>((ref) {
   return RecurringInvoiceScheduler(ref);
@@ -89,13 +90,24 @@ class RecurringInvoiceScheduler {
 
     await repository.createInvoice(newInvoice);
     await numberingService.incrementNextInvoiceNumber();
-    
-    // Log to Analytics
+
     AnalyticsService.instance.logRecurringInvoiceCreated(
       parentInvoiceId: parent.id,
       newInvoiceId: newInvoice.id,
     );
-    
+
+    try {
+      final notificationService = _ref.read(notificationServiceProvider);
+      await notificationService.showInstantReminder(
+        id: newInvoiceId.hashCode.abs() % 100000,
+        title: 'Recurring invoice created',
+        body: 'New draft invoice for ${parent.clientName} has been auto-generated.',
+        payload: newInvoice.id,
+      );
+    } catch (e) {
+      debugPrint('RecurringInvoiceScheduler notification error: $e');
+    }
+
     debugPrint('Generated recurring draft ${newInvoice.invoiceNumber} from parent ${parent.invoiceNumber}');
   }
 }

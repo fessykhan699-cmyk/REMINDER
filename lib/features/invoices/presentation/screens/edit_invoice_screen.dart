@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -105,12 +108,33 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
 
   Future<void> _pickDueDate() async {
     final initial = _dueDate ?? DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
-      initialDate: initial,
-    );
+    DateTime? picked;
+
+    if (Platform.isIOS) {
+      DateTime iosSelected = initial;
+      await showCupertinoModalPopup<void>(
+        context: context,
+        builder: (BuildContext ctx) => SizedBox(
+          height: 260,
+          child: CupertinoDatePicker(
+            mode: CupertinoDatePickerMode.date,
+            initialDateTime: iosSelected,
+            minimumDate: DateTime.now().subtract(const Duration(days: 365)),
+            maximumDate: DateTime.now().add(const Duration(days: 3650)),
+            onDateTimeChanged: (date) => iosSelected = date,
+          ),
+        ),
+      );
+      picked = iosSelected;
+    } else {
+      picked = await showDatePicker(
+        context: context,
+        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+        lastDate: DateTime.now().add(const Duration(days: 3650)),
+        initialDate: initial,
+      );
+    }
+
     if (!mounted || picked == null) return;
     setState(() => _dueDate = picked);
     _dueDateController.text = AppFormatters.shortDate(picked);

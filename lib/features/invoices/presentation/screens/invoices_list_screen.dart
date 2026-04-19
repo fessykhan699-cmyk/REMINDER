@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:remixicon/remixicon.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -195,7 +196,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                           foregroundColor: AppColors.textPrimary,
                           shape: const CircleBorder(),
                         ),
-                        icon: const Icon(Icons.file_download_outlined, size: 20),
+                        icon: const Icon(RemixIcons.file_download_line, size: 20),
                       ),
                       const SizedBox(width: spacingSM),
                       IconButton(
@@ -207,7 +208,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                           foregroundColor: AppColors.textPrimary,
                           shape: const CircleBorder(),
                         ),
-                        icon: const Icon(Icons.add, size: 20),
+                        icon: const Icon(RemixIcons.add_line, size: 20),
                       ),
                     ],
                   ),
@@ -245,10 +246,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                       onChanged: (val) => ref.read(invoiceSearchQueryProvider.notifier).state = val,
                       decoration: InputDecoration(
                         hintText: 'Search by client, invoice number, or item',
-                        prefixIcon: const Icon(Icons.search, size: 20),
+                        prefixIcon: const Icon(RemixIcons.search_2_line, size: 20),
                         suffixIcon: query.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
+                                icon: const Icon(RemixIcons.close_circle_line, size: 18),
                                 onPressed: () {
                                   _searchController.clear();
                                   ref.read(invoiceSearchQueryProvider.notifier).state = "";
@@ -314,7 +315,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.date_range, size: 18),
+                                const Icon(RemixIcons.calendar_2_line, size: 18),
                                 const SizedBox(width: 8),
                                 Text(
                                   fromDate != null && toDate != null
@@ -328,7 +329,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                         ),
                         if (fromDate != null || toDate != null)
                           IconButton(
-                            icon: const Icon(Icons.close, size: 18),
+                            icon: const Icon(RemixIcons.close_line, size: 18),
                             onPressed: () {
                               ref.read(invoiceFromDateFilterProvider.notifier).state = null;
                               ref.read(invoiceToDatFilterProvider.notifier).state = null;
@@ -358,7 +359,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                         message: 'Create your first invoice in seconds.',
                         action: FilledButton.icon(
                           onPressed: _openCreateInvoice,
-                          icon: const Icon(Icons.add_rounded),
+                          icon: const Icon(RemixIcons.add_line),
                           label: const Text('Create Invoice'),
                         ),
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:remixicon/remixicon.dart';
 import '../../../../core/constants/app_routes.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -256,21 +257,21 @@ class _ExpenseTile extends StatelessWidget {
   IconData _getCategoryIcon(ExpenseCategory category) {
     switch (category) {
       case ExpenseCategory.meals:
-        return Icons.restaurant;
+        return RemixIcons.restaurant_2_line;
       case ExpenseCategory.travel:
-        return Icons.flight;
+        return RemixIcons.flight_takeoff_line;
       case ExpenseCategory.supplies:
-        return Icons.inventory_2;
+        return RemixIcons.archive_line;
       case ExpenseCategory.software:
-        return Icons.computer;
+        return RemixIcons.terminal_box_line;
       case ExpenseCategory.marketing:
-        return Icons.campaign;
+        return RemixIcons.advertisement_line;
       case ExpenseCategory.rent:
-        return Icons.home;
+        return RemixIcons.home_4_line;
       case ExpenseCategory.utilities:
-        return Icons.bolt;
+        return RemixIcons.flashlight_line;
       case ExpenseCategory.other:
-        return Icons.more_horiz;
+        return RemixIcons.more_2_line;
     }
   }
 }
