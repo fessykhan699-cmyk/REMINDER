@@ -7,6 +7,7 @@ class AuthSession {
     required this.token,
     required this.createdAt,
     this.isEmailVerified = false,
+    this.isSocial = false,
   });
 
   final String userId;
@@ -14,4 +15,5 @@ class AuthSession {
   final String token;
   final DateTime createdAt;
   final bool isEmailVerified;
+  final bool isSocial;
 }

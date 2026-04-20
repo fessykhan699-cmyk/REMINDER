@@ -7,6 +7,7 @@ class AuthSessionModel extends AuthSession {
     required super.token,
     required super.createdAt,
     super.isEmailVerified = false,
+    super.isSocial = false,
   });
 
   factory AuthSessionModel.fromEntity(AuthSession session) {
@@ -15,6 +16,8 @@ class AuthSessionModel extends AuthSession {
       email: session.email,
       token: session.token,
       createdAt: session.createdAt,
+      isEmailVerified: session.isEmailVerified,
+      isSocial: session.isSocial,
     );
   }
 }

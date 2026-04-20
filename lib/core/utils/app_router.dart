@@ -205,9 +205,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return isPublicRoute ? null : LoginRoute.routePath;
       }
 
-      // Email Verification Check
+      // Email Verification Check - Skip for social logins
       final isEmailVerified = authState.session?.isEmailVerified ?? false;
-      if (authState.status == AuthStatus.authenticated && !isEmailVerified) {
+      final isSocial = authState.session?.isSocial ?? false;
+      if (authState.status == AuthStatus.authenticated && !isEmailVerified && !isSocial) {
         return location == EmailVerificationRoute.routePath ? null : EmailVerificationRoute.routePath;
       }
 

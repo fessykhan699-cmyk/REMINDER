@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ class AuthLocalDatasource {
       token: 'firebase-user',
       createdAt: user.metadata.creationTime ?? DateTime.now(),
       isEmailVerified: user.emailVerified,
+      isSocial: user.providerData.any((p) => p.providerId != 'password'),
     );
   }
 
@@ -100,27 +102,56 @@ class AuthLocalDatasource {
       token: 'firebase-user',
       createdAt: user.metadata.creationTime ?? DateTime.now(),
       isEmailVerified: user.emailVerified,
+      isSocial: user.providerData.any((p) => p.providerId != 'password'),
     );
   }
 
   Future<AuthSessionModel> loginWithGoogle() async {
-    final googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) {
-      throw Exception('Google sign-in cancelled by user.');
-    }
-    final auth = await googleUser.authentication;
-    final idToken = auth.idToken;
-    if (idToken == null) {
-      throw Exception('Google sign-in failed: no ID token.');
-    }
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google sign-in cancelled by user.');
+      }
+      final auth = await googleUser.authentication;
+      final idToken = auth.idToken;
+      final accessToken = auth.accessToken;
 
-    final credential = GoogleAuthProvider.credential(idToken: idToken);
-    final userCredential = await _auth.signInWithCredential(credential);
-    if (userCredential.user == null) {
-      throw Exception('Google sign-in failed: no user returned.');
-    }
+      if (idToken == null) {
+        throw Exception('Google sign-in failed: no ID token returned.');
+      }
 
-    return _sessionFromUser(userCredential.user!, googleUser.email);
+      final credential = GoogleAuthProvider.credential(
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+      
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+      
+      if (user == null) {
+        throw Exception('Google sign-in failed: Firebase user is null.');
+      }
+
+      return _sessionFromUser(user, googleUser.email);
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'account-exists-with-different-credential' => 'An account already exists with a different login method.',
+        'invalid-credential' => 'The Google account credentials are invalid.',
+        'user-disabled' => 'This user account has been disabled.',
+        'user-not-found' => 'No user found for these credentials.',
+        'wrong-password' => 'Incorrect password.',
+        _ => 'Google login failed: ${e.message ?? 'Unknown error.'}',
+      };
+      throw Exception(message);
+    } catch (e) {
+      if (e.toString().contains('sign_in_failed')) {
+        if (e is PlatformException) {
+          throw Exception('Google Sign-In failed: code=${e.code} message=${e.message} details=${e.details}');
+        }
+        throw Exception('Google Sign-In failed: ${e.toString()}');
+      }
+      rethrow;
+    }
   }
 
   Future<void> logout() async {

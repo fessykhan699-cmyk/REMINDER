@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCaZHAsSdSYqo_2g9Idw-WD4BO6x2C6TTM',
-    appId: '1:276742242102:android:21ee1d4e24eb824d59fd97',
+    appId: '1:276742242102:android:53e9cd91ffe221aa59fd97',
     messagingSenderId: '276742242102',
     projectId: 'reminder-d0ca3',
     storageBucket: 'reminder-d0ca3.firebasestorage.app',
@@ -59,7 +59,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC1h5m1Qc_6uCnhpGtd6f-zFVUbevEwqqM',
-    appId: '1:276742242102:ios:2120a2c79bbfe17e59fd97',
+    appId: '1:276742242102:ios:b9b8705f15ca408659fd97',
     messagingSenderId: '276742242102',
     projectId: 'reminder-d0ca3',
     storageBucket: 'reminder-d0ca3.firebasestorage.app',
