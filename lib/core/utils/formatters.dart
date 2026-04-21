@@ -82,6 +82,17 @@ class AppFormatters {
     return '$symbol$formattedAmount';
   }
 
+  static String formatPerCurrencyTotals(Map<String, double> totals) {
+    try {
+      if (totals.isEmpty) return '—';
+      return totals.entries
+          .map((e) => currency(e.value, currencyCode: e.key))
+          .join(' · ');
+    } catch (e) {
+      return '—';
+    }
+  }
+
   static String shortDate(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');

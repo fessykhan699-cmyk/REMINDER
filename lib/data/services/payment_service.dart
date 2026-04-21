@@ -102,6 +102,41 @@ class PaymentService {
     }
     return total;
   }
+
+  Map<String, double> getPaidTotalsByCurrency(List<Invoice> invoices) {
+    try {
+      final result = <String, double>{};
+      for (final invoice in invoices) {
+        if (invoice.status == InvoiceStatus.paid) {
+          final code = invoice.currencyCode;
+          result[code] = (result[code] ?? 0) + invoice.amount;
+        }
+      }
+      return result;
+    } catch (e, st) {
+      debugPrint('[PaymentService] getPaidTotalsByCurrency failed: $e\n$st');
+      return {};
+    }
+  }
+
+  Map<String, double> getPendingTotalsByCurrency(List<Invoice> invoices) {
+    try {
+      final result = <String, double>{};
+      for (final invoice in invoices) {
+        if (invoice.status != InvoiceStatus.paid) {
+          final pending = invoice.remainingBalance;
+          if (pending > 0) {
+            final code = invoice.currencyCode;
+            result[code] = (result[code] ?? 0) + pending;
+          }
+        }
+      }
+      return result;
+    } catch (e, st) {
+      debugPrint('[PaymentService] getPendingTotalsByCurrency failed: $e\n$st');
+      return {};
+    }
+  }
 }
 
 final totalRevenueProvider = Provider<double>((ref) {
@@ -112,4 +147,14 @@ final totalRevenueProvider = Provider<double>((ref) {
 final pendingBalanceProvider = Provider<double>((ref) {
   final invoices = ref.watch(invoicesControllerProvider).valueOrNull ?? [];
   return ref.read(paymentServiceProvider).calculatePendingPayments(invoices);
+});
+
+final paidTotalsByCurrencyProvider = Provider<Map<String, double>>((ref) {
+  final invoices = ref.watch(invoicesControllerProvider).valueOrNull ?? [];
+  return ref.read(paymentServiceProvider).getPaidTotalsByCurrency(invoices);
+});
+
+final pendingTotalsByCurrencyProvider = Provider<Map<String, double>>((ref) {
+  final invoices = ref.watch(invoicesControllerProvider).valueOrNull ?? [];
+  return ref.read(paymentServiceProvider).getPendingTotalsByCurrency(invoices);
 });

@@ -277,6 +277,7 @@ Future<pw.Document> buildInvoicePdf(
             taxLabel: taxLabel,
             totalLabel: totalLabel,
             taxPercent: invoice.taxPercent,
+            taxAmount: invoice.taxAmount,
           ),
         ),
         if (invoice.hasNotes) ...[
@@ -679,6 +680,7 @@ pw.Widget _buildTotalsBox({
   required String taxLabel,
   required String totalLabel,
   required double taxPercent,
+  required double taxAmount,
 }) {
   return pw.Container(
     width: 220,
@@ -690,7 +692,7 @@ pw.Widget _buildTotalsBox({
           pw.SizedBox(height: _spaceSm),
           _summaryLine('Discount', '-$discountLabel'),
         ],
-        if (taxPercent > 0) ...[
+        if (taxPercent > 0 || taxAmount > 0) ...[
           pw.SizedBox(height: _spaceSm),
           _summaryLine(
             'Tax (${taxPercent.toStringAsFixed(0)}%)',

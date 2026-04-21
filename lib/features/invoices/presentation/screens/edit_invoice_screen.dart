@@ -87,7 +87,9 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     _status = invoice.status;
     _clientNameController.text = invoice.clientName;
     _serviceController.text = invoice.service;
-    _amountController.text = invoice.amount.toStringAsFixed(2);
+    _amountController.text = _formatAmountInput(
+      invoice.items.isEmpty ? invoice.subtotalAmount : invoice.amount,
+    );
     _dueDateController.text = AppFormatters.shortDate(invoice.dueDate);
     _notesController.text = invoice.notes ?? '';
     _paymentLinkController.text = invoice.paymentLink ?? '';
@@ -150,14 +152,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       return;
     }
 
-    if (_lineItems.isEmpty && serviceStr.isNotEmpty && amount > 0) {
-      _lineItems.add(LineItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        description: serviceStr,
-        quantity: 1,
-        unitPrice: amount,
-      ));
-    }
+    final wasClassicMode = _lineItems.isEmpty;
 
     if (_paymentLinkController.text.trim().isNotEmpty && paymentLink == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -178,10 +173,14 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
       recurringNextDate = null;
     }
 
+    final effectiveAmount = wasClassicMode && _taxPercent > 0
+        ? amount * (1 + _taxPercent / 100)
+        : amount;
+
     final updated = invoice.copyWith(
       clientName: _clientNameController.text.trim(),
       service: serviceStr,
-      amount: amount,
+      amount: effectiveAmount,
       dueDate: dueDate,
       status: _status,
       discountAmount: 0.0,
@@ -384,6 +383,37 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                             ),
                             decoration: _inputDecoration(label: 'Amount'),
                           ),
+                          if (_lineItems.isEmpty && _taxPercent > 0)
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _amountController,
+                              builder: (context2, amountValue, child2) {
+                                final parsedAmt = double.tryParse(amountValue.text.trim()) ?? 0.0;
+                                if (parsedAmt <= 0) return const SizedBox.shrink();
+                                final taxAmt = parsedAmt * _taxPercent / 100;
+                                final total = parsedAmt + taxAmt;
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Tax (${_taxPercent.toStringAsFixed(0)}%): ${AppFormatters.currency(taxAmt, currencyCode: invoice.currencyCode)}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: AppColors.textMuted,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Total: ${AppFormatters.currency(total, currencyCode: invoice.currencyCode)}',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _dueDateController,

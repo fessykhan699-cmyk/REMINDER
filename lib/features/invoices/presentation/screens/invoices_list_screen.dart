@@ -146,8 +146,10 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     final allInvoicesAsync = ref.watch(invoicesControllerProvider);
     final allInvoices = allInvoicesAsync.valueOrNull ?? [];
     
-    final totalRevenue = ref.watch(totalRevenueProvider);
-    final pendingBalance = ref.watch(pendingBalanceProvider);
+    final paidTotals = ref.watch(paidTotalsByCurrencyProvider);
+    final pendingTotals = ref.watch(pendingTotalsByCurrencyProvider);
+    final revenueText = AppFormatters.formatPerCurrencyTotals(paidTotals);
+    final pendingText = AppFormatters.formatPerCurrencyTotals(pendingTotals);
     
     final query = ref.watch(invoiceSearchQueryProvider);
     final statusFilter = ref.watch(invoiceStatusFilterProvider);
@@ -229,8 +231,8 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                   child: _staggeredItem(
                     index: 1,
                     child: _RevenueSummary(
-                      revenue: totalRevenue,
-                      pending: pendingBalance,
+                      revenueText: revenueText,
+                      pendingText: pendingText,
                       isPro: subscription.isPro,
                       currencyCode: currencyCode,
                       onUpgrade: () => const UpgradeToProRoute().push(context),
@@ -445,15 +447,15 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
 
 class _RevenueSummary extends StatelessWidget {
   const _RevenueSummary({
-    required this.revenue,
-    required this.pending,
+    required this.revenueText,
+    required this.pendingText,
     required this.isPro,
     required this.currencyCode,
     required this.onUpgrade,
   });
 
-  final double revenue;
-  final double pending;
+  final String revenueText;
+  final String pendingText;
   final bool isPro;
   final String currencyCode;
   final VoidCallback onUpgrade;
@@ -501,16 +503,20 @@ class _RevenueSummary extends StatelessWidget {
           const SizedBox(height: spacingMD),
           Row(
             children: [
-              _StatItem(
-                label: 'Total Revenue',
-                value: isPro ? AppFormatters.currency(revenue, currencyCode: currencyCode) : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
-                color: Colors.greenAccent,
+              Expanded(
+                child: _StatItem(
+                  label: 'Total Revenue',
+                  value: isPro ? revenueText : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
+                  color: Colors.greenAccent,
+                ),
               ),
               const SizedBox(width: spacingLG),
-              _StatItem(
-                label: 'Pending',
-                value: isPro ? AppFormatters.currency(pending, currencyCode: currencyCode) : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
-                color: Colors.orangeAccent,
+              Expanded(
+                child: _StatItem(
+                  label: 'Pending',
+                  value: isPro ? pendingText : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
+                  color: Colors.orangeAccent,
+                ),
               ),
             ],
           ),
@@ -556,6 +562,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
+          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: color,

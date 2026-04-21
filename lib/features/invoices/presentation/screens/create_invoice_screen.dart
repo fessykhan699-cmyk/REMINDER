@@ -670,6 +670,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     final paymentLink = _normalizedPaymentLink();
     final now = DateTime.now();
 
+    final wasClassicMode = _lineItems.isEmpty;
+
     // Ensure at least one line item from classic fields if none added
     if (_lineItems.isEmpty && service.isNotEmpty && amount != null) {
       _lineItems.add(LineItem(
@@ -714,14 +716,19 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
           .read(invoicesLocalDatasourceProvider)
           .getNextInvoiceId(prefix: preferences.invoicePrefix, now: now);
 
+      final taxPct = preferences.defaultTaxPercent;
+      final effectiveAmount = wasClassicMode && taxPct > 0
+          ? amount * (1 + taxPct / 100)
+          : amount;
+
       final result = await _saveInvoice(
         invoiceId: invoiceId,
         selectedClient: selectedClient,
         selectedDueDate: selectedDueDate,
         service: service,
-        amount: amount,
+        amount: effectiveAmount,
         currencyCode: preferences.defaultCurrency,
-        taxPercent: preferences.defaultTaxPercent,
+        taxPercent: taxPct,
         paymentTermsDays: preferences.paymentTerms.days,
         notes: notes,
         paymentLink: paymentLink,
@@ -1209,6 +1216,39 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                           ),
                         ),
                       ),
+                      if (_lineItems.isEmpty)
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _amountController,
+                          builder: (context2, amountValue, child2) {
+                            final prefs = ref.read(appPreferencesControllerProvider).valueOrNull;
+                            final taxPct = prefs?.defaultTaxPercent ?? 0.0;
+                            final parsedAmt = double.tryParse(amountValue.text.trim()) ?? 0.0;
+                            if (taxPct <= 0 || parsedAmt <= 0) return const SizedBox.shrink();
+                            final taxAmt = parsedAmt * taxPct / 100;
+                            final total = parsedAmt + taxAmt;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tax (${taxPct.toStringAsFixed(0)}%): ${AppFormatters.currency(taxAmt, currencyCode: currencyCode)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Total: ${AppFormatters.currency(total, currencyCode: currencyCode)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       if (_lineItems.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
