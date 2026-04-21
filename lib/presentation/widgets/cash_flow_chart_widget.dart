@@ -17,7 +17,7 @@ class CashFlowChartWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     try {
-      final currencyCode = ref.watch(appPreferencesControllerProvider).valueOrNull?.defaultCurrency ?? 'USD';
+      final currencyCode = ref.watch(appPreferencesControllerProvider).valueOrNull?.defaultCurrency ?? 'AED';
 
       // If all values are zero: show a centered Text widget instead
       bool allZero = data.every((d) => d.totalPaid == 0);

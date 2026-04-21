@@ -392,7 +392,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                             decoration: _inputDecoration(label: 'Due Date'),
                           ),
                           const SizedBox(height: 24),
-                          _buildLineItemsSection(theme),
+                          _buildLineItemsSection(theme, invoice.currencyCode),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _paymentLinkController,
@@ -640,7 +640,7 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
     return value.toStringAsFixed(2);
   }
 
-  Widget _buildLineItemsSection(ThemeData theme) {
+  Widget _buildLineItemsSection(ThemeData theme, String currencyCode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -683,13 +683,13 @@ class _EditInvoiceScreenState extends ConsumerState<EditInvoiceScreen> {
                 contentPadding: EdgeInsets.zero,
                 title: Text(item.description),
                 subtitle: Text(
-                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: 'USD')}',
+                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: currencyCode)}',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      AppFormatters.currency(item.amount, currencyCode: 'USD'),
+                      AppFormatters.currency(item.amount, currencyCode: currencyCode),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     IconButton(

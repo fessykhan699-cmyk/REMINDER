@@ -70,4 +70,17 @@ class SettingsLocalDatasource {
     await _legacyPreferencesBox.put(_appPreferencesKey, preferences);
     return preferences;
   }
+
+  Future<String> getExpenseCurrency() async {
+    final currency = _settingsBox.get('expense_default_currency');
+    if (currency is String) return currency;
+
+    // Fallback to defaultCurrency from appPreferences if not set
+    final prefs = await getAppPreferences();
+    return prefs.expenseCurrency;
+  }
+
+  Future<void> saveExpenseCurrency(String currency) async {
+    await _settingsBox.put('expense_default_currency', currency);
+  }
 }

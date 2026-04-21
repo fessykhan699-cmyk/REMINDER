@@ -62,6 +62,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   bool _isRecurring = false;
   RecurringInterval _recurringInterval = RecurringInterval.monthly;
   bool _saveAsTemplate = false;
+  String _selectedCurrency = 'AED';
 
   @override
   void initState() {
@@ -74,6 +75,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     if (prefs != null) {
       _invoiceNumberController.text =
           ref.read(invoiceNumberingServiceProvider).getNextInvoiceNumber(prefs);
+      _selectedCurrency = prefs.defaultCurrency;
     }
   }
 
@@ -168,6 +170,16 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
 
     setState(() => _selectedClient = client);
     _clientFieldKey.currentState?.didChange(client);
+
+    // Detect currency from phone number if available
+    if (client.phone.isNotEmpty) {
+      final detectedCurrency = AppFormatters.currencyFromPhone(client.phone);
+      if (detectedCurrency != null) {
+        setState(() {
+          _selectedCurrency = detectedCurrency;
+        });
+      }
+    }
 
     _applyClientSuggestion(
       intelligence: _buildCurrentIntelligence(),
@@ -503,12 +515,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   }
 
   String _compactCurrency(double value) {
-    final currencyCode =
-        ref
-            .read(appPreferencesControllerProvider)
-            .valueOrNull
-            ?.defaultCurrency ??
-        'USD';
+    final currencyCode = _selectedCurrency;
     if (value == value.roundToDouble()) {
       return AppFormatters.currency(
         value,
@@ -853,7 +860,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
   }
 
-  Widget _buildLineItemsSection(ThemeData theme) {
+  Widget _buildLineItemsSection(ThemeData theme, String currencyCode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -896,13 +903,13 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                 contentPadding: EdgeInsets.zero,
                 title: Text(item.description),
                 subtitle: Text(
-                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: 'USD')}',
+                  '${item.quantity.toStringAsFixed(0)} x ${AppFormatters.currency(item.unitPrice, currencyCode: currencyCode)}',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      AppFormatters.currency(item.amount, currencyCode: 'USD'),
+                      AppFormatters.currency(item.amount, currencyCode: currencyCode),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     IconButton(
@@ -941,6 +948,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         : intelligence.suggestionFor(_selectedClient!.id);
     final amountHintText = _buildAmountHintText(intelligence, clientSuggestion);
     final smartActions = _buildSmartActions(intelligence, clientSuggestion);
+    final currencyCode = ref
+            .watch(appPreferencesControllerProvider)
+            .valueOrNull
+            ?.defaultCurrency ??
+        _selectedCurrency;
 
     _scheduleSmartSync();
 
@@ -1160,39 +1172,54 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _InvoiceTextField(
-                        controller: _amountController,
-                        label: 'Amount',
-                        hintText: amountHintText,
-                        focusNode: _amountFocusNode,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        textInputAction: TextInputAction.done,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,2}$'),
+                      AbsorbPointer(
+                        absorbing: _lineItems.isNotEmpty,
+                        child: Opacity(
+                          opacity: _lineItems.isNotEmpty ? 0.55 : 1.0,
+                          child: _InvoiceTextField(
+                            controller: _amountController,
+                            label: 'Amount',
+                            hintText: amountHintText,
+                            focusNode: _amountFocusNode,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            textInputAction: TextInputAction.done,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}$'),
+                              ),
+                            ],
+                            validator: (value) {
+                              final rawValue = value?.trim() ?? '';
+                              if (rawValue.isEmpty) {
+                                return 'Enter an amount.';
+                              }
+
+                              final parsedValue = double.tryParse(rawValue);
+                              if (parsedValue == null || parsedValue <= 0) {
+                                return 'Enter a valid amount.';
+                              }
+
+                              return null;
+                            },
+                            onFieldSubmitted: (_) async {
+                              await _selectDueDate();
+                            },
                           ),
-                        ],
-                        validator: (value) {
-                          final rawValue = value?.trim() ?? '';
-                          if (rawValue.isEmpty) {
-                            return 'Enter an amount.';
-                          }
-
-                          final parsedValue = double.tryParse(rawValue);
-                          if (parsedValue == null || parsedValue <= 0) {
-                            return 'Enter a valid amount.';
-                          }
-
-                          return null;
-                        },
-                        onFieldSubmitted: (_) async {
-                          await _selectDueDate();
-                        },
+                        ),
                       ),
+                      if (_lineItems.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total calculated from line items',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 24),
-                      _buildLineItemsSection(theme),
+                      _buildLineItemsSection(theme, currencyCode),
                       const SizedBox(height: 16),
                       FormField<DateTime?>(
                         key: _dueDateFieldKey,
@@ -2385,16 +2412,16 @@ class _ClientAvatar extends StatelessWidget {
   }
 }
 
-class _LineItemDialog extends StatefulWidget {
+class _LineItemDialog extends ConsumerStatefulWidget {
   const _LineItemDialog({this.item});
 
   final LineItem? item;
 
   @override
-  State<_LineItemDialog> createState() => _LineItemDialogState();
+  ConsumerState<_LineItemDialog> createState() => _LineItemDialogState();
 }
 
-class _LineItemDialogState extends State<_LineItemDialog> {
+class _LineItemDialogState extends ConsumerState<_LineItemDialog> {
   late final _descriptionController = TextEditingController(text: widget.item?.description ?? '');
   late final _quantityController = TextEditingController(text: (widget.item?.quantity ?? 1).toString());
   late final _unitPriceController = TextEditingController(text: widget.item?.unitPrice.toStringAsFixed(2) ?? '');
@@ -2410,6 +2437,11 @@ class _LineItemDialogState extends State<_LineItemDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currencyCode = ref
+            .watch(appPreferencesControllerProvider)
+            .valueOrNull
+            ?.defaultCurrency ??
+        'AED';
     return AlertDialog(
       title: Text(widget.item == null ? 'Add Item' : 'Edit Item'),
       backgroundColor: AppColors.backgroundSecondary,
@@ -2445,7 +2477,10 @@ class _LineItemDialogState extends State<_LineItemDialog> {
                 Expanded(
                   child: TextFormField(
                     controller: _unitPriceController,
-                    decoration: const InputDecoration(labelText: 'Unit Price'),
+                    decoration: InputDecoration(
+                      labelText: 'Unit Price',
+                      prefixText: '$currencyCode ',
+                    ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     validator: (v) {
                        final d = double.tryParse(v ?? '');

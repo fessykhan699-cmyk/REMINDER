@@ -26,6 +26,7 @@ import '../../../subscription/presentation/widgets/upgrade_prompt_sheet.dart';
 import '../../../../data/services/cash_flow_service.dart';
 import '../../../../presentation/widgets/cash_flow_chart_widget.dart';
 import '../../../expenses/presentation/controllers/expenses_controller.dart';
+import '../../../settings/presentation/controllers/expense_currency_controller.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -374,7 +375,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
-        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
+        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses, currencyCode: currencyCode));
         addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
@@ -396,13 +397,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         if (model.suggestions.isNotEmpty) {
           addSection('suggestions', _buildSuggestionsSection(context, model));
         }
-        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
+        addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses, currencyCode: currencyCode));
         addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
         addSection('recent', _buildRecentActivitySection(context, model));
         break;
       case _DashboardUrgency.calm:
         if (model.focusMode == _DashboardFocusMode.overview) {
-          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
+          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses, currencyCode: currencyCode));
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
@@ -430,7 +431,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           if (model.suggestions.isNotEmpty) {
             addSection('suggestions', _buildSuggestionsSection(context, model));
           }
-          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses));
+          addSection('stats', _StatsSection(totals: model.totals, totalExpenses: totalExpenses, currencyCode: currencyCode));
         }
       addSection('cash_flow', _buildCashFlowSection(context, invoicesState, subscription));
       addSection('recent', _buildRecentActivitySection(context, model));
@@ -495,7 +496,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         const SubscriptionState.free();
     final currencyCode =
         ref.watch(appPreferencesControllerProvider).valueOrNull?.defaultCurrency
-        ?? 'USD';
+        ?? 'AED';
     final dashboard = _DashboardViewModel.fromSignals(
       invoices: invoices,
       adaptiveState: adaptiveState,
@@ -510,6 +511,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         child: _HeaderSection(
           name: profileName,
           unpaidByCurrency: dashboard.totals.unpaidByCurrency,
+          currencyCode: currencyCode,
           avatar: const DashboardAvatar(),
         ),
       ),
@@ -667,11 +669,13 @@ class _HeaderSection extends StatelessWidget {
   const _HeaderSection({
     required this.name,
     required this.unpaidByCurrency,
+    required this.currencyCode,
     required this.avatar,
   });
 
   final String name;
   final List<({String currencyCode, double amount})> unpaidByCurrency;
+  final String currencyCode;
   final Widget avatar;
 
   @override
@@ -680,7 +684,7 @@ class _HeaderSection extends StatelessWidget {
     // Multiple currencies → "AED 2,000 · USD 500"
     final String amountText;
     if (unpaidByCurrency.isEmpty) {
-      amountText = AppFormatters.currency(0);
+      amountText = AppFormatters.currency(0, currencyCode: currencyCode);
     } else if (unpaidByCurrency.length == 1) {
       final entry = unpaidByCurrency.first;
       amountText = AppFormatters.currency(
@@ -764,17 +768,20 @@ class _HeaderSection extends StatelessWidget {
   }
 }
 
-class _StatsSection extends StatelessWidget {
+class _StatsSection extends ConsumerWidget {
   const _StatsSection({
     required this.totals,
     required this.totalExpenses,
+    required this.currencyCode,
   });
 
   final _DashboardTotals totals;
   final double totalExpenses;
+  final String currencyCode;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expenseCurrencyCode = ref.watch(expenseCurrencyControllerProvider);
     return Column(
       children: [
         Row(
@@ -806,7 +813,7 @@ class _StatsSection extends StatelessWidget {
         if (totalExpenses > 0) ...[
           const SizedBox(height: 12),
           _StatsCard(
-            value: AppFormatters.currency(totalExpenses),
+            value: AppFormatters.currency(totalExpenses, currencyCode: expenseCurrencyCode),
             label: 'Total Expenses',
             valueColor: Colors.redAccent,
             isFullWidth: true,
@@ -1423,7 +1430,7 @@ class _DashboardViewModel {
     required AdaptiveSystemState adaptiveState,
     required int clientCount,
     required int reminderCount,
-    String currencyCode = 'USD',
+    String currencyCode = 'AED',
   }) {
     final now = DateTime.now();
     final overdueInvoices = <Invoice>[];
@@ -1622,7 +1629,7 @@ class _PrioritySectionData {
     required double totalUnpaid,
     required int ignoredReminderCount,
     required bool hasRecentResolution,
-    String currencyCode = 'USD',
+    String currencyCode = 'AED',
   }) {
     final leadClient = invoices.isEmpty
         ? 'Top overdue invoice'
@@ -1659,7 +1666,7 @@ class _PrioritySectionData {
     required double totalUnpaid,
     required int ignoredReminderCount,
     required bool hasRecentResolution,
-    String currencyCode = 'USD',
+    String currencyCode = 'AED',
   }) {
     final leadClient = invoices.isEmpty
         ? 'Upcoming invoice'
@@ -1777,7 +1784,7 @@ List<_DashboardSuggestion> _buildDashboardSuggestions({
   required AdaptiveSystemState adaptiveState,
   required int reminderCount,
   required _DashboardFocusMode focusMode,
-  String currencyCode = 'USD',
+  String currencyCode = 'AED',
 }) {
   final suggestions = <_DashboardSuggestion>[];
   final topPriority = topPriorityInvoices.isEmpty

@@ -65,13 +65,17 @@ class AppFormatters {
     return null;
   }
 
+  static String getCurrencySymbol(String currencyCode) {
+    final normalizedCode = currencyCode.trim().toUpperCase();
+    return _currencySymbols[normalizedCode] ?? '$normalizedCode ';
+  }
+
   static String currency(
     num amount, {
-    String currencyCode = 'USD',
+    String currencyCode = 'AED',
     bool includeDecimals = true,
   }) {
-    final normalizedCode = currencyCode.trim().toUpperCase();
-    final symbol = _currencySymbols[normalizedCode] ?? '$normalizedCode ';
+    final symbol = getCurrencySymbol(currencyCode);
     final formattedAmount = includeDecimals
         ? amount.toStringAsFixed(2)
         : amount.toStringAsFixed(0);

@@ -8,7 +8,8 @@ abstract class BillingServiceInterface {
   static const String androidBusinessMonthlyId = 'invoiceflow_business_monthly';
   static const String androidBusinessYearlyId = 'invoiceflow_business_yearly';
 
-  static const String iosProId = 'com.apexmobilelabs.reminder.pro';
+  static const String iosProMonthlyId = 'com.apexmobilelabs.reminder.pro.monthly';
+  static const String iosProYearlyId = 'com.apexmobilelabs.reminder.pro';
   static const String iosBusinessId = 'com.apexmobilelabs.reminder.business';
 
   static Set<String> get allProductIds {
@@ -20,14 +21,15 @@ abstract class BillingServiceInterface {
         androidBusinessYearlyId,
       };
     } else {
-      return {iosProId, iosBusinessId};
+      return {iosProMonthlyId, iosProYearlyId, iosBusinessId};
     }
   }
 
   static bool isProProduct(String productId) {
     return productId == androidProMonthlyId ||
         productId == androidProYearlyId ||
-        productId == iosProId;
+        productId == iosProMonthlyId ||
+        productId == iosProYearlyId;
   }
 
   static bool isBusinessProduct(String productId) {

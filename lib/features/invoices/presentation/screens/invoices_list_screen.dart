@@ -22,6 +22,9 @@ import '../../../../shared/services/csv_export_service.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../../data/services/payment_service.dart';
 import '../../../../shared/components/glass_card.dart';
+import '../../../settings/presentation/controllers/app_preferences_controller.dart';
+import '../../../../core/utils/formatters.dart';
+
 
 class InvoicesListScreen extends ConsumerStatefulWidget {
   const InvoicesListScreen({super.key});
@@ -159,6 +162,8 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
     final showNudge = !subscription.isPro;
     final hasMore = filteredInvoices.length > visibleCount;
 
+    final currencyCode = ref.watch(appPreferencesControllerProvider).valueOrNull?.defaultCurrency ?? 'AED';
+
     return AppScaffold(
       extendBody: true,
       body: SafeArea(
@@ -227,6 +232,7 @@ class _InvoicesListScreenState extends ConsumerState<InvoicesListScreen>
                       revenue: totalRevenue,
                       pending: pendingBalance,
                       isPro: subscription.isPro,
+                      currencyCode: currencyCode,
                       onUpgrade: () => const UpgradeToProRoute().push(context),
                     ),
                   ),
@@ -442,12 +448,14 @@ class _RevenueSummary extends StatelessWidget {
     required this.revenue,
     required this.pending,
     required this.isPro,
+    required this.currencyCode,
     required this.onUpgrade,
   });
 
   final double revenue;
   final double pending;
   final bool isPro;
+  final String currencyCode;
   final VoidCallback onUpgrade;
 
   @override
@@ -495,13 +503,13 @@ class _RevenueSummary extends StatelessWidget {
             children: [
               _StatItem(
                 label: 'Total Revenue',
-                value: isPro ? '\$${revenue.toStringAsFixed(2)}' : '\$ ••••',
+                value: isPro ? AppFormatters.currency(revenue, currencyCode: currencyCode) : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
                 color: Colors.greenAccent,
               ),
               const SizedBox(width: spacingLG),
               _StatItem(
                 label: 'Pending',
-                value: isPro ? '\$${pending.toStringAsFixed(2)}' : '\$ ••••',
+                value: isPro ? AppFormatters.currency(pending, currencyCode: currencyCode) : '${AppFormatters.getCurrencySymbol(currencyCode)} ••••',
                 color: Colors.orangeAccent,
               ),
             ],

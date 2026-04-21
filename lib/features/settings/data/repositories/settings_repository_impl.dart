@@ -42,6 +42,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
     );
   }
 
+  @override
+  Future<String> getExpenseCurrency() => _datasource.getExpenseCurrency();
+
+  @override
+  Future<void> saveExpenseCurrency(String currency) =>
+      _datasource.saveExpenseCurrency(currency);
+
   // ── Private sync helper ────────────────────────────────────────────────
 
   void _syncProfile(ProfileModel model) {

@@ -6,9 +6,11 @@ import '../../../../core/constants/app_routes.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
+import '../../../settings/presentation/controllers/expense_currency_controller.dart';
 import '../controllers/expenses_controller.dart';
 import '../../domain/entities/expense.dart';
 
@@ -57,6 +59,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen>
     final theme = Theme.of(context);
     final expensesAsync = ref.watch(expensesControllerProvider);
     final totalExpenses = ref.watch(totalExpensesProvider);
+    final currencyCode = ref.watch(expenseCurrencyControllerProvider);
 
     return AppScaffold(
       body: SafeArea(
@@ -111,7 +114,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '\$${totalExpenses.toStringAsFixed(2)}',
+                            AppFormatters.currency(totalExpenses, currencyCode: currencyCode),
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.redAccent,
@@ -176,7 +179,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen>
   }
 }
 
-class _ExpenseTile extends StatelessWidget {
+class _ExpenseTile extends ConsumerWidget {
   const _ExpenseTile({
     required this.expense,
     required this.onDelete,
@@ -186,9 +189,10 @@ class _ExpenseTile extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final dateFormat = DateFormat('MMM dd, yyyy');
+    final currencyCode = ref.watch(expenseCurrencyControllerProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: spacingMD, vertical: spacingXS),
@@ -232,7 +236,7 @@ class _ExpenseTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '\$${expense.amount.toStringAsFixed(2)}',
+                  AppFormatters.currency(expense.amount, currencyCode: currencyCode),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: Colors.redAccent,

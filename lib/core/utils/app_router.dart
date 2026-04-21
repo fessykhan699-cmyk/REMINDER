@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -28,11 +29,32 @@ import '../../features/subscription/presentation/screens/upgrade_to_pro_screen.d
 import '../../shared/widgets/app_shell_scaffold.dart';
 import '../constants/app_routes.dart';
 
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterNotifier(this._ref) {
+    _ref.listen<AuthViewState>(
+      authControllerProvider,
+      (previous, next) {
+        if (previous?.status != next.status ||
+            previous?.onboardingCompleted != next.onboardingCompleted ||
+            previous?.session?.isEmailVerified != next.session?.isEmailVerified ||
+            previous?.session?.isSocial != next.session?.isSocial) {
+          notifyListeners();
+        }
+      },
+    );
+  }
+}
+
+final routerNotifierProvider = Provider<RouterNotifier>((ref) => RouterNotifier(ref));
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
+  final notifier = ref.read(routerNotifierProvider);
 
   return GoRouter(
     initialLocation: const SplashRoute().location,
+    refreshListenable: notifier,
     routes: [
       GoRoute(
         path: SplashRoute.routePath,
@@ -178,6 +200,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
+      final authState = ref.read(authControllerProvider);
       final location = state.matchedLocation;
 
       // Routes allowed when unauthenticated

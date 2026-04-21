@@ -14,7 +14,7 @@ class UserProfileImageService {
 
   static Box<dynamic> get _box => Hive.box<dynamic>(HiveStorage.settingsBoxName);
 
-  static Future<String?> pickLogo() async {
+  static Future<String?> pickAndSaveLogo() async {
     try {
       final subscription = await const SubscriptionLocalDatasource().loadState();
       if (!subscription.isPro) return null;
@@ -38,7 +38,7 @@ class UserProfileImageService {
     }
   }
 
-  static Future<String?> pickSignature() async {
+  static Future<String?> pickAndSaveSignature() async {
     try {
       final subscription = await const SubscriptionLocalDatasource().loadState();
       if (!subscription.isPro) return null;

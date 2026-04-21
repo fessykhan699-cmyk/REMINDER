@@ -151,6 +151,12 @@ class _FakeSettingsRepository implements SettingsRepository {
   Future<UserProfile> saveProfile(UserProfile profile) async {
     return profile;
   }
+
+  @override
+  Future<String> getExpenseCurrency() async => 'AED';
+
+  @override
+  Future<void> saveExpenseCurrency(String currency) async {}
 }
 
 class _FakePathProviderPlatform extends PathProviderPlatform

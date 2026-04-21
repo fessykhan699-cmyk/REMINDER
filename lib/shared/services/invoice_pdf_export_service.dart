@@ -147,9 +147,7 @@ Future<pw.Document> buildInvoicePdf(
   bool includeWatermark = false,
   bool isPro = false,
 }) async {
-  final logoImage = await _loadBrandLogo(senderProfile, isPro: isPro);
-  final signatureImage = await _loadSignatureImage(senderProfile, isPro: isPro);
-
+  // Load custom assets from UserProfileImageService
   final customLogoPath = await UserProfileImageService.getLogoPath();
   final customSignaturePath = await UserProfileImageService.getSignaturePath();
 
@@ -172,6 +170,14 @@ Future<pw.Document> buildInvoicePdf(
       }
     } catch (_) {}
   }
+
+  // Load default app logo as fallback
+  pw.MemoryImage? defaultLogo;
+  try {
+    final assetBytes =
+        (await rootBundle.load(_logoAssetPath)).buffer.asUint8List();
+    defaultLogo = pw.MemoryImage(assetBytes);
+  } catch (_) {}
 
   final lineItems = _resolveLineItems(invoice, items);
   final subtotalAmount = invoice.subtotalAmount;
@@ -225,7 +231,7 @@ Future<pw.Document> buildInvoicePdf(
       ),
       build: (context) => <pw.Widget>[
         _buildHeader(
-          logoImage: logoImage,
+          logoImage: defaultLogo,
           customLogo: customLogo,
           brandName: brandName,
         ),
@@ -289,7 +295,7 @@ Future<pw.Document> buildInvoicePdf(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
                 pw.Container(
-                  constraints: const pw.BoxConstraints(maxWidth: 150, maxHeight: 60),
+                  constraints: const pw.BoxConstraints(maxWidth: 150, maxHeight: 40),
                   child: pw.Image(customSignature, fit: pw.BoxFit.contain),
                 ),
                 pw.SizedBox(height: 4),
@@ -302,15 +308,6 @@ Future<pw.Document> buildInvoicePdf(
                   ),
                 ),
               ],
-            ),
-          ),
-        ] else if (signatureImage != null) ...[
-          pw.SizedBox(height: _spaceLg),
-          _buildSignatureSection(
-            signatureImage,
-            signerName: _displayValue(
-              senderProfile?.displayBusinessName,
-              brandName,
             ),
           ),
         ],
@@ -336,34 +333,42 @@ pw.Widget _buildHeader({
           constraints: const pw.BoxConstraints(maxWidth: 120, maxHeight: 60),
           child: pw.Image(customLogo, fit: pw.BoxFit.contain),
         ),
-        pw.SizedBox(height: _spaceMd),
+        pw.SizedBox(height: _spaceLg),
       ],
       pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          if (customLogo == null && logoImage != null) ...[
-            pw.Container(
-              width: 36,
-              height: 36,
-              child: pw.Image(logoImage, fit: pw.BoxFit.contain),
-            ),
-            pw.SizedBox(width: _spaceSm),
-          ],
           pw.Expanded(
-            child: pw.Text(
-              brandName,
-              style: pw.TextStyle(
-                color: _pdfInk,
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-              ),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (customLogo == null && logoImage != null) ...[
+                  pw.Container(
+                    width: 40,
+                    height: 40,
+                    child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                  ),
+                  pw.SizedBox(width: _spaceSm),
+                ],
+                pw.Expanded(
+                  child: pw.Text(
+                    brandName,
+                    style: pw.TextStyle(
+                      color: _pdfInk,
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           pw.Text(
             'INVOICE',
             style: pw.TextStyle(
               color: _pdfInk,
-              fontSize: 26,
+              fontSize: 28,
               fontWeight: pw.FontWeight.bold,
               letterSpacing: 2,
             ),
@@ -371,7 +376,8 @@ pw.Widget _buildHeader({
         ],
       ),
       pw.SizedBox(height: _spaceMd),
-      pw.Container(height: 1, color: _pdfBorder),
+      pw.Container(height: 2, color: _pdfAccent),
+      pw.SizedBox(height: _spaceLg),
     ],
   );
 }
@@ -752,41 +758,6 @@ pw.Widget _buildPaymentSection(String paymentLink) {
   );
 }
 
-pw.Widget _buildSignatureSection(
-  pw.MemoryImage signatureImage, {
-  required String signerName,
-}) {
-  return pw.Align(
-    alignment: pw.Alignment.centerRight,
-    child: pw.Container(
-      width: 220,
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-        color: _pdfSurface,
-        borderRadius: pw.BorderRadius.circular(_cardRadius),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          _sectionLabel('AUTHORIZED SIGNATURE'),
-          pw.SizedBox(height: _spaceSm),
-          pw.Container(
-            height: 50,
-            alignment: pw.Alignment.centerLeft,
-            child: pw.Image(signatureImage, fit: pw.BoxFit.contain),
-          ),
-          pw.SizedBox(height: _spaceXs),
-          pw.Divider(color: _pdfBorder, height: 1),
-          pw.SizedBox(height: _spaceXs),
-          pw.Text(
-            signerName,
-            style: pw.TextStyle(color: _pdfInk, fontSize: 10),
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
 pw.Widget _buildWatermark() {
   return pw.Padding(
@@ -859,55 +830,6 @@ List<InvoicePdfLineItem> _resolveLineItems(
   ];
 }
 
-Future<pw.MemoryImage?> _loadBrandLogo(
-  InvoicePdfSenderProfile? senderProfile, {
-  required bool isPro,
-}) async {
-  if (isPro) {
-    final customLogo = await _loadLocalImage(senderProfile?.normalizedLogoPath);
-    if (customLogo != null) {
-      return customLogo;
-    }
-  }
-
-  try {
-    final assetBytes = (await rootBundle.load(
-      _logoAssetPath,
-    )).buffer.asUint8List();
-    return pw.MemoryImage(assetBytes);
-  } catch (_) {
-    return null;
-  }
-}
-
-Future<pw.MemoryImage?> _loadSignatureImage(
-  InvoicePdfSenderProfile? senderProfile, {
-  required bool isPro,
-}) async {
-  if (!isPro) {
-    return null;
-  }
-
-  return _loadLocalImage(senderProfile?.normalizedSignaturePath);
-}
-
-Future<pw.MemoryImage?> _loadLocalImage(String? path) async {
-  final normalizedPath = path?.trim() ?? '';
-  if (normalizedPath.isEmpty) {
-    return null;
-  }
-
-  try {
-    final file = File(normalizedPath);
-    if (!await file.exists()) {
-      return null;
-    }
-
-    return pw.MemoryImage(await file.readAsBytes());
-  } catch (_) {
-    return null;
-  }
-}
 
 String _resolveBrandName(
   InvoicePdfSenderProfile? senderProfile, {

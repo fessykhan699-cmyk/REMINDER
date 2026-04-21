@@ -28,6 +28,7 @@ class AppPreferencesModel extends AppPreferences {
     required super.appLockEnabled,
     required super.appLockPin,
     required super.defaultCurrency,
+    required super.expenseCurrency,
     required super.defaultTaxPercent,
     required super.invoicePrefix,
     required super.nextInvoiceNumber,
@@ -50,6 +51,7 @@ class AppPreferencesModel extends AppPreferences {
       appLockEnabled: preferences.appLockEnabled,
       appLockPin: preferences.appLockPin,
       defaultCurrency: preferences.defaultCurrency,
+      expenseCurrency: preferences.expenseCurrency,
       defaultTaxPercent: preferences.defaultTaxPercent,
       invoicePrefix: preferences.invoicePrefix,
       nextInvoiceNumber: preferences.nextInvoiceNumber,
@@ -84,6 +86,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       smartPredictionEnabled: reader.readBool(),
       nextInvoiceNumber: reader.availableBytes > 0 ? reader.readInt() : 1,
       biometricLockEnabled: reader.availableBytes > 0 ? reader.readBool() : false,
+      expenseCurrency: reader.availableBytes > 0 ? reader.readString() : 'AED',
     );
   }
 
@@ -105,6 +108,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       ..writeBool(obj.oneTapInvoiceEnabled)
       ..writeBool(obj.smartPredictionEnabled)
       ..writeInt(obj.nextInvoiceNumber)
-      ..writeBool(obj.biometricLockEnabled);
+      ..writeBool(obj.biometricLockEnabled)
+      ..writeString(obj.expenseCurrency);
   }
 }

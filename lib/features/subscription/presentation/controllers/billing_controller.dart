@@ -165,11 +165,12 @@ class BillingController extends AsyncNotifier<BillingState> {
 
       for (final p in products) {
         if (p.id == BillingServiceInterface.androidProMonthlyId ||
-            p.id == BillingServiceInterface.iosProId) {
+            p.id == BillingServiceInterface.iosProMonthlyId) {
           monthly = p;
           monthlyNotFound = false;
         }
-        if (p.id == BillingServiceInterface.androidProYearlyId) {
+        if (p.id == BillingServiceInterface.androidProYearlyId ||
+            p.id == BillingServiceInterface.iosProYearlyId) {
           yearly = p;
           yearlyNotFound = false;
         }
@@ -261,14 +262,19 @@ class BillingController extends AsyncNotifier<BillingState> {
     try {
       await ref.read(billingServiceProvider).restorePurchases();
       final restoredPlan = await _syncPlanFromStore();
+      
+      final subState = ref.read(subscriptionControllerProvider).valueOrNull;
+      final isActuallyPro = (subState != null && subState.plan != InvoiceFlowPlan.free) ||
+                           (restoredPlan != null && restoredPlan != InvoiceFlowPlan.free);
+
       _currentAction = _BillingAction.none;
 
       final latest = state.valueOrNull ?? current;
-      if (restoredPlan != null && restoredPlan != InvoiceFlowPlan.free) {
+      if (isActuallyPro) {
         _emitFeedback(
           latest,
           type: BillingFeedbackType.restoreSuccess,
-          message: 'Purchases restored.',
+          message: 'Purchases restored successfully.',
           isRestoring: false,
         );
         return;
@@ -379,13 +385,6 @@ class BillingController extends AsyncNotifier<BillingState> {
     final action = _currentAction;
     _currentAction = _BillingAction.none;
 
-    final subscriptionState = ref
-        .read(subscriptionControllerProvider)
-        .valueOrNull;
-    if (subscriptionState?.isPro == true) {
-      await _persistPlan(isPro: false);
-    }
-
     if (action == _BillingAction.purchase) {
       _emitFeedback(
         current,
@@ -444,11 +443,6 @@ class BillingController extends AsyncNotifier<BillingState> {
 
     await _persistPlanTier(syncedPlan);
     return syncedPlan;
-  }
-
-  Future<void> _persistPlan({required bool isPro}) async {
-    await ref.read(subscriptionLocalDatasourceProvider).savePlan(isPro: isPro);
-    ref.invalidate(subscriptionControllerProvider);
   }
 
   Future<void> _persistPlanTier(InvoiceFlowPlan plan) async {

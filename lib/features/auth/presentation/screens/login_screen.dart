@@ -84,7 +84,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final state = ref.read(authControllerProvider);
     if (state.status == AuthStatus.authenticated) {
-      const DashboardTabRoute().go(context);
       return;
     }
 
@@ -103,7 +102,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final state = ref.read(authControllerProvider);
     if (state.status == AuthStatus.authenticated) {
-      const DashboardTabRoute().go(context);
       return;
     }
 

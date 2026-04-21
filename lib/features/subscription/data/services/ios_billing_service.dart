@@ -58,6 +58,8 @@ class IOSBillingService implements BillingServiceInterface {
   @override
   Future<InvoiceFlowPlan?> syncOwnedPlanState(Set<String> productIds) async {
     // iOS plan state is resolved through the purchase/restore stream in this app.
-    return InvoiceFlowPlan.free;
+    // Returning null allows the controller to fall back to the last known local state
+    // instead of forcing a downgrade to 'free' on every boot.
+    return null;
   }
 }

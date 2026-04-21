@@ -22,6 +22,7 @@ import '../widgets/app_lock_gate.dart';
 import '../widgets/pin_editor_sheet.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
 import '../../../subscription/presentation/controllers/subscription_controller.dart';
+import '../controllers/expense_currency_controller.dart';
 import 'edit_profile_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -262,6 +263,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _editExpenseCurrency(String currentCurrency) async {
+    final nextValue = await _showSelectionSettingSheet<String>(
+      title: 'Expense Currency',
+      subtitle: 'Used for expense tracking',
+      currentValue: currentCurrency,
+      options: _currencyOptions
+          .map(
+            (currency) =>
+                _SettingOption<String>(value: currency, label: currency),
+          )
+          .toList(growable: false),
+    );
+
+    if (!mounted || nextValue == null || nextValue == currentCurrency) {
+      return;
+    }
+
+    await ref
+        .read(expenseCurrencyControllerProvider.notifier)
+        .setCurrency(nextValue);
+  }
+
   Future<void> _editDefaultTaxPercent(AppPreferences preferences) async {
     final rawValue = await _showTextSettingSheet(
       title: 'Default Tax %',
@@ -379,6 +402,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ref.watch(subscriptionControllerProvider).valueOrNull ??
         const SubscriptionState.free();
     final usage = ref.watch(subscriptionUsageProvider);
+    final expenseCurrency = ref.watch(expenseCurrencyControllerProvider);
 
     final profileError = profileState.asError;
     final preferencesError = preferencesState.asError;
@@ -576,13 +600,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'Invoice Settings',
               children: [
                 _SettingValueRow(
-                  title: 'Default Currency',
+                  title: 'Invoice Currency',
                   subtitle: 'Used for all invoices',
                   value: _currencyOptions.contains(preferences.defaultCurrency)
                       ? preferences.defaultCurrency
                       : _currencyOptions.first,
                   trailingIcon: Icons.keyboard_arrow_down_rounded,
                   onTap: () => _editDefaultCurrency(preferences),
+                ),
+                _SettingValueRow(
+                  title: 'Expense Currency',
+                  subtitle: 'Used for expense tracking',
+                  value: _currencyOptions.contains(expenseCurrency)
+                      ? expenseCurrency
+                      : _currencyOptions.first,
+                  trailingIcon: Icons.keyboard_arrow_down_rounded,
+                  onTap: () => _editExpenseCurrency(expenseCurrency),
                 ),
                 _SettingValueRow(
                   title: 'Default Tax %',

@@ -35,6 +35,7 @@ class AppPreferences {
     required this.appLockEnabled,
     required this.appLockPin,
     required this.defaultCurrency,
+    required this.expenseCurrency,
     required this.defaultTaxPercent,
     required this.invoicePrefix,
     required this.nextInvoiceNumber,
@@ -54,6 +55,7 @@ class AppPreferences {
       appLockEnabled = false,
       appLockPin = '',
       defaultCurrency = 'USD',
+      expenseCurrency = 'AED',
       defaultTaxPercent = 0,
       invoicePrefix = 'INV',
       nextInvoiceNumber = 1,
@@ -71,6 +73,7 @@ class AppPreferences {
   final bool appLockEnabled;
   final String appLockPin;
   final String defaultCurrency;
+  final String expenseCurrency;
   final double defaultTaxPercent;
   final String invoicePrefix;
   final int nextInvoiceNumber;
@@ -92,6 +95,7 @@ class AppPreferences {
     String? appLockPin,
     bool clearPin = false,
     String? defaultCurrency,
+    String? expenseCurrency,
     double? defaultTaxPercent,
     String? invoicePrefix,
     int? nextInvoiceNumber,
@@ -112,6 +116,7 @@ class AppPreferences {
       appLockEnabled: appLockEnabled ?? this.appLockEnabled,
       appLockPin: clearPin ? '' : (appLockPin ?? this.appLockPin),
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
+      expenseCurrency: expenseCurrency ?? this.expenseCurrency,
       defaultTaxPercent: defaultTaxPercent ?? this.defaultTaxPercent,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       nextInvoiceNumber: nextInvoiceNumber ?? this.nextInvoiceNumber,

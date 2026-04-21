@@ -11,7 +11,8 @@
       "Bash(python3 -c \"import json; d=json.load\\(open\\('.dart_tool/package_config.json'\\)\\); fl=[p for p in d['packages'] if p['name']=='flutter']; print\\(fl[0]\\)\")",
       "Read(//c/flutter/packages/flutter/lib/src/material/**)",
       "Bash(FLUTTER_ROOT=\"/c/flutter\" /c/flutter/bin/flutter.bat pub get)",
-      "Bash(FLUTTER_ROOT=\"/c/flutter\" /c/flutter/bin/flutter.bat test --no-pub --exclude-tags=native)"
+      "Bash(FLUTTER_ROOT=\"/c/flutter\" /c/flutter/bin/flutter.bat test --no-pub --exclude-tags=native)",
+      "Bash(grep -n \"AED\\\\|currencyCode\\\\|currency\\\\|Currency\\\\|AddItem\\\\|_addItem\\\\|_showAdd\\\\|lineItem\\\\|LineItem\\\\|line_item\\\\|dialog\\\\|Dialog\\\\|symbol\\\\|\\\\\\\\\\\\$\" \"c:/flutter dev/projects/reminder/reminder/lib/features/invoices/presentation/screens/create_invoice_screen.dart\")"
     ]
   }
 }

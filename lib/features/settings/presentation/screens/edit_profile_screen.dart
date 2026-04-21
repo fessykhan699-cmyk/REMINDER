@@ -79,8 +79,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     try {
       final String? persistedPath = isSignature
-          ? await UserProfileImageService.pickSignature()
-          : await UserProfileImageService.pickLogo();
+          ? await UserProfileImageService.pickAndSaveSignature()
+          : await UserProfileImageService.pickAndSaveLogo();
 
       if (!mounted) return;
 
@@ -331,7 +331,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ),
                         const SizedBox(height: 16),
                         _BrandAssetField(
-                          label: 'Brand Logo',
+                          label: 'Business Logo',
                           helper: isPro
                               ? 'Visible on generated invoices.'
                               : 'Upgrade to Pro to customize your invoice branding.',
@@ -345,7 +345,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ),
                         const SizedBox(height: 16),
                         _BrandAssetField(
-                          label: 'Authorized Signature',
+                          label: 'Signature',
                           helper: isPro
                               ? 'Optional signature image for professional invoices.'
                               : 'Upgrade to Pro to add an authorized signature.',

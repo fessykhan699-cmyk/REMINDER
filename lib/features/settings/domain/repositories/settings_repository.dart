@@ -9,4 +9,8 @@ abstract interface class SettingsRepository {
   Future<AppPreferences> getAppPreferences();
 
   Future<AppPreferences> saveAppPreferences(AppPreferences preferences);
+
+  Future<String> getExpenseCurrency();
+
+  Future<void> saveExpenseCurrency(String currency);
 }

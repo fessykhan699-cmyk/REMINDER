@@ -324,6 +324,12 @@ class _TestSettingsRepository implements SettingsRepository {
   Future<UserProfile> saveProfile(UserProfile profile) async {
     return profile;
   }
+
+  @override
+  Future<String> getExpenseCurrency() async => 'AED';
+
+  @override
+  Future<void> saveExpenseCurrency(String currency) async {}
 }
 
 SmartInvoicePrediction _buildPrediction(Client client) {
