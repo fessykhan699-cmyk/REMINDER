@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import '../../features/invoices/domain/entities/invoice.dart';
+
 class AppFormatters {
   AppFormatters._();
 
@@ -89,6 +92,38 @@ class AppFormatters {
           .map((e) => currency(e.value, currencyCode: e.key))
           .join(' · ');
     } catch (e) {
+      return '—';
+    }
+  }
+
+  static Map<String, double> groupAmountsByCurrency(
+    List<Invoice> invoices,
+    double Function(Invoice) amountSelector,
+  ) {
+    try {
+      final map = <String, double>{};
+      for (final invoice in invoices) {
+        final code = invoice.currencyCode;
+        final amount = amountSelector(invoice);
+        if (amount > 0) {
+          map[code] = (map[code] ?? 0.0) + amount;
+        }
+      }
+      return map;
+    } catch (e) {
+      debugPrint('groupAmountsByCurrency error: $e');
+      return {};
+    }
+  }
+
+  static String formatCurrencyGroups(Map<String, double> groups) {
+    try {
+      if (groups.isEmpty) return '—';
+      return groups.entries
+          .map((e) => '${e.key} ${e.value.toStringAsFixed(2)}')
+          .join(' · ');
+    } catch (e) {
+      debugPrint('formatCurrencyGroups error: $e');
       return '—';
     }
   }

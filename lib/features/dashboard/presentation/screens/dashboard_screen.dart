@@ -1544,6 +1544,11 @@ class _DashboardViewModel {
         ignoredReminderCount: adaptiveState.ignoredReminderCount,
         hasRecentResolution: adaptiveState.hasRecentResolution,
         currencyCode: currencyCode,
+        unpaidText: totals.unpaidByCurrency.isEmpty
+            ? null
+            : totals.unpaidByCurrency
+                .map((e) => AppFormatters.currency(e.amount, currencyCode: e.currencyCode))
+                .join(' · '),
       ),
       _DashboardUrgency.dueSoon => _PrioritySectionData.dueSoon(
         dueSoonHighlights,
@@ -1551,6 +1556,11 @@ class _DashboardViewModel {
         ignoredReminderCount: adaptiveState.ignoredReminderCount,
         hasRecentResolution: adaptiveState.hasRecentResolution,
         currencyCode: currencyCode,
+        unpaidText: totals.unpaidByCurrency.isEmpty
+            ? null
+            : totals.unpaidByCurrency
+                .map((e) => AppFormatters.currency(e.amount, currencyCode: e.currencyCode))
+                .join(' · '),
       ),
       _DashboardUrgency.empty || _DashboardUrgency.calm => null,
     };
@@ -1630,6 +1640,7 @@ class _PrioritySectionData {
     required int ignoredReminderCount,
     required bool hasRecentResolution,
     String currencyCode = 'AED',
+    String? unpaidText,
   }) {
     final leadClient = invoices.isEmpty
         ? 'Top overdue invoice'
@@ -1637,8 +1648,9 @@ class _PrioritySectionData {
 
     String summary;
     if (ignoredReminderCount >= 2) {
+      final amountStr = unpaidText ?? AppFormatters.currency(totalUnpaid, currencyCode: currencyCode);
       summary =
-          '$leadClient still needs attention. ${AppFormatters.currency(totalUnpaid, currencyCode: currencyCode)} remains at risk.';
+          '$leadClient still needs attention. $amountStr remains at risk.';
     } else if (hasRecentResolution) {
       summary = 'You are catching up. $leadClient is the next follow-up.';
     } else if (invoices.length > 1) {
@@ -1667,6 +1679,7 @@ class _PrioritySectionData {
     required int ignoredReminderCount,
     required bool hasRecentResolution,
     String currencyCode = 'AED',
+    String? unpaidText,
   }) {
     final leadClient = invoices.isEmpty
         ? 'Upcoming invoice'
@@ -1676,8 +1689,9 @@ class _PrioritySectionData {
     if (hasRecentResolution) {
       summary = 'You are ahead of the curve. Keep $leadClient on track.';
     } else if (totalUnpaid >= 2500) {
+      final amountStr = unpaidText ?? AppFormatters.currency(totalUnpaid, currencyCode: currencyCode);
       summary =
-          '${AppFormatters.currency(totalUnpaid, currencyCode: currencyCode)} is due soon. Start with $leadClient.';
+          '$amountStr is due soon. Start with $leadClient.';
     } else if (ignoredReminderCount >= 2) {
       summary = '$leadClient is coming due and still needs a follow-up.';
     } else if (invoices.length > 1) {
@@ -1847,7 +1861,7 @@ List<_DashboardSuggestion> _buildDashboardSuggestions({
     addSuggestion(
       _DashboardSuggestion(
         id: 'monetary-risk',
-        title: '${AppFormatters.currency(totals.totalUnpaid, currencyCode: currencyCode)} is still unpaid',
+        title: '${totals.unpaidByCurrency.map((e) => AppFormatters.currency(e.amount, currencyCode: e.currencyCode)).join(' · ')} is still unpaid',
         detail: 'Review payments to reduce your cash-risk exposure.',
         icon: Icons.account_balance_wallet_outlined,
         action: _DashboardSuggestionAction.reviewPayments,

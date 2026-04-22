@@ -22,46 +22,45 @@ class CsvExportService {
     required List<Client> clients,
   }) async {
     try {
-      final Map<String, Client> clientMap = {for (var c in clients) c.id: c};
-      
       final List<List<dynamic>> rows = [];
-      
+
       // Header
       rows.add([
-        'Invoice #',
-        'Date Created',
-        'Client Name',
-        'Client Email',
-        'Status',
+        'Invoice Number',
+        'Client',
+        'Service',
+        'Currency',
         'Subtotal',
         'Tax %',
         'Tax Amount',
-        'Discount',
-        'Total Amount',
-        'Paid Amount',
-        'Balance',
+        'Total',
+        'Amount Paid',
+        'Remaining Balance',
+        'Status',
+        'Issue Date',
         'Due Date',
+        'Payment Date',
         'Notes',
       ]);
-      
+
       final dateFormat = DateFormat('yyyy-MM-dd');
-      
+
       for (final invoice in invoices) {
-        final client = clientMap[invoice.clientId];
         rows.add([
           invoice.invoiceNumber,
-          dateFormat.format(invoice.createdAt),
           invoice.clientName,
-          client?.email ?? '',
-          invoice.status.label,
+          invoice.service,
+          invoice.currencyCode,
           invoice.subtotalAmount.toStringAsFixed(2),
           invoice.taxPercent.toStringAsFixed(2),
           invoice.taxAmount.toStringAsFixed(2),
-          invoice.discountAmount.toStringAsFixed(2),
           invoice.amount.toStringAsFixed(2),
           invoice.totalPaid.toStringAsFixed(2),
           invoice.remainingBalance.toStringAsFixed(2),
+          invoice.status.label,
+          dateFormat.format(invoice.createdAt),
           dateFormat.format(invoice.dueDate),
+          '',
           invoice.notes ?? '',
         ]);
       }

@@ -562,7 +562,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          overflow: TextOverflow.ellipsis,
+          softWrap: true,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: color,

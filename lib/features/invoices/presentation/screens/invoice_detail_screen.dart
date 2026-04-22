@@ -15,7 +15,7 @@ import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../../../shared/services/invoice_export_service.dart';
-import '../../../../shared/services/whatsapp_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../data/services/whatsapp_reminder_service.dart';
 import '../../../../data/services/email_invoice_service.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
@@ -105,25 +105,29 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     setState(() => _isSendingWhatsApp = true);
 
     try {
-      AnalyticsService.instance.logInvoiceShared('whatsapp');
-      final result = await ref
-          .read(whatsAppServiceProvider)
-          .sendInvoiceReminder(invoice: invoice);
-      await ref
-          .read(invoicesControllerProvider.notifier)
-          .markInvoiceSent(invoice);
-
-      if (!mounted || !result.usedFallbackShareSheet) {
-        return;
+      final amountStr = AppFormatters.currency(
+        invoice.amount,
+        currencyCode: invoice.currencyCode,
+      );
+      final dueDateStr = AppFormatters.shortDate(invoice.dueDate);
+      final message =
+          'Hi ${invoice.clientName}, please find your invoice '
+          '${invoice.invoiceNumber} for $amountStr '
+          'due on $dueDateStr. '
+          'Thank you for your business.';
+      final uri = Uri.parse(
+        'https://wa.me/?text=${Uri.encodeComponent(message)}',
+      );
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        AnalyticsService.instance.logInvoiceShared('whatsapp');
+      } else {
+        if (mounted) {
+          _showSnackBar('WhatsApp is not installed on this device');
+        }
       }
-
-      _showSnackBar('WhatsApp unavailable. Opened the share sheet instead.');
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      _showSnackBar('Unable to open WhatsApp right now');
+    } catch (e) {
+      debugPrint('WhatsApp send error: $e');
     } finally {
       if (mounted) {
         setState(() => _isSendingWhatsApp = false);
@@ -585,17 +589,22 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
             ),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
             padding: const EdgeInsets.all(spacingMD),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -624,6 +633,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               ],
             ),
           ),
+        ),
+      ),
     );
   }
 
