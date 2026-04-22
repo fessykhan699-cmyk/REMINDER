@@ -229,6 +229,37 @@ Future<pw.Document> buildInvoicePdf(
             ? (context) => _buildWatermark()
             : null,
       ),
+      header: (pw.Context context) {
+        if (context.pageNumber == 1) {
+          return pw.SizedBox();
+        }
+        try {
+          return _buildContinuationHeader(
+            invoiceNumber: invoice.invoiceNumber.isNotEmpty
+                ? invoice.invoiceNumber
+                : invoice.id,
+            brandName: brandName,
+          );
+        } catch (e) {
+          return pw.SizedBox();
+        }
+      },
+      footer: (pw.Context context) {
+        try {
+          return pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: pw.TextStyle(
+                color: _pdfMuted,
+                fontSize: 8,
+              ),
+            ),
+          );
+        } catch (e) {
+          return pw.SizedBox();
+        }
+      },
       build: (context) => <pw.Widget>[
         _buildHeader(
           logoImage: defaultLogo,
@@ -379,6 +410,42 @@ pw.Widget _buildHeader({
       pw.SizedBox(height: _spaceMd),
       pw.Container(height: 2, color: _pdfAccent),
       pw.SizedBox(height: _spaceLg),
+    ],
+  );
+}
+
+pw.Widget _buildContinuationHeader({
+  required String invoiceNumber,
+  required String brandName,
+}) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Text(
+            brandName,
+            style: pw.TextStyle(
+              color: _pdfInk,
+              fontSize: 16,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.Text(
+            'Invoice $invoiceNumber — Continued',
+            style: pw.TextStyle(
+              color: _pdfMuted,
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+      pw.SizedBox(height: 8),
+      pw.Container(height: 1, color: _pdfBorder),
+      pw.SizedBox(height: _spaceMd),
     ],
   );
 }
