@@ -36,6 +36,7 @@ class AppPreferencesModel extends AppPreferences {
     required super.oneTapInvoiceEnabled,
     required super.smartPredictionEnabled,
     required super.biometricLockEnabled,
+    required super.faceUnlockEnabled,
   });
 
   const AppPreferencesModel.defaults() : super.defaults();
@@ -59,6 +60,7 @@ class AppPreferencesModel extends AppPreferences {
       oneTapInvoiceEnabled: preferences.oneTapInvoiceEnabled,
       smartPredictionEnabled: preferences.smartPredictionEnabled,
       biometricLockEnabled: preferences.biometricLockEnabled,
+      faceUnlockEnabled: preferences.faceUnlockEnabled,
     );
   }
 }
@@ -87,6 +89,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       nextInvoiceNumber: reader.availableBytes > 0 ? reader.readInt() : 1,
       biometricLockEnabled: reader.availableBytes > 0 ? reader.readBool() : false,
       expenseCurrency: reader.availableBytes > 0 ? reader.readString() : 'AED',
+      faceUnlockEnabled: reader.availableBytes > 0 ? reader.readBool() : false,
     );
   }
 
@@ -109,6 +112,7 @@ class AppPreferencesModelAdapter extends TypeAdapter<AppPreferencesModel> {
       ..writeBool(obj.smartPredictionEnabled)
       ..writeInt(obj.nextInvoiceNumber)
       ..writeBool(obj.biometricLockEnabled)
-      ..writeString(obj.expenseCurrency);
+      ..writeString(obj.expenseCurrency)
+      ..writeBool(obj.faceUnlockEnabled);
   }
 }

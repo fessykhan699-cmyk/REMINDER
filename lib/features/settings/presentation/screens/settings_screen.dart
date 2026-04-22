@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../../../data/services/analytics_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -33,6 +34,25 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _faceAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFaceAvailability();
+  }
+
+  Future<void> _checkFaceAvailability() async {
+    final auth = LocalAuthentication();
+    final available = await auth.getAvailableBiometrics();
+    if (mounted) {
+      setState(() {
+        _faceAvailable = available.contains(BiometricType.face) ||
+            available.contains(BiometricType.weak);
+      });
+    }
+  }
+
   static const List<String> _currencyOptions = <String>[
     'USD',
     'AED',
@@ -576,6 +596,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       .read(appPreferencesControllerProvider.notifier)
                       .setBiometricLock(value),
                 ),
+                if (_faceAvailable)
+                  _SwitchRow(
+                    title: 'Face Unlock',
+                    subtitle: 'Use face recognition to unlock the app',
+                    value: preferences.faceUnlockEnabled,
+                    enabled: preferences.biometricLockEnabled,
+                    onChanged: (value) => ref
+                        .read(appPreferencesControllerProvider.notifier)
+                        .setFaceUnlock(value),
+                  ),
                 _SwitchRow(
                   title: 'App lock',
                   subtitle: preferences.appLockEnabled

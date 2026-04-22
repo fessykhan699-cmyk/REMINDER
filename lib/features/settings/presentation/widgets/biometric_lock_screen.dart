@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/providers/biometric_provider.dart';
+import '../../presentation/controllers/app_preferences_controller.dart';
 
 class BiometricLockScreen extends ConsumerStatefulWidget {
   const BiometricLockScreen({super.key});
@@ -27,7 +28,10 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
     _isAuthenticating = true;
     try {
       final service = ref.read(biometricServiceProvider);
-      final success = await service.authenticate();
+      final prefs = ref.read(appPreferencesControllerProvider).valueOrNull;
+      final success = await service.authenticate(
+        facePreferred: prefs?.faceUnlockEnabled ?? false,
+      );
       if (success && mounted) {
         ref.read(isBiometricLockedProvider.notifier).state = false;
       }

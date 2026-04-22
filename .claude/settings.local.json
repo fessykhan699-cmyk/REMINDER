@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(claude plugin:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(py:*)",
+      "Bash(flutter run:*)"
     ]
   }
 }
