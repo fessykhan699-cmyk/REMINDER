@@ -56,7 +56,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   String? _lastAutoAmountValue;
   DateTime? _lastAutoDueDate;
   bool _isSaving = false;
-  bool _smartSyncScheduled = false;
   final List<LineItem> _lineItems = [];
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
   bool _isRecurring = false;
@@ -182,7 +181,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
 
     _applyClientSuggestion(
-      intelligence: _buildCurrentIntelligence(),
+      intelligence: ref.read(smartInvoicePredictionProvider),
       client: client,
       force: forceFill,
     );
@@ -196,59 +195,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
         _serviceFocusNode.requestFocus();
       }
     });
-  }
-
-  SmartInvoicePrediction _buildCurrentIntelligence() {
-    return ref.read(smartInvoicePredictionProvider);
-  }
-
-  void _scheduleSmartSync() {
-    final launchMode = ref.read(invoiceCreateLaunchModeProvider);
-    if (launchMode == InvoiceCreateLaunchMode.manual) {
-      return;
-    }
-
-    if (_smartSyncScheduled) {
-      return;
-    }
-
-    _smartSyncScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _smartSyncScheduled = false;
-      if (!mounted) {
-        return;
-      }
-
-      _syncSmartDefaults(_buildCurrentIntelligence());
-    });
-  }
-
-  void _syncSmartDefaults(SmartInvoicePrediction intelligence) {
-    final selectedClient = _selectedClient;
-    if (selectedClient != null) {
-      _applyClientSuggestion(
-        intelligence: intelligence,
-        client: selectedClient,
-        force: false,
-      );
-      return;
-    }
-
-    final preferredDueDays = intelligence.preferredDueDays;
-    final suggestedAmount = intelligence.quickAmountConfidence >= 0.50
-        ? intelligence.quickAmount
-        : null;
-    final suggestedDueDays = intelligence.preferredDueDaysConfidence >= 0.50
-        ? preferredDueDays
-        : null;
-
-    if (suggestedAmount != null || suggestedDueDays != null) {
-      _applySmartValues(
-        amount: suggestedAmount,
-        dueDays: suggestedDueDays,
-        force: false,
-      );
-    }
   }
 
   void _applyClientSuggestion({
@@ -945,7 +891,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    ref.watch(invoiceCreateLaunchModeProvider);
     final intelligence = ref.watch(smartInvoicePredictionProvider);
     final subscription = ref.watch(subscriptionControllerProvider).valueOrNull;
     final isPro = subscription?.isPro ?? false;
@@ -960,8 +905,6 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             .valueOrNull
             ?.defaultCurrency ??
         _selectedCurrency;
-
-    _scheduleSmartSync();
 
     return Scaffold(
       appBar: AppBar(

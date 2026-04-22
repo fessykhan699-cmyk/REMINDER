@@ -12,7 +12,13 @@
       "Read(//c/flutter/packages/flutter/lib/src/material/**)",
       "Bash(FLUTTER_ROOT=\"/c/flutter\" /c/flutter/bin/flutter.bat pub get)",
       "Bash(FLUTTER_ROOT=\"/c/flutter\" /c/flutter/bin/flutter.bat test --no-pub --exclude-tags=native)",
-      "Bash(grep -n \"AED\\\\|currencyCode\\\\|currency\\\\|Currency\\\\|AddItem\\\\|_addItem\\\\|_showAdd\\\\|lineItem\\\\|LineItem\\\\|line_item\\\\|dialog\\\\|Dialog\\\\|symbol\\\\|\\\\\\\\\\\\$\" \"c:/flutter dev/projects/reminder/reminder/lib/features/invoices/presentation/screens/create_invoice_screen.dart\")"
+      "Bash(grep -n \"AED\\\\|currencyCode\\\\|currency\\\\|Currency\\\\|AddItem\\\\|_addItem\\\\|_showAdd\\\\|lineItem\\\\|LineItem\\\\|line_item\\\\|dialog\\\\|Dialog\\\\|symbol\\\\|\\\\\\\\\\\\$\" \"c:/flutter dev/projects/reminder/reminder/lib/features/invoices/presentation/screens/create_invoice_screen.dart\")",
+      "Read(//c/Users/fessy/AppData/Local/Pub/Cache/hosted/pub.dev/**)",
+      "Bash(grep -v \"test\\\\|import\\\\|//\")",
+      "Bash(powershell -Command ' *)",
+      "PowerShell($lines = Get-Content 'C:\\\\Users\\\\fessy\\\\.claude\\\\projects\\\\c--flutter-dev-projects-reminder-reminder\\\\494c384a-4ebe-4e71-a3be-49d716e97cf8.jsonl' -Tail 15; foreach \\($line in $lines\\) { try { $d = $line | ConvertFrom-Json; $role = $d.role; $content = $d.content; if \\($content -is [string]\\) { $short = $content.Substring\\(0, [Math]::Min\\(200, $content.Length\\)\\); Write-Host \"$role : $short\" } elseif \\($content -is [array]\\) { foreach \\($c in $content\\) { if \\($c.type -eq 'text'\\) { $short = $c.text.Substring\\(0, [Math]::Min\\(200, $c.text.Length\\)\\); Write-Host \"$role : $short\" } } } } catch {} })",
+      "Bash(pip install *)",
+      "Bash(graphify install *)"
     ]
   }
 }
