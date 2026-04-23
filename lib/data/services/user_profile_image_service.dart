@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 import '../../core/storage/hive_storage.dart';
-import '../../features/subscription/data/datasources/subscription_local_datasource.dart';
 
 class UserProfileImageService {
   static const String logoKey = 'user_logo_path';
@@ -16,9 +15,6 @@ class UserProfileImageService {
 
   static Future<String?> pickAndSaveLogo() async {
     try {
-      final subscription = await const SubscriptionLocalDatasource().loadState();
-      if (!subscription.isPro) return null;
-
       final picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image == null) return null;
@@ -40,9 +36,6 @@ class UserProfileImageService {
 
   static Future<String?> pickAndSaveSignature() async {
     try {
-      final subscription = await const SubscriptionLocalDatasource().loadState();
-      if (!subscription.isPro) return null;
-
       final picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
       if (image == null) return null;
