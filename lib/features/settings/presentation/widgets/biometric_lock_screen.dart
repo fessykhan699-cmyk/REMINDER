@@ -31,6 +31,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
       final prefs = ref.read(appPreferencesControllerProvider).valueOrNull;
       final success = await service.authenticate(
         facePreferred: prefs?.faceUnlockEnabled ?? false,
+        fingerprintPreferred: prefs?.fingerprintLockEnabled ?? false,
       );
       if (success && mounted) {
         ref.read(isBiometricLockedProvider.notifier).state = false;

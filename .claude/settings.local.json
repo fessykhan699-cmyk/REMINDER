@@ -4,7 +4,10 @@
       "Bash(claude plugin:*)",
       "Bash(flutter analyze:*)",
       "Bash(py:*)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(python3 -c ':*)",
+      "Read(//c/Users/fessy/.claude/plugins/cache//**)",
+      "Read(//c/Users/fessy/.claude/plugins//**)"
     ]
   }
 }

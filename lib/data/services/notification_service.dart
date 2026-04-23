@@ -7,6 +7,10 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/subscription/data/datasources/subscription_local_datasource.dart';
 
+const String _overdueChannelId = 'overdue_invoices';
+const String _overdueChannelName = 'Overdue Invoices';
+const String _overdueChannelDesc = 'Daily notifications for overdue invoices';
+
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
@@ -126,23 +130,49 @@ class NotificationService {
 
   static Future<void> showOverdueNotification(Invoice invoice) async {
     try {
-      final subscription = await const SubscriptionLocalDatasource().loadState();
-      if (!subscription.isPro) return;
-
       final now = DateTime.now();
-      final scheduledAt = now.add(const Duration(minutes: 1));
-      
-      final invoiceHash = invoice.id.hashCode;
-      
-      await _schedule(
-        id: (invoiceHash * 2 + 2) & 0x7FFFFFFF, // Unique ID for overdue
+      final today = DateTime(now.year, now.month, now.day);
+      final dueDay = DateTime(
+        invoice.dueDate.year,
+        invoice.dueDate.month,
+        invoice.dueDate.day,
+      );
+      final daysOverdue = today.difference(dueDay).inDays.clamp(1, 9999);
+
+      final symbol = _currencySymbol(invoice.currencyCode);
+      final amount = '$symbol${invoice.amount.toStringAsFixed(2)}';
+
+      await _plugin.show(
+        id: (invoice.id.hashCode * 2 + 2) & 0x7FFFFFFF,
         title: 'Invoice Overdue',
-        body: 'Invoice #${invoice.id} for ${invoice.clientName} is now overdue.',
-        scheduledAt: scheduledAt,
+        body: '${invoice.clientName} invoice for $amount is overdue by '
+            '$daysOverdue day${daysOverdue == 1 ? '' : 's'}',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _overdueChannelId,
+            _overdueChannelName,
+            channelDescription: _overdueChannelDesc,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+        payload: invoice.id,
       );
     } catch (e) {
       debugPrint('NotificationService showOverdueNotification error: $e');
     }
+  }
+
+  static String _currencySymbol(String code) {
+    const symbols = <String, String>{
+      'USD': '\$',
+      'EUR': '€',
+      'GBP': '£',
+      'AED': 'AED ',
+      'INR': '₹',
+      'SAR': 'SAR ',
+    };
+    return symbols[code] ?? '$code ';
   }
 
   static Future<void> cancelAllNotifications() async {

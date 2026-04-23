@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/app_feedback_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/app_router.dart';
-import 'data/providers/biometric_provider.dart';
 import 'features/settings/presentation/widgets/app_lock_gate.dart';
-import 'features/settings/presentation/widgets/biometric_lock_screen.dart';
 import 'features/subscription/presentation/controllers/billing_controller.dart';
 import 'features/subscription/presentation/controllers/subscription_controller.dart';
 import 'data/services/recurring_invoice_scheduler.dart';
@@ -46,18 +44,7 @@ class InvoiceReminderApp extends ConsumerWidget {
         if (child == null) {
           return const SizedBox.shrink();
         }
-        return Consumer(
-          builder: (context, ref, _) {
-            final isLocked = ref.watch(isBiometricLockedProvider);
-            return Stack(
-              children: [
-                AppLockGate(child: child),
-                if (isLocked)
-                  const Positioned.fill(child: BiometricLockScreen()),
-              ],
-            );
-          },
-        );
+        return AppLockGate(child: child);
       },
       routerConfig: router,
     );

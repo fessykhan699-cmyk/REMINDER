@@ -10,6 +10,7 @@ class SubscriptionLocalDatasource {
 
   static const String storageKey = 'invoice_flow_is_pro_v1';
   static const String planStorageKey = 'invoice_flow_plan_v2';
+  static const String debugModeKey = 'debug_mode_enabled';
 
   Box<dynamic>? get _settingsBoxOrNull {
     if (!Hive.isBoxOpen(HiveStorage.settingsBoxName)) {
@@ -17,6 +18,15 @@ class SubscriptionLocalDatasource {
     }
 
     return Hive.box<dynamic>(HiveStorage.settingsBoxName);
+  }
+
+  bool loadDebugMode() {
+    return _settingsBoxOrNull?.get(debugModeKey, defaultValue: false) as bool? ??
+        false;
+  }
+
+  Future<void> saveDebugMode(bool value) async {
+    await _settingsBoxOrNull?.put(debugModeKey, value);
   }
 
   Future<SubscriptionState> loadState() async {

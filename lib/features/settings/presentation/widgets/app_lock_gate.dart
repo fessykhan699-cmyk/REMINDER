@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../data/providers/biometric_provider.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../domain/entities/app_preferences.dart';
@@ -24,7 +23,6 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   final TextEditingController _pinController = TextEditingController();
   String? _errorText;
   AppPreferences _lastKnownPreferences = const AppPreferences.defaults();
-  bool _wasPaused = false;
 
   @override
   void initState() {
@@ -42,17 +40,10 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      _wasPaused = true;
       if (_lastKnownPreferences.appLockEnabled &&
           _lastKnownPreferences.hasPin) {
         ref.read(appLockSessionProvider.notifier).state = false;
       }
-    }
-    if (state == AppLifecycleState.resumed) {
-      if (_wasPaused && _lastKnownPreferences.biometricLockEnabled) {
-        ref.read(isBiometricLockedProvider.notifier).state = true;
-      }
-      _wasPaused = false;
     }
   }
 

@@ -44,6 +44,7 @@ class AppPreferences {
     required this.smartPredictionEnabled,
     required this.biometricLockEnabled,
     required this.faceUnlockEnabled,
+    required this.fingerprintLockEnabled,
   });
 
   const AppPreferences.defaults()
@@ -64,7 +65,8 @@ class AppPreferences {
       oneTapInvoiceEnabled = true,
       smartPredictionEnabled = true,
       biometricLockEnabled = false,
-      faceUnlockEnabled = false;
+      faceUnlockEnabled = false,
+      fingerprintLockEnabled = false;
 
   final bool pushNotificationsEnabled;
   final bool whatsAppRemindersEnabled;
@@ -84,6 +86,7 @@ class AppPreferences {
   final bool smartPredictionEnabled;
   final bool biometricLockEnabled;
   final bool faceUnlockEnabled;
+  final bool fingerprintLockEnabled;
 
   bool get hasPin => appLockPin.trim().length >= 4;
 
@@ -107,6 +110,7 @@ class AppPreferences {
     bool? smartPredictionEnabled,
     bool? biometricLockEnabled,
     bool? faceUnlockEnabled,
+    bool? fingerprintLockEnabled,
   }) {
     return AppPreferences(
       pushNotificationsEnabled:
@@ -130,6 +134,7 @@ class AppPreferences {
           smartPredictionEnabled ?? this.smartPredictionEnabled,
       biometricLockEnabled: biometricLockEnabled ?? this.biometricLockEnabled,
       faceUnlockEnabled: faceUnlockEnabled ?? this.faceUnlockEnabled,
+      fingerprintLockEnabled: fingerprintLockEnabled ?? this.fingerprintLockEnabled,
     );
   }
 }

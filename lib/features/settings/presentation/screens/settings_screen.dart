@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
 import '../../../../data/services/analytics_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -34,21 +33,23 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _faceAvailable = false;
+  int _headerTapCount = 0;
+  DateTime? _lastHeaderTapTime;
+  bool _developerOptionsVisible = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkFaceAvailability();
-  }
-
-  Future<void> _checkFaceAvailability() async {
-    final auth = LocalAuthentication();
-    final available = await auth.getAvailableBiometrics();
-    if (mounted) {
+  void _onHeaderTap() {
+    final now = DateTime.now();
+    final last = _lastHeaderTapTime;
+    if (last == null || now.difference(last).inSeconds > 3) {
+      _headerTapCount = 1;
+    } else {
+      _headerTapCount++;
+    }
+    _lastHeaderTapTime = now;
+    if (_headerTapCount >= 7) {
       setState(() {
-        _faceAvailable = available.contains(BiometricType.face) ||
-            available.contains(BiometricType.weak);
+        _developerOptionsVisible = true;
+        _headerTapCount = 0;
       });
     }
   }
@@ -472,10 +473,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // ── Header ──
             Padding(
               padding: const EdgeInsets.only(bottom: 20),
-              child: Text(
-                'Settings',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _onHeaderTap,
+                child: Text(
+                  'Settings',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
@@ -587,25 +592,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionCard(
               title: 'Security',
               children: [
-                _SwitchRow(
-                  title: 'Biometric App Lock',
-                  subtitle:
-                      'Require fingerprint or Face ID when opening the app',
-                  value: preferences.biometricLockEnabled,
-                  onChanged: (value) => ref
-                      .read(appPreferencesControllerProvider.notifier)
-                      .setBiometricLock(value),
-                ),
-                if (_faceAvailable)
-                  _SwitchRow(
-                    title: 'Face Unlock',
-                    subtitle: 'Use face recognition to unlock the app',
-                    value: preferences.faceUnlockEnabled,
-                    enabled: preferences.biometricLockEnabled,
-                    onChanged: (value) => ref
-                        .read(appPreferencesControllerProvider.notifier)
-                        .setFaceUnlock(value),
-                  ),
                 _SwitchRow(
                   title: 'App lock',
                   subtitle: preferences.appLockEnabled
@@ -750,6 +736,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ),
+            if (_developerOptionsVisible) ...[
+              const SizedBox(height: 20),
+              _SectionCard(
+                title: 'Developer Options',
+                children: [
+                  _SwitchRow(
+                    title: 'Debug Mode',
+                    subtitle: 'Bypass subscription checks (testing only)',
+                    value: ref.watch(debugModeProvider),
+                    onChanged: (value) => ref
+                        .read(subscriptionControllerProvider.notifier)
+                        .setDebugMode(value),
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             PrimaryButton(
               label: 'Logout',

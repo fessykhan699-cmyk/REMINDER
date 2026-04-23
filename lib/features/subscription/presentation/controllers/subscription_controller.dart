@@ -30,6 +30,13 @@ final subscriptionGatekeeperProvider = Provider<SubscriptionGatekeeper>(
   (ref) => SubscriptionGatekeeper(ref),
 );
 
+/// Runtime debug bypass — survives hot restart, persists across sessions via Hive.
+/// Toggled from the hidden Developer Options section in Settings (7-tap on header).
+final debugModeProvider = StateProvider<bool>((ref) {
+  final datasource = ref.read(subscriptionLocalDatasourceProvider);
+  return datasource.loadDebugMode();
+});
+
 class SubscriptionController extends AsyncNotifier<SubscriptionState> {
   /// Set to true to bypass subscription gates during testing.
   /// Has zero effect in release builds — kDebugMode is false.
@@ -39,6 +46,10 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
   @override
   Future<SubscriptionState> build() async {
     if (kDebugMode && _debugBypassSubscription) {
+      return const SubscriptionState.business();
+    }
+
+    if (ref.watch(debugModeProvider)) {
       return const SubscriptionState.business();
     }
 
@@ -63,6 +74,11 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
       debugPrint('[SubscriptionController] syncOwnedProState failed: $e\n$st');
       return localState;
     }
+  }
+
+  Future<void> setDebugMode(bool value) async {
+    await ref.read(subscriptionLocalDatasourceProvider).saveDebugMode(value);
+    ref.read(debugModeProvider.notifier).state = value;
   }
 
   Future<void> setPlan({required bool isPro}) async {
