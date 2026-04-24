@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -120,7 +121,10 @@ class NotificationService {
           'Invoice Reminders',
           importance: Importance.high,
           priority: Priority.high,
-          largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
+          icon: 'ic_notification',
+          largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          color: Color(0xFFD4A017),
+          colorized: false,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -161,9 +165,12 @@ class NotificationService {
             _overdueChannelId,
             _overdueChannelName,
             channelDescription: _overdueChannelDesc,
-            importance: Importance.high,
+            importance: Importance.max,
             priority: Priority.high,
-            largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
+            icon: 'ic_notification',
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+            color: Color(0xFFD4A017),
+            colorized: false,
           ),
         ),
         payload: invoice.id,
@@ -183,24 +190,6 @@ class NotificationService {
       'SAR': 'SAR ',
     };
     return symbols[code] ?? '$code ';
-  }
-
-  // TEMP: test notification — remove after verifying notification system works
-  static Future<void> showTestNotification() async {
-    await _plugin.show(
-      id: 999,
-      title: 'Invoice Flow Test',
-      body: 'Notification system is working ✅',
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'overdue_invoices',
-          'Overdue Invoices',
-          channelDescription: 'Notifications for overdue invoices',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-    );
   }
 
   static Future<void> cancelAllNotifications() async {

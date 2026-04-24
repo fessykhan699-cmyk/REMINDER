@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../shared/components/app_scaffold.dart';
 import '../../../../core/services/app_feedback_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -150,6 +152,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     appLockSession.state = true;
     if (mounted) {
       AppFeedbackService.showSnackBar('PIN updated.');
+    }
+  }
+
+  Future<void> _showDeleteConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This will permanently delete your account and ALL data '
+          '(invoices, clients, expenses). This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _performDelete();
+  }
+
+  Future<void> _performDelete() async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Deleting account...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final userId = FirebaseAuth.instance.currentUser!.uid;
+      await ref.read(firestoreSyncServiceProvider).deleteAccount(userId);
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // close loading dialog
+      ref.read(authControllerProvider.notifier).logout();
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // close loading dialog
+
+      final isReauthError = e.toString().contains('requires-recent-login');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isReauthError
+                ? 'For security, please sign out and sign back in, '
+                    'then try deleting again.'
+                : 'Failed to delete account: $e',
+          ),
+          duration: Duration(seconds: isReauthError ? 5 : 3),
+        ),
+      );
     }
   }
 
@@ -761,6 +831,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(appLockSessionProvider.notifier).state = false;
                 ref.read(authControllerProvider.notifier).logout();
               },
+            ),
+            const SizedBox(height: 12),
+            GlassCard(
+              padding: EdgeInsets.zero,
+              child: ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text(
+                  'Delete Account',
+                  style: TextStyle(color: Colors.red),
+                ),
+                subtitle: const Text(
+                  'Permanently delete your account and all data',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onTap: _showDeleteConfirmation,
+              ),
             ),
           ],
         ),

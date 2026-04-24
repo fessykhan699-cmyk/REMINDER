@@ -17,7 +17,10 @@
       "Bash(xargs grep:*)",
       "Bash(awk -F: '{sum += $2} END {print \"Total test\\(\\) calls: \" sum}')",
       "Bash(find \"C:/flutter dev/projects/reminder/reminder/test\" -name \"*.dart\" -exec grep -c \"^\\\\s*test\\(\" {} \\\\;)",
-      "Bash(awk '{sum += $1} END {print \"Total tests: \" sum}')"
+      "Bash(awk '{sum += $1} END {print \"Total tests: \" sum}')",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(dart --version)"
     ]
   }
 }

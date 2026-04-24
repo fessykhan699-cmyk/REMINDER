@@ -66,9 +66,6 @@ Future<void> main() async {
 
   await NotificationService.init();
 
-  // TEMP: test notification — if this appears, notification system works
-  await NotificationService.showTestNotification();
-
   // Flip overdue invoices on startup
   try {
     await OverdueFlipService().flipOverdueInvoices();

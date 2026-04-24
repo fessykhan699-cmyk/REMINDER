@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 
@@ -54,7 +55,6 @@ class FirestoreSyncService {
     required bool isPro,
     required InvoiceModel invoice,
   }) async {
-    if (!isPro) return;
     try {
       await _invoices(userId).doc(invoice.id).set(invoice.toJson());
     } catch (e, st) {
@@ -67,7 +67,6 @@ class FirestoreSyncService {
     required bool isPro,
     required ClientModel client,
   }) async {
-    if (!isPro) return;
     try {
       await _clients(userId).doc(client.id).set(client.toJson());
     } catch (e, st) {
@@ -118,7 +117,6 @@ class FirestoreSyncService {
     required bool isPro,
     required String invoiceId,
   }) async {
-    if (!isPro) return;
     try {
       await _invoices(userId).doc(invoiceId).delete();
     } catch (e, st) {
@@ -131,7 +129,6 @@ class FirestoreSyncService {
     required bool isPro,
     required String clientId,
   }) async {
-    if (!isPro) return;
     try {
       await _clients(userId).doc(clientId).delete();
     } catch (e, st) {
@@ -282,6 +279,60 @@ class FirestoreSyncService {
       } catch (e) {
         debugPrint('[FirestoreSync] skipping malformed expense ${doc.id}: $e');
       }
+    }
+  }
+
+  // ── Account deletion ──────────────────────────────────────────────────────
+
+  /// Permanently deletes all user data from Firestore, clears all local Hive
+  /// boxes, then deletes the Firebase Auth account.
+  ///
+  /// Order: Firestore data → Hive → Auth account.
+  /// Throws [Exception('requires-recent-login')] if Firebase requires
+  /// re-authentication before deletion.
+  Future<void> deleteAccount(String userId) async {
+    // Step 1 — Delete Firestore subcollections
+    for (final col in ['invoices', 'clients', 'expenses', 'reminders']) {
+      final snapshot = await _db
+          .collection('users')
+          .doc(userId)
+          .collection(col)
+          .get();
+      for (final doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
+    }
+
+    // Profile is a single document, not a collection — delete it directly
+    await _profile(userId).delete();
+
+    // Step 2 — Delete the user document itself
+    await _db.collection('users').doc(userId).delete();
+
+    // Step 3 — Clear all local Hive boxes
+    Future<void> clearBox(String name) async {
+      if (Hive.isBoxOpen(name)) {
+        await Hive.box<dynamic>(name).clear();
+      }
+    }
+
+    await clearBox(HiveStorage.invoicesBoxName);
+    await clearBox(HiveStorage.clientsBoxName);
+    await clearBox(HiveStorage.expensesBoxName);
+    await clearBox(HiveStorage.settingsBoxName);
+    await clearBox(HiveStorage.remindersBoxName);
+    await clearBox(HiveStorage.userProfileBoxName);
+    await clearBox(HiveStorage.appPreferencesBoxName);
+    await clearBox(HiveStorage.invoiceTemplatesBoxName);
+
+    // Step 4 — Delete the Firebase Auth account
+    try {
+      await FirebaseAuth.instance.currentUser?.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        throw Exception('requires-recent-login');
+      }
+      rethrow;
     }
   }
 
