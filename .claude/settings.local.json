@@ -7,7 +7,11 @@
       "Bash(flutter run:*)",
       "Bash(python3 -c ':*)",
       "Read(//c/Users/fessy/.claude/plugins/cache//**)",
-      "Read(//c/Users/fessy/.claude/plugins//**)"
+      "Read(//c/Users/fessy/.claude/plugins//**)",
+      "Read(//mnt/skills/user/**)",
+      "Bash(rm -f \"C:/Users/fessy/.claude/skills/save/SKILL.md\")",
+      "Bash(rm -f \"C:/Users/fessy/.claude/skills/resume/SKILL.md\")",
+      "Bash(bash:*)"
     ]
   }
 }
