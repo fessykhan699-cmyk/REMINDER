@@ -70,33 +70,43 @@ class ReminderRepositoryImpl implements ReminderRepository {
     required Invoice invoice,
     required ReminderMessageType type,
   }) {
-    final dueDate = invoice.dueDate.toLocal().toString().split(' ').first;
+    final clientName = invoice.clientName;
+    final invoiceNumber = invoice.invoiceNumber.isNotEmpty
+        ? invoice.invoiceNumber
+        : invoice.id;
     final amount = AppFormatters.currency(
       invoice.amount,
       currencyCode: invoice.currencyCode,
     );
+    final dueDate = AppFormatters.shortDate(invoice.dueDate.toLocal());
     final paymentLinkLine = invoice.hasPaymentLink
-        ? ' You can view or pay here: ${invoice.normalizedPaymentLink}'
+        ? '\n\nPay here: ${invoice.normalizedPaymentLink}'
         : '';
 
     switch (type) {
       case ReminderMessageType.professional:
-        return 'Hello ${invoice.clientName}, this is a reminder that invoice '
-            '${invoice.id} (${invoice.service}) for '
-            '$amount is due on $dueDate. '
-            'Please confirm your payment timeline.'
+        return 'Hi $clientName, hope you\'re doing well.\n\n'
+            'This is a gentle reminder that invoice $invoiceNumber for '
+            '$amount was due on $dueDate.\n\n'
+            'If you\'ve already processed the payment, please disregard this '
+            'message. Otherwise, kindly let us know when we can expect it.\n\n'
+            'Thank you for your business. 🙏'
             '$paymentLinkLine';
       case ReminderMessageType.friendly:
-        return 'Hi ${invoice.clientName}! Quick reminder about invoice '
-            '${invoice.id} for ${invoice.service} '
-            '($amount). '
-            'It is due on $dueDate. '
-            'Could you please share when payment will be processed? Thanks!'
+        return 'Hey $clientName! 😊\n\n'
+            'Just a quick heads-up — invoice $invoiceNumber for $amount '
+            'was due on $dueDate.\n\n'
+            'No worries if it slipped through — these things happen! '
+            'Let me know if you need anything from my end to process it.\n\n'
+            'Thanks a lot! 🙌'
             '$paymentLinkLine';
       case ReminderMessageType.firm:
-        return 'Reminder: invoice ${invoice.id} for ${invoice.service} '
-            '($amount) is due on $dueDate. '
-            'Please arrange payment today to avoid service delays.'
+        return 'Dear $clientName,\n\n'
+            'This is a follow-up regarding invoice $invoiceNumber for '
+            '$amount, which was due on $dueDate and remains unpaid.\n\n'
+            'Please arrange payment at your earliest convenience. '
+            'If there is an issue, do reach out so we can resolve it.\n\n'
+            'Thank you.'
             '$paymentLinkLine';
     }
   }

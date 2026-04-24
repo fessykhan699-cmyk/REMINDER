@@ -15,8 +15,6 @@ import '../../../../shared/components/app_scaffold.dart';
 import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/premium_primary_button.dart';
 import '../../../../shared/services/invoice_export_service.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../../data/services/whatsapp_reminder_service.dart';
 import '../../../../data/services/email_invoice_service.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../subscription/domain/entities/subscription_state.dart';
@@ -42,7 +40,6 @@ class InvoiceDetailScreen extends ConsumerStatefulWidget {
 class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   bool _isOpeningPdfPreview = false;
   bool _isSharingPdf = false;
-  bool _isSendingWhatsApp = false;
   bool _isSendingEmail = false;
   bool _isMarkingPaid = false;
   bool _isAddingPayment = false;
@@ -50,7 +47,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   bool get _isPdfBusy =>
       _isOpeningPdfPreview ||
       _isSharingPdf ||
-      _isSendingWhatsApp ||
       _isSendingEmail ||
       _isAddingPayment;
 
@@ -93,44 +89,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSharingPdf = false);
-      }
-    }
-  }
-
-  Future<void> _sendViaWhatsApp(Invoice invoice) async {
-    if (_isPdfBusy) {
-      return;
-    }
-
-    setState(() => _isSendingWhatsApp = true);
-
-    try {
-      final amountStr = AppFormatters.currency(
-        invoice.amount,
-        currencyCode: invoice.currencyCode,
-      );
-      final dueDateStr = AppFormatters.shortDate(invoice.dueDate);
-      final message =
-          'Hi ${invoice.clientName}, please find your invoice '
-          '${invoice.invoiceNumber} for $amountStr '
-          'due on $dueDateStr. '
-          'Thank you for your business.';
-      final uri = Uri.parse(
-        'https://wa.me/?text=${Uri.encodeComponent(message)}',
-      );
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        AnalyticsService.instance.logInvoiceShared('whatsapp');
-      } else {
-        if (mounted) {
-          _showSnackBar('WhatsApp is not installed on this device');
-        }
-      }
-    } catch (e) {
-      debugPrint('WhatsApp send error: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isSendingWhatsApp = false);
       }
     }
   }
@@ -546,117 +504,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
       if (mounted) {
         setState(() => _isSendingEmail = false);
       }
-    }
-  }
-
-  Future<void> _showWhatsAppReminderSheet(Invoice invoice) async {
-    // Phase 5 — Subscription Gate
-    final subscription =
-        ref.read(subscriptionControllerProvider).valueOrNull ??
-        const SubscriptionState.free();
-    if (!subscription.isPro) {
-      const UpgradeToProRoute().push(context);
-      return;
-    }
-
-    // if client has no phone number: show a snackbar
-    final client = await ref.read(clientDetailProvider(invoice.clientId).future);
-    final phone = client?.phone ?? '';
-    if (phone.trim().isEmpty) {
-      _showSnackBar('Add a WhatsApp number to this client first');
-      return;
-    }
-
-    if (!mounted) return;
-
-    final service = ref.read(whatsAppReminderServiceProvider);
-    final amountStr = AppFormatters.currency(
-      invoice.amount,
-      currencyCode: invoice.currencyCode,
-    );
-    final dueDateStr = AppFormatters.shortDate(invoice.dueDate);
-    final clientName = invoice.clientName;
-
-    final friendly = service.getFriendlyMessage(
-      clientName,
-      amountStr,
-      dueDateStr,
-    );
-    final firm = service.getFirmMessage(clientName, amountStr, dueDateStr);
-    final finalNotice = service.getFinalMessage(clientName, amountStr, dueDateStr);
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(20),
-            ),
-          ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(spacingMD),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Send WhatsApp Reminder',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: spacingMD),
-                _ReminderOption(
-                  title: 'Friendly Reminder',
-                  preview: friendly,
-                  onTap: () => _handleSend(invoice.id, phone, friendly, 'friendly'),
-                ),
-                const SizedBox(height: spacingSM),
-                _ReminderOption(
-                  title: 'Firm Reminder',
-                  preview: firm,
-                  onTap: () => _handleSend(invoice.id, phone, firm, 'firm'),
-                ),
-                const SizedBox(height: spacingSM),
-                _ReminderOption(
-                  title: 'Final Notice',
-                  preview: finalNotice,
-                  onTap: () => _handleSend(invoice.id, phone, finalNotice, 'final'),
-                ),
-                const SizedBox(height: spacingLG),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleSend(
-    String invoiceId,
-    String phone,
-    String message,
-    String template,
-  ) async {
-    Navigator.pop(context);
-    final success = await ref.read(whatsAppReminderServiceProvider).sendReminder(
-      invoiceId: invoiceId,
-      phone: phone,
-      message: message,
-      template: template,
-    );
-
-    if (!mounted) return;
-    if (success) {
-      _showSnackBar('WhatsApp opened successfully');
-    } else {
-      _showSnackBar('Could not open WhatsApp');
     }
   }
 
@@ -1168,23 +1015,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     child: Column(
                       children: [
                         _ActionRow(
-                          icon: Icons.chat_bubble_outline_rounded,
-                          label: _isSendingWhatsApp
-                              ? 'Opening WhatsApp...'
-                              : 'Send via WhatsApp',
-                          isLoading: _isSendingWhatsApp,
-                          onTap: _isPdfBusy
-                              ? null
-                              : () => _sendViaWhatsApp(invoice),
-                        ),
-                        _ActionRow(
                           icon: RemixIcons.share_line,
                           label: _isSharingPdf ? 'Sharing PDF...' : 'Share PDF',
                           isLoading: _isSharingPdf,
                           onTap: _isPdfBusy
                               ? null
                               : () => _shareInvoicePdf(invoice),
-                          showTopBorder: true,
                         ),
                         _ActionRow(
                           icon: RemixIcons.file_pdf_line,
@@ -1225,7 +1061,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                         _ActionRow(
                           icon: RemixIcons.message_3_line,
                           label: 'Send WhatsApp Reminder',
-                          onTap: () => _showWhatsAppReminderSheet(invoice),
+                          onTap: () => ReminderFlowRoute(invoice.id).push(context),
                           showTopBorder: true,
                         ),
                         _ActionRow(
@@ -1369,70 +1205,6 @@ class _ActionRow extends StatelessWidget {
                 color: onTap == null
                     ? theme.disabledColor
                     : AppColors.textSecondary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReminderOption extends StatelessWidget {
-  const _ReminderOption({
-    required this.title,
-    required this.preview,
-    required this.onTap,
-  });
-
-  final String title;
-  final String preview;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: spacingMD, vertical: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(spacingLG),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.04),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.12)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accent,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      preview,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            height: 1.4,
-                          ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                RemixIcons.arrow_right_s_line,
-                color: AppColors.textSecondary,
               ),
             ],
           ),

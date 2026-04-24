@@ -22,6 +22,14 @@ class FirestoreSyncService {
 
   final FirebaseFirestore _db;
 
+  /// True once a full data restore has completed this app session.
+  /// Prevents duplicate restores when _triggerCloudRestore is called from
+  /// multiple auth paths (initialize, login, Google, auth stream).
+  bool _dataRestoreCompleted = false;
+
+  /// True while a restore is actively running — prevents concurrent calls.
+  bool _dataRestoreInProgress = false;
+
   // ── Path helpers ──────────────────────────────────────────────────────────
 
   CollectionReference<Map<String, dynamic>> _invoices(String userId) =>
@@ -85,7 +93,6 @@ class FirestoreSyncService {
     required bool isPro,
     required ProfileModel profile,
   }) async {
-    if (!isPro) return;
     try {
       await _profile(userId).set(profile.toJson());
     } catch (e, st) {
@@ -148,26 +155,46 @@ class FirestoreSyncService {
   // ── Restore (pull from Firestore → write to Hive) ─────────────────────────
 
   /// Pulls all data for [userId] from Firestore into local Hive boxes.
-  /// Skips if Hive already has invoices OR clients.
+  /// Profile is ALWAYS restored (Firestore is source of truth).
+  /// Business data restore runs at most ONCE per session and is skipped if
+  /// Hive already has data or a restore is already in progress.
   Future<void> restoreAllFromCloud(String userId) async {
     try {
+      // Always restore profile — Firestore is the source of truth for profile.
+      await _restoreProfile(userId);
+
+      // Guard: skip data restore if already completed or already running.
+      if (_dataRestoreCompleted) {
+        debugPrint('[FirestoreSync] Data restore already done this session.');
+        return;
+      }
+      if (_dataRestoreInProgress) {
+        debugPrint('[FirestoreSync] Data restore already in progress — skipping duplicate call.');
+        return;
+      }
+
       final invoicesBox = Hive.box<InvoiceModel>(HiveStorage.invoicesBoxName);
       final clientsBox = Hive.box<ClientModel>(HiveStorage.clientsBoxName);
 
       if (invoicesBox.isNotEmpty || clientsBox.isNotEmpty) {
-        debugPrint('[FirestoreSync] Hive has data — skipping restore.');
+        debugPrint('[FirestoreSync] Hive has data — skipping data restore.');
+        _dataRestoreCompleted = true;
         return;
       }
 
-      await Future.wait([
-        _restoreInvoices(userId, invoicesBox),
-        _restoreClients(userId, clientsBox),
-        _restoreReminders(userId),
-        _restoreProfile(userId),
-        _restoreExpenses(userId),
-      ]);
-
-      debugPrint('[FirestoreSync] restoreAllFromCloud complete for $userId');
+      _dataRestoreInProgress = true;
+      try {
+        await Future.wait([
+          _restoreInvoices(userId, invoicesBox),
+          _restoreClients(userId, clientsBox),
+          _restoreReminders(userId),
+          _restoreExpenses(userId),
+        ]);
+        _dataRestoreCompleted = true;
+        debugPrint('[FirestoreSync] restoreAllFromCloud complete for $userId');
+      } finally {
+        _dataRestoreInProgress = false;
+      }
     } catch (e, st) {
       debugPrint('[FirestoreSync] restoreAllFromCloud failed: $e\n$st');
     }
@@ -177,6 +204,12 @@ class FirestoreSyncService {
     String userId,
     Box<InvoiceModel> box,
   ) async {
+    // Re-check at restore time — user could have created data while
+    // Firestore fetch was in flight.
+    if (box.isNotEmpty) {
+      debugPrint('[FirestoreSync] Invoices created locally during restore — skipping.');
+      return;
+    }
     final snapshot = await _invoices(userId).get();
     for (final doc in snapshot.docs) {
       try {
@@ -192,6 +225,12 @@ class FirestoreSyncService {
     String userId,
     Box<ClientModel> box,
   ) async {
+    // Re-check at restore time — user could have created data while
+    // Firestore fetch was in flight.
+    if (box.isNotEmpty) {
+      debugPrint('[FirestoreSync] Clients created locally during restore — skipping.');
+      return;
+    }
     final snapshot = await _clients(userId).get();
     for (final doc in snapshot.docs) {
       try {
@@ -218,12 +257,16 @@ class FirestoreSyncService {
 
   Future<void> _restoreProfile(String userId) async {
     final doc = await _profile(userId).get();
-    if (!doc.exists || doc.data() == null) return;
+    if (!doc.exists || doc.data() == null) {
+      debugPrint('[FirestoreSync] No profile in Firestore for $userId.');
+      return;
+    }
     try {
       final model = ProfileModel.fromJson(doc.data()!);
-      // Write to the actual profile Hive box using the same key as SettingsLocalDatasource
+      // Always overwrite local — Firestore is the source of truth for profile.
       final settingsBox = Hive.box<dynamic>(HiveStorage.settingsBoxName);
       await settingsBox.put('currentUserProfile', model);
+      debugPrint('[FirestoreSync] Profile restored from Firestore for $userId.');
     } catch (e) {
       debugPrint('[FirestoreSync] skipping malformed profile: $e');
     }

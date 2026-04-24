@@ -41,7 +41,7 @@ class SubscriptionController extends AsyncNotifier<SubscriptionState> {
   /// Set to true to bypass subscription gates during testing.
   /// Has zero effect in release builds — kDebugMode is false.
   /// MUST be set back to false before Play Store submission.
-  static const bool _debugBypassSubscription = true;
+  static const bool _debugBypassSubscription = true; // TESTING ONLY — set false before release
 
   @override
   Future<SubscriptionState> build() async {

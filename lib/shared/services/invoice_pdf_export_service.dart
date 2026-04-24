@@ -65,7 +65,7 @@ class _InvoicePdfParty {
   final String address;
 }
 
-const String _logoAssetPath = 'assets/images/logo.png';
+const String _logoAssetPath = 'assets/logo.png';
 
 const double _spaceXs = 6;
 const double _spaceSm = 10;
@@ -179,6 +179,14 @@ Future<pw.Document> buildInvoicePdf(
     defaultLogo = pw.MemoryImage(assetBytes);
   } catch (_) {}
 
+  // Load TTF fonts that support all Unicode currency symbols (₹ € £ ¥ ₦ ₩ etc).
+  // Helvetica (pdf package default) only covers Latin-1 and garbles these glyphs.
+  final regularFontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+  final boldFontData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+  final regularFont = pw.Font.ttf(regularFontData);
+  final boldFont = pw.Font.ttf(boldFontData);
+  final pdfTheme = pw.ThemeData.withFont(base: regularFont, bold: boldFont);
+
   final lineItems = _resolveLineItems(invoice, items);
   final subtotalAmount = invoice.subtotalAmount;
   final discountAmount = invoice.appliedDiscountAmount;
@@ -218,7 +226,7 @@ Future<pw.Document> buildInvoicePdf(
     phone: _displayValue(client?.phone, 'Not provided'),
     address: '',
   );
-  final document = pw.Document();
+  final document = pw.Document(theme: pdfTheme);
 
   document.addPage(
     pw.MultiPage(

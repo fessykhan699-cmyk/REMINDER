@@ -635,11 +635,45 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     );
     var shouldResetSavingState = true;
 
-    if (!(form?.validate() ?? false) ||
-        selectedClient == null ||
-        selectedDueDate == null ||
-        amount == null ||
-        invoiceNumber.isEmpty) {
+    if (!(form?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields')),
+      );
+      return;
+    }
+
+    if (selectedClient == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a client')),
+      );
+      return;
+    }
+
+    if (selectedDueDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a due date')),
+      );
+      return;
+    }
+
+    if (amount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid amount')),
+      );
+      return;
+    }
+
+    if (invoiceNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invoice number is required')),
+      );
+      return;
+    }
+
+    if (_isRecurring && _recurringInterval == RecurringInterval.none) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a recurring frequency')),
+      );
       return;
     }
 
