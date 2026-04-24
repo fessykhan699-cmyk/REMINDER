@@ -30,13 +30,21 @@ class NotificationService {
       // Request notification permission on Android 13+
       await androidImplementation?.requestNotificationsPermission();
       
-      // Configure notification channel
+      // Configure notification channels
       const channel = AndroidNotificationChannel(
         'invoice_reminders',
         'Invoice Reminders',
         importance: Importance.high,
       );
       await androidImplementation?.createNotificationChannel(channel);
+
+      const overdueChannel = AndroidNotificationChannel(
+        'overdue_invoices',
+        'Overdue Invoices',
+        description: 'Notifications for overdue invoices',
+        importance: Importance.high,
+      );
+      await androidImplementation?.createNotificationChannel(overdueChannel);
     } catch (e) {
       debugPrint('NotificationService init error: $e');
     }
@@ -175,6 +183,24 @@ class NotificationService {
       'SAR': 'SAR ',
     };
     return symbols[code] ?? '$code ';
+  }
+
+  // TEMP: test notification — remove after verifying notification system works
+  static Future<void> showTestNotification() async {
+    await _plugin.show(
+      id: 999,
+      title: 'Invoice Flow Test',
+      body: 'Notification system is working ✅',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'overdue_invoices',
+          'Overdue Invoices',
+          channelDescription: 'Notifications for overdue invoices',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+    );
   }
 
   static Future<void> cancelAllNotifications() async {

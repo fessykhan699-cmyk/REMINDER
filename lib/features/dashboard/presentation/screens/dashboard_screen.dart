@@ -737,32 +737,57 @@ class _HeaderSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'You are owed',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
+        if (unpaidByCurrency.length > 1) ...[
+          Text(
+            'You are owed',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: unpaidByCurrency.map((c) => Text(
+              AppFormatters.currency(
+                c.amount,
+                currencyCode: c.currencyCode,
+                includeDecimals: false,
               ),
-            ),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )).toList(),
+          ),
+        ] else
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  amountText,
+                  'You are owed',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    amountText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
