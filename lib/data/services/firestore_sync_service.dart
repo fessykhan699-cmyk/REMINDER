@@ -31,6 +31,12 @@ class FirestoreSyncService {
   /// True while a restore is actively running — prevents concurrent calls.
   bool _dataRestoreInProgress = false;
 
+  void clearSession() {
+    _dataRestoreCompleted = false;
+    _dataRestoreInProgress = false;
+    debugPrint('[FirestoreSync] Session cleared — restore flags reset.');
+  }
+
   // ── Path helpers ──────────────────────────────────────────────────────────
 
   CollectionReference<Map<String, dynamic>> _invoices(String userId) =>
@@ -52,7 +58,6 @@ class FirestoreSyncService {
 
   Future<void> syncInvoiceToCloud({
     required String userId,
-    required bool isPro,
     required InvoiceModel invoice,
   }) async {
     try {
@@ -114,7 +119,6 @@ class FirestoreSyncService {
 
   Future<void> deleteInvoiceFromCloud({
     required String userId,
-    required bool isPro,
     required String invoiceId,
   }) async {
     try {
@@ -156,16 +160,19 @@ class FirestoreSyncService {
   /// Business data restore runs at most ONCE per session and is skipped if
   /// Hive already has data or a restore is already in progress.
   Future<void> restoreAllFromCloud(String userId) async {
+    debugPrint('[DIAGNOSTIC] RestoreService.restoreAllFromCloud() called for UID=$userId');
     try {
       // Always restore profile — Firestore is the source of truth for profile.
       await _restoreProfile(userId);
 
       // Guard: skip data restore if already completed or already running.
       if (_dataRestoreCompleted) {
+        debugPrint('[DIAGNOSTIC] Restore skipped: Already completed this session.');
         debugPrint('[FirestoreSync] Data restore already done this session.');
         return;
       }
       if (_dataRestoreInProgress) {
+        debugPrint('[DIAGNOSTIC] Restore skipped: Already in progress.');
         debugPrint('[FirestoreSync] Data restore already in progress — skipping duplicate call.');
         return;
       }
@@ -173,12 +180,7 @@ class FirestoreSyncService {
       final invoicesBox = Hive.box<InvoiceModel>(HiveStorage.invoicesBoxName);
       final clientsBox = Hive.box<ClientModel>(HiveStorage.clientsBoxName);
 
-      if (invoicesBox.isNotEmpty || clientsBox.isNotEmpty) {
-        debugPrint('[FirestoreSync] Hive has data — skipping data restore.');
-        _dataRestoreCompleted = true;
-        return;
-      }
-
+      debugPrint('=== FETCHING FROM FIRESTORE ===');
       _dataRestoreInProgress = true;
       try {
         await Future.wait([
@@ -201,16 +203,19 @@ class FirestoreSyncService {
     String userId,
     Box<InvoiceModel> box,
   ) async {
-    // Re-check at restore time — user could have created data while
-    // Firestore fetch was in flight.
-    if (box.isNotEmpty) {
-      debugPrint('[FirestoreSync] Invoices created locally during restore — skipping.');
-      return;
-    }
+    debugPrint('[DIAGNOSTIC] Fetching invoices from Firestore for UID=$userId');
     final snapshot = await _invoices(userId).get();
+    final path = _invoices(userId).path;
+    debugPrint('[DIAGNOSTIC] Fetching invoices from path: $path');
+    debugPrint('[DIAGNOSTIC] Fetched ${snapshot.docs.length} invoices');
+
     for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final workspaceId = data['workspaceId'];
+      debugPrint('[DIAGNOSTIC] Restoring invoice doc: ID=${doc.id}, workspaceId=$workspaceId');
+      
       try {
-        final model = InvoiceModel.fromJson(doc.data());
+        final model = InvoiceModel.fromJson(data);
         await box.put(model.id, model);
       } catch (e) {
         debugPrint('[FirestoreSync] skipping malformed invoice ${doc.id}: $e');
@@ -222,12 +227,6 @@ class FirestoreSyncService {
     String userId,
     Box<ClientModel> box,
   ) async {
-    // Re-check at restore time — user could have created data while
-    // Firestore fetch was in flight.
-    if (box.isNotEmpty) {
-      debugPrint('[FirestoreSync] Clients created locally during restore — skipping.');
-      return;
-    }
     final snapshot = await _clients(userId).get();
     for (final doc in snapshot.docs) {
       try {

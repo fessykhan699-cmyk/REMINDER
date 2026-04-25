@@ -6,7 +6,6 @@ import 'notification_service.dart';
 import '../../features/invoices/data/models/invoice_model.dart';
 import '../../features/invoices/domain/entities/invoice.dart';
 import '../../core/storage/hive_storage.dart';
-import '../../features/subscription/data/datasources/subscription_local_datasource.dart';
 
 /// Service to automatically flip unpaid invoices to 'overdue' status.
 class OverdueFlipService {
@@ -35,8 +34,6 @@ class OverdueFlipService {
       final user = _auth.currentUser;
       final userId = user?.uid;
 
-      final subscription = await const SubscriptionLocalDatasource().loadState();
-      final isPro = subscription.isPro;
 
       // Load daily dedup state from Hive
       final notifiedIds = _loadNotifiedTodayIds(today);
@@ -65,7 +62,6 @@ class OverdueFlipService {
           if (userId != null) {
             await _syncService.syncInvoiceToCloud(
               userId: userId,
-              isPro: isPro,
               invoice: candidate,
             );
           }

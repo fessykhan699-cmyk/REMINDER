@@ -12,6 +12,9 @@ import '../../domain/usecases/logout_usecase.dart';
 import '../../domain/usecases/sign_up_usecase.dart';
 import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../data/services/workspace/workspace_provider.dart';
+import '../../../clients/presentation/controllers/clients_controller.dart';
+import '../../../dashboard/presentation/controllers/dashboard_controller.dart';
+import '../../../invoices/presentation/controllers/invoices_controller.dart';
 
 class AuthViewState {
   const AuthViewState({
@@ -113,6 +116,7 @@ class AuthController extends Notifier<AuthViewState> {
     }
 
     if (user == null && current.status == AuthStatus.authenticated) {
+      debugPrint('[DIAGNOSTIC] Auth state changed. UID=null (unauthenticated)');
       // Remote sign-out: session revoked, password changed, account deleted
       await _clearWorkspaceOwner();
       state = state.copyWith(
@@ -133,6 +137,7 @@ class AuthController extends Notifier<AuthViewState> {
         return;
       }
       if (_disposed) return;
+      debugPrint('[DIAGNOSTIC] Auth state changed. UID=${user.uid} email=${user.email} (authenticated)');
       final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
         user.uid,
       );
@@ -148,7 +153,7 @@ class AuthController extends Notifier<AuthViewState> {
         ),
         clearError: true,
       );
-      _triggerCloudRestore(workspaceOwnerId);
+      await _triggerCloudRestore(workspaceOwnerId);
     }
   }
 
@@ -166,6 +171,8 @@ class AuthController extends Notifier<AuthViewState> {
         await _clearWorkspaceOwner();
       }
 
+      if (_disposed) return;
+
       state = state.copyWith(
         onboardingCompleted: onboardingCompleted,
         session: session,
@@ -176,7 +183,8 @@ class AuthController extends Notifier<AuthViewState> {
         clearError: true,
       );
       if (workspaceOwnerId != null) {
-        _triggerCloudRestore(workspaceOwnerId);
+        debugPrint('[DIAGNOSTIC] Current workspace on startup: $workspaceOwnerId');
+        await _triggerCloudRestore(workspaceOwnerId);
       }
     } catch (error) {
       state = state.copyWith(
@@ -194,16 +202,16 @@ class AuthController extends Notifier<AuthViewState> {
           .read(loginUseCaseProvider)
           .call(email: email, password: password);
 
+      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
+        session.userId,
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
         session: session,
         isSubmitting: false,
         clearError: true,
       );
-      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
-        session.userId,
-      );
-      _triggerCloudRestore(workspaceOwnerId);
+      await _triggerCloudRestore(workspaceOwnerId);
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -264,16 +272,16 @@ class AuthController extends Notifier<AuthViewState> {
           .read(signUpUseCaseProvider)
           .call(email: email, password: password);
 
+      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
+        session.userId,
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
         session: session,
         isSubmitting: false,
         clearError: true,
       );
-      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
-        session.userId,
-      );
-      _triggerCloudRestore(workspaceOwnerId);
+      await _triggerCloudRestore(workspaceOwnerId);
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -290,16 +298,16 @@ class AuthController extends Notifier<AuthViewState> {
       final datasource = ref.read(authLocalDatasourceProvider);
       final session = await datasource.loginWithGoogle();
 
+      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
+        session.userId,
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
         session: session,
         isSubmitting: false,
         clearError: true,
       );
-      final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
-        session.userId,
-      );
-      _triggerCloudRestore(workspaceOwnerId);
+      await _triggerCloudRestore(workspaceOwnerId);
     } catch (error) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -310,6 +318,7 @@ class AuthController extends Notifier<AuthViewState> {
   }
 
   Future<void> logout() async {
+    ref.read(firestoreSyncServiceProvider).clearSession();
     state = state.copyWith(isSubmitting: true, clearError: true);
 
     try {
@@ -362,17 +371,23 @@ class AuthController extends Notifier<AuthViewState> {
     }
   }
 
-  /// Triggers a cloud restore in the background after successful login.
-  /// Only runs if Hive is empty (first install or new device).
-  /// Does not await — runs fire-and-forget to avoid blocking login UX.
-  void _triggerCloudRestore(String ownerId) {
-    ref
-        .read(firestoreSyncServiceProvider)
-        .restoreAllFromCloud(ownerId)
-        .catchError((Object e) {
-          debugPrint('[AuthController] cloud restore error: $e');
-          return null;
-        });
+  /// Triggers a cloud restore after successful login.
+  /// Awaited — ensures Firestore data is merged into Hive before callers proceed.
+  Future<void> _triggerCloudRestore(String ownerId) async {
+    debugPrint('[DIAGNOSTIC] About to call RestoreService.restoreAllFromCloud() from AuthController._triggerCloudRestore');
+    debugPrint('=== RESTORE STARTED ===');
+    debugPrint('UID: $ownerId');
+    try {
+      await ref
+          .read(firestoreSyncServiceProvider)
+          .restoreAllFromCloud(ownerId);
+    } catch (e) {
+      debugPrint('[AuthController] cloud restore error: $e');
+    }
+    debugPrint('[DIAGNOSTIC] About to invalidate invoicesControllerProvider after restore');
+    ref.invalidate(invoicesControllerProvider);
+    ref.invalidate(clientsControllerProvider);
+    ref.invalidate(dashboardControllerProvider);
   }
 
   Future<String> _resolveAndActivateWorkspaceOwner(String userId) async {

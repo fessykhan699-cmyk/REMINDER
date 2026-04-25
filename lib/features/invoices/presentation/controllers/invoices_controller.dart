@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/services/analytics_service.dart';
 
@@ -34,8 +35,6 @@ final invoiceRepositoryProvider = Provider<InvoiceRepository>((ref) {
     datasource,
     syncService: ref.watch(firestoreSyncServiceProvider),
     userId: ref.watch(activeWorkspaceOwnerIdProvider),
-    isPro:
-        ref.watch(subscriptionControllerProvider).valueOrNull?.isPro ?? false,
   );
 });
 
@@ -74,7 +73,6 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
-  bool _didLoad = false;
   late final ReminderService _reminderService = ref.read(
     reminderServiceProvider,
   );
@@ -88,23 +86,23 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
   @override
   AsyncValue<List<Invoice>> build() {
+    debugPrint('[DIAGNOSTIC] InvoicesController.build() called');
     // When client data changes (rename, delete), clear invoice cache so
     // clientName resolves to the new value on next fetch.
     ref.listen(clientsControllerProvider, (previous, next) {
       if (previous?.valueOrNull != null && next.valueOrNull != null) {
         ref.read(invoicesLocalDatasourceProvider).clearCache();
-        if (_didLoad) loadInitial();
+        loadInitial();
       }
     });
 
-    if (!_didLoad) {
-      _didLoad = true;
-      Future(() => loadInitial());
-    }
+    debugPrint('[DIAGNOSTIC] InvoicesController.build: scheduling loadInitial via Future microtask');
+    Future(() => loadInitial());
     return const AsyncValue.loading();
   }
 
   Future<void> loadInitial() async {
+    debugPrint('[DIAGNOSTIC] InvoicesController.loadInitial() called');
     _currentPage = 1;
     _hasMore = true;
 
@@ -118,6 +116,7 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
             forceRefresh: true,
           ),
     );
+    debugPrint('[DIAGNOSTIC] InvoicesController.loadInitial DONE. state=${state.runtimeType} value count=${state.valueOrNull?.length ?? 'null'}');
   }
 
   Future<void> loadMore() async {

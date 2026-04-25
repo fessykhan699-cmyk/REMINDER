@@ -11,13 +11,11 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     this._datasource, {
     this.syncService,
     this.userId,
-    this.isPro = false,
   });
 
   final InvoicesLocalDatasource _datasource;
   final FirestoreSyncService? syncService;
   final String? userId;
-  final bool isPro;
 
   @override
   Future<List<Invoice>> getInvoices({
@@ -97,13 +95,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final svc = syncService;
     final uid = userId;
     if (svc == null || uid == null) return;
-    svc.syncInvoiceToCloud(userId: uid, isPro: isPro, invoice: model);
+    svc.syncInvoiceToCloud(userId: uid, invoice: model);
   }
 
   void _deleteInvoice(String invoiceId) {
     final svc = syncService;
     final uid = userId;
     if (svc == null || uid == null) return;
-    svc.deleteInvoiceFromCloud(userId: uid, isPro: isPro, invoiceId: invoiceId);
+    svc.deleteInvoiceFromCloud(userId: uid, invoiceId: invoiceId);
   }
 }

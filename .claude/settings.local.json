@@ -20,7 +20,9 @@
       "Bash(awk '{sum += $1} END {print \"Total tests: \" sum}')",
       "Bash(magick --version)",
       "Bash(convert --version)",
-      "Bash(dart --version)"
+      "Bash(dart --version)",
+      "Bash(flutter devices:*)",
+      "Bash(node -e ':*)"
     ]
   }
 }
