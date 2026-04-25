@@ -20,6 +20,14 @@
 - Google Play Billing for subscriptions
 - UAE context: AED currency, VAT awareness
 
+## Hard Rules
+- Auth methods MUST set session state BEFORE calling _triggerCloudRestore. Never after.
+- Riverpod controller build() MUST NOT use _didLoad-style class fields to guard loadInitial. Always schedule loadInitial unconditionally.
+- _triggerCloudRestore MUST invalidate every controller that reads restored data (invoices, clients, dashboard, and any new ones).
+- Silent catch blocks are forbidden. Every catch logs with [Tag] prefix and stack trace.
+- [DIAGNOSTIC]-prefixed logs are temporary debugging only and must be deleted before release.
+- See vault/invoice-flow/decisions/active-decisions.md for full rationale and code examples.
+
 ## Current Sprint
 - [Claude will update this on /save]
 ---
