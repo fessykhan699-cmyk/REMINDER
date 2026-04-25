@@ -11,7 +11,7 @@ final expensesControllerProvider =
 class ExpensesController extends Notifier<AsyncValue<List<Expense>>> {
   @override
   AsyncValue<List<Expense>> build() {
-    loadExpenses();
+    Future(() => loadExpenses());
     return const AsyncValue.loading();
   }
 

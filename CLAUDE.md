@@ -27,6 +27,8 @@
 - Silent catch blocks are forbidden. Every catch logs with [Tag] prefix and stack trace.
 - [DIAGNOSTIC]-prefixed logs are temporary debugging only and must be deleted before release.
 - See vault/invoice-flow/decisions/active-decisions.md for full rationale and code examples.
+- ExpensesController, InvoicesController, ClientsController, DashboardController are CONFIRMED-WORKING. Do not add _didLoad or remove their invalidate calls in _triggerCloudRestore. See active-decisions.md.
+- Any new controller that reads restored Hive data MUST be added to ref.invalidate list in _triggerCloudRestore AND must follow the unconditional build() pattern.
 
 ## Current Sprint
 - [Claude will update this on /save]

@@ -14,6 +14,7 @@ import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../data/services/workspace/workspace_provider.dart';
 import '../../../clients/presentation/controllers/clients_controller.dart';
 import '../../../dashboard/presentation/controllers/dashboard_controller.dart';
+import '../../../expenses/presentation/controllers/expenses_controller.dart';
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
 
 class AuthViewState {
@@ -388,6 +389,7 @@ class AuthController extends Notifier<AuthViewState> {
     ref.invalidate(invoicesControllerProvider);
     ref.invalidate(clientsControllerProvider);
     ref.invalidate(dashboardControllerProvider);
+    ref.invalidate(expensesControllerProvider);
   }
 
   Future<String> _resolveAndActivateWorkspaceOwner(String userId) async {
