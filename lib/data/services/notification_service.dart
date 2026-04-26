@@ -21,7 +21,7 @@ class NotificationService {
       final String timezoneName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timezoneName));
       
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings = AndroidInitializationSettings('ic_notification');
       const settings = InitializationSettings(android: androidSettings);
       
       await _plugin.initialize(settings: settings);
@@ -122,8 +122,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: 'ic_notification',
-          largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-          color: Color(0xFFD4A017),
+          color: Color(0xFFC8A96A),
           colorized: false,
         ),
       ),
@@ -168,8 +167,7 @@ class NotificationService {
             importance: Importance.max,
             priority: Priority.high,
             icon: 'ic_notification',
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
-            color: Color(0xFFD4A017),
+            color: Color(0xFFC8A96A),
             colorized: false,
           ),
         ),

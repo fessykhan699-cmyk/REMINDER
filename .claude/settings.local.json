@@ -24,7 +24,8 @@
       "Bash(flutter devices:*)",
       "Bash(node -e ':*)",
       "Bash(cmd:*)",
-      "Bash(where flutter:*)"
+      "Bash(where flutter:*)",
+      "Bash(\"C:\\\\flutter dev\\\\sdk\\\\bin\\\\flutter.bat\" analyze)"
     ]
   }
 }

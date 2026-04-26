@@ -53,7 +53,7 @@ class NotificationService {
       await _configureLocalTimezone();
 
       const androidSettings = AndroidInitializationSettings(
-        '@mipmap/ic_launcher',
+        'ic_notification',
       );
       const darwinSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
@@ -224,6 +224,8 @@ class NotificationService {
       channelDescription: _channelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_notification',
+      color: Color(0xFFC8A96A),
     ),
     iOS: DarwinNotificationDetails(threadIdentifier: _channelId),
     macOS: DarwinNotificationDetails(threadIdentifier: _channelId),

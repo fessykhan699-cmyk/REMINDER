@@ -6,7 +6,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/clients/domain/entities/client.dart';
 import '../../features/clients/domain/repositories/client_repository.dart';
@@ -66,6 +65,7 @@ class _InvoicePdfParty {
 }
 
 const String _logoAssetPath = 'assets/logo.png';
+const String _pdfAppName = 'Paydeck';
 
 const double _spaceXs = 6;
 const double _spaceSm = 10;
@@ -79,7 +79,6 @@ final PdfColor _pdfMuted = PdfColor.fromHex('#6B7280');
 final PdfColor _pdfBorder = PdfColor.fromHex('#E5E7EB');
 final PdfColor _pdfSurface = PdfColor.fromHex('#F7F8FA');
 final PdfColor _pdfAccent = PdfColor.fromHex('#C8A96A');
-final PdfColor _pdfWatermark = PdfColor.fromHex('#F3F4F6');
 
 class InvoicePdfExportService {
   InvoicePdfExportService({
@@ -192,7 +191,6 @@ Future<pw.Document> buildInvoicePdf(
   final discountAmount = invoice.appliedDiscountAmount;
   final taxAmount = invoice.taxAmount;
   final totalAmount = invoice.amount;
-  final generatedAt = DateTime.now();
   final brandName = _resolveBrandName(senderProfile, isPro: isPro);
   final subtotalLabel = AppFormatters.currency(
     subtotalAmount,
@@ -352,7 +350,7 @@ Future<pw.Document> buildInvoicePdf(
           ),
         ],
         pw.SizedBox(height: _spaceXl),
-        _buildFooter(brandName: brandName, generatedAt: generatedAt),
+        _buildFooter(),
       ],
     ),
   );
@@ -509,45 +507,18 @@ pw.Widget _buildDetailCell(String label, String value) {
   );
 }
 
-pw.Widget _buildFooter({
-  required String brandName,
-  required DateTime generatedAt,
-}) {
+pw.Widget _buildFooter() {
   return pw.Column(
     children: [
       pw.Divider(color: _pdfBorder, height: 1),
       pw.SizedBox(height: _spaceMd),
-      pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Thank you for your business!',
-            style: pw.TextStyle(
-              color: _pdfMuted,
-              fontSize: 10,
-              fontStyle: pw.FontStyle.italic,
-            ),
-          ),
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
-            children: [
-              pw.Text(
-                brandName,
-                style: pw.TextStyle(
-                  color: _pdfInk,
-                  fontSize: 10,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.SizedBox(height: 3),
-              pw.Text(
-                'Generated ${_dateLabel(generatedAt)}',
-                style: pw.TextStyle(color: _pdfMuted, fontSize: 9),
-              ),
-            ],
-          ),
-        ],
+      pw.Text(
+        'Thank you for your business!',
+        style: pw.TextStyle(
+          color: _pdfMuted,
+          fontSize: 10,
+          fontStyle: pw.FontStyle.italic,
+        ),
       ),
     ],
   );
@@ -837,16 +808,16 @@ pw.Widget _buildPaymentSection(String paymentLink) {
 
 
 pw.Widget _buildWatermark() {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.all(32),
-    child: pw.Watermark.text(
-      AppConstants.aboutAppName.toUpperCase(),
-      angle: -0.45,
-      style: pw.TextStyle(
-        color: _pdfWatermark,
-        fontSize: 82,
-        fontWeight: pw.FontWeight.bold,
-        letterSpacing: 3,
+  return pw.Center(
+    child: pw.Transform.rotate(
+      angle: -0.6,
+      child: pw.Text(
+        _pdfAppName.toUpperCase(),
+        style: pw.TextStyle(
+          color: PdfColor.fromInt(0x14000000),
+          fontSize: 100,
+          fontWeight: pw.FontWeight.bold,
+        ),
       ),
     ),
   );
@@ -913,7 +884,7 @@ String _resolveBrandName(
   required bool isPro,
 }) {
   if (!isPro) {
-    return AppConstants.aboutAppName;
+    return _pdfAppName;
   }
 
   final businessName = senderProfile?.businessName.trim() ?? '';
@@ -922,7 +893,7 @@ String _resolveBrandName(
   }
 
   final senderName = senderProfile?.displayBusinessName.trim() ?? '';
-  return senderName.isEmpty ? AppConstants.aboutAppName : senderName;
+  return senderName.isEmpty ? _pdfAppName : senderName;
 }
 
 String _displayValue(String? value, String fallback) {
