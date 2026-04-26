@@ -293,6 +293,19 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                         ],
                       ),
 
+                      const SizedBox(height: spacingXS),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: spacingSM),
+                        child: Text(
+                          'Subscription automatically renews unless cancelled at least 24 hours before the renewal date.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
                       const SizedBox(height: spacingMD),
 
                       // ── Usage ──
@@ -375,22 +388,21 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
                         ),
                       ),
                     ),
-                    if (billing.canRestore || billing.isRestoring)
-                      TextButton(
-                        onPressed: billing.canRestore
-                            ? () => ref
-                                  .read(billingControllerProvider.notifier)
-                                  .restorePurchases()
-                            : null,
-                        child: Text(
-                          billing.isRestoring
-                              ? 'Restoring purchases...'
-                              : 'Restore purchases',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
+                    TextButton(
+                      onPressed: billing.canRestore
+                          ? () => ref
+                                .read(billingControllerProvider.notifier)
+                                .restorePurchases()
+                          : null,
+                      child: Text(
+                        billing.isRestoring
+                            ? 'Restoring purchases...'
+                            : 'Restore purchases',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

@@ -9,7 +9,7 @@ import '../../features/invoices/domain/entities/invoice.dart';
 import '../../features/subscription/data/datasources/subscription_local_datasource.dart';
 
 const String _overdueChannelId = 'overdue_invoices';
-const String _overdueChannelName = 'Overdue Invoices';
+const String _overdueChannelName = 'Paydeck Reminders';
 const String _overdueChannelDesc = 'Daily notifications for overdue invoices';
 
 class NotificationService {
@@ -46,7 +46,7 @@ class NotificationService {
 
       const overdueChannel = AndroidNotificationChannel(
         'overdue_invoices',
-        'Overdue Invoices',
+        'Paydeck Reminders',
         description: 'Notifications for overdue invoices',
         importance: Importance.high,
       );

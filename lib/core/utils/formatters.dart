@@ -92,6 +92,7 @@ class AppFormatters {
           .map((e) => currency(e.value, currencyCode: e.key))
           .join(' · ');
     } catch (e) {
+      debugPrint('[Formatters] formatPerCurrencyTotals failed: ${e.toString()}');
       return '—';
     }
   }

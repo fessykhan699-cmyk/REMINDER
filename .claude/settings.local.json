@@ -25,7 +25,10 @@
       "Bash(node -e ':*)",
       "Bash(cmd:*)",
       "Bash(where flutter:*)",
-      "Bash(\"C:\\\\flutter dev\\\\sdk\\\\bin\\\\flutter.bat\" analyze)"
+      "Bash(\"C:\\\\flutter dev\\\\sdk\\\\bin\\\\flutter.bat\" analyze)",
+      "Bash(flutter --version)",
+      "Read(//c/flutter/**)",
+      "Read(//c/flutter dev/sdk/flutter_windows_3.41.2-stable/flutter/bin/internal/**)"
     ]
   }
 }

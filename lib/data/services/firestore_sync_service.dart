@@ -317,7 +317,25 @@ class FirestoreSyncService {
     await clearBox<AppPreferencesModel>(HiveStorage.appPreferencesBoxName);
     await clearBox<InvoiceTemplateModel>(HiveStorage.invoiceTemplatesBoxName);
 
-    // Step 4 — Delete the Firebase Auth account
+    // Step 4 — Clean up workspace data
+    try {
+      final workspaceDocs = await _db
+          .collection('workspaces')
+          .where('ownerId', isEqualTo: userId)
+          .get();
+      for (final doc in workspaceDocs.docs) {
+        await doc.reference.delete();
+      }
+      final membershipDoc = _db
+          .collection('workspaceMemberships')
+          .doc(userId);
+      await membershipDoc.delete();
+      debugPrint('[DeleteAccount] Workspace data cleared for $userId');
+    } catch (e) {
+      debugPrint('[DeleteAccount] Workspace cleanup error: ${e.toString()}');
+    }
+
+    // Step 5 — Delete the Firebase Auth account
     try {
       await FirebaseAuth.instance.currentUser?.delete();
     } on FirebaseAuthException catch (e) {

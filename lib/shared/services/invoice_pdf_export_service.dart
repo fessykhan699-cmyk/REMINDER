@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/pdf.dart';
@@ -113,7 +114,8 @@ class InvoicePdfExportService {
     if (saveLocally) {
       try {
         savedFilePath = await savePdfBytesToLocalFile(bytes, resolvedFilename);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[PdfExport] Error saving PDF locally: ${e.toString()}');
         savedFilePath = null;
       }
     }
@@ -157,7 +159,9 @@ Future<pw.Document> buildInvoicePdf(
       if (await file.exists()) {
         customLogo = pw.MemoryImage(await file.readAsBytes());
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PdfExport] Error loading custom logo: ${e.toString()}');
+    }
   }
 
   pw.MemoryImage? customSignature;
@@ -167,7 +171,9 @@ Future<pw.Document> buildInvoicePdf(
       if (await file.exists()) {
         customSignature = pw.MemoryImage(await file.readAsBytes());
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[PdfExport] Error loading custom signature: ${e.toString()}');
+    }
   }
 
   // Load default app logo as fallback
@@ -176,7 +182,9 @@ Future<pw.Document> buildInvoicePdf(
     final assetBytes =
         (await rootBundle.load(_logoAssetPath)).buffer.asUint8List();
     defaultLogo = pw.MemoryImage(assetBytes);
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('[PdfExport] Error loading default logo: ${e.toString()}');
+  }
 
   // Load TTF fonts that support all Unicode currency symbols (₹ € £ ¥ ₦ ₩ etc).
   // Helvetica (pdf package default) only covers Latin-1 and garbles these glyphs.
@@ -247,6 +255,7 @@ Future<pw.Document> buildInvoicePdf(
             brandName: brandName,
           );
         } catch (e) {
+          debugPrint('[PdfExport] Error building continuation header: ${e.toString()}');
           return pw.SizedBox();
         }
       },
@@ -263,6 +272,7 @@ Future<pw.Document> buildInvoicePdf(
             ),
           );
         } catch (e) {
+          debugPrint('[PdfExport] Error building footer: ${e.toString()}');
           return pw.SizedBox();
         }
       },
