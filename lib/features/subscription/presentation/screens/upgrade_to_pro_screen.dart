@@ -76,8 +76,8 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
     final billingAsync = ref.watch(billingControllerProvider);
     final billing = billingAsync.valueOrNull ?? const BillingState.initial();
     final selectedPlan = _effectiveSelectedPlan(billing);
-    final monthlyPriceLabel = billing.monthlyProduct?.price ?? r'$4.91 / month';
-    final yearlyPriceLabel = billing.yearlyProduct?.price ?? r'$39.99 / year';
+    final monthlyPriceLabel = billing.monthlyProduct?.price ?? r'AED 29 / month';
+    final yearlyPriceLabel = billing.yearlyProduct?.price ?? r'AED 199 / year';
     final businessPriceLabel = billing.businessProduct?.price ?? 'AED 99/mo';
     final canPurchase = switch (selectedPlan) {
       _UpgradePlan.monthly => billing.canPurchaseMonthly,
@@ -585,7 +585,7 @@ class _UpgradeToProScreenState extends ConsumerState<UpgradeToProScreen>
       return 'Unlock full access instantly before you hit the limit.';
     }
 
-    return 'Free includes up to 5 clients and 5 invoices each month. Pro removes every cap right away.';
+    return 'Free includes up to 3 clients and 5 invoices each month. Pro removes every cap right away.';
   }
 }
 

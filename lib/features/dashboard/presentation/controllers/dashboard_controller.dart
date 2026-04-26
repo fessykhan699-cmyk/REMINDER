@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../invoices/presentation/controllers/invoices_controller.dart';
@@ -38,7 +37,6 @@ class DashboardController
   }
 
   Future<void> load() async {
-    debugPrint('[DIAGNOSTIC] DashboardController.load() called');
     state = await AsyncValue.guard(
       () => ref.read(getDashboardSummaryUseCaseProvider).call(),
     );

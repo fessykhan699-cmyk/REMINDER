@@ -33,7 +33,7 @@ class InvoiceReminderApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'Invoice Reminder',
+      title: 'Paydeck',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: AppFeedbackService.scaffoldMessengerKey,
       themeMode: ThemeMode.dark,

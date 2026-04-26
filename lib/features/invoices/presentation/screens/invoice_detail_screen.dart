@@ -530,7 +530,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           content: Text(
             subscriptionIsPro(ref)
                 ? 'PDF ready to preview and share.'
-                : 'PDF preview opened. Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
+                : 'PDF preview opened. Free plan PDFs include a faint Paydeck watermark behind the invoice content.',
           ),
           action: subscriptionIsPro(ref)
               ? null
@@ -1086,7 +1086,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Free plan PDFs include a faint Invoice Flow watermark.',
+                            'Free plan PDFs include a faint Paydeck watermark.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: spacingSM),

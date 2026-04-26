@@ -31,10 +31,15 @@ class NotificationService {
       // Request notification permission on Android 13+
       await androidImplementation?.requestNotificationsPermission();
       
+      // Delete old cached channels before recreating
+      await androidImplementation?.deleteNotificationChannel(channelId: 'invoice_reminders');
+      await androidImplementation?.deleteNotificationChannel(channelId: 'overdue_invoices');
+      await androidImplementation?.deleteNotificationChannel(channelId: 'invoice_due_reminders');
+
       // Configure notification channels
       const channel = AndroidNotificationChannel(
         'invoice_reminders',
-        'Invoice Reminders',
+        'Paydeck',
         importance: Importance.high,
       );
       await androidImplementation?.createNotificationChannel(channel);
@@ -118,7 +123,7 @@ class NotificationService {
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'invoice_reminders',
-          'Invoice Reminders',
+          'Paydeck',
           importance: Importance.high,
           priority: Priority.high,
           icon: 'ic_notification',

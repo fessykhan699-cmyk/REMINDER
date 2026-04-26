@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../data/providers/firestore_sync_provider.dart';
 import '../../../../shared/components/app_scaffold.dart';
 import '../../../../core/services/app_feedback_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -84,7 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       scheme: 'mailto',
       path: AppConstants.supportEmail,
       queryParameters: const <String, String>{
-        'subject': 'Invoice Flow support',
+        'subject': 'Paydeck support',
       },
     );
 
@@ -1240,8 +1239,8 @@ class _PlanSectionCard extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               isBusiness
-                  ? 'Invoice Flow Business is active on this device.'
-                  : 'Invoice Flow Pro is active on this device.',
+                  ? 'Paydeck Business is active on this device.'
+                  : 'Paydeck Pro is active on this device.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

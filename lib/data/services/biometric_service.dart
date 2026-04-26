@@ -27,7 +27,7 @@ class BiometricService {
         return true;
       }
       return await _auth.authenticate(
-        localizedReason: 'Authenticate to open Invoice Flow',
+        localizedReason: 'Authenticate to open Paydeck',
         authMessages: [
           AndroidAuthMessages(
             signInTitle: 'Biometric Authentication',

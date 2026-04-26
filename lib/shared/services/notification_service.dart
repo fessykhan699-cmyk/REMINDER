@@ -26,7 +26,7 @@ class NotificationService {
     'reminder/device_timezone',
   );
   static const String _channelId = 'invoice_due_reminders';
-  static const String _channelName = 'Invoice Due Reminders';
+  static const String _channelName = 'Paydeck';
   static const String _channelDescription =
       'Notifications for upcoming and due invoices.';
 
@@ -67,6 +67,17 @@ class NotificationService {
       );
 
       await _plugin.initialize(settings: settings);
+
+      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.deleteNotificationChannel(channelId: 'invoice_due_reminders');
+      const channel = AndroidNotificationChannel(
+        'invoice_due_reminders',
+        'Paydeck',
+        importance: Importance.high,
+      );
+      await androidImpl?.createNotificationChannel(channel);
+
       _initialized = true;
       _initCompleter!.complete();
     } catch (e) {

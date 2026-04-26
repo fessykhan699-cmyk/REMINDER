@@ -91,8 +91,6 @@ class OverdueFlipService {
   }
 
   List<String> _loadNotifiedTodayIds(DateTime today) {
-    return []; // TEMP TEST: bypass daily dedup — revert after testing
-    // ignore: dead_code
     if (!Hive.isBoxOpen(HiveStorage.settingsBoxName)) return [];
     final box = Hive.box<dynamic>(HiveStorage.settingsBoxName);
     final todayStr = _dateKey(today);

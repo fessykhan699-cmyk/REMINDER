@@ -122,7 +122,6 @@ class AuthController extends Notifier<AuthViewState> {
     }
 
     if (user == null && current.status == AuthStatus.authenticated) {
-      debugPrint('[DIAGNOSTIC] Auth state changed. UID=null (unauthenticated)');
       // Remote sign-out: session revoked, password changed, account deleted
       await _clearWorkspaceOwner();
       state = state.copyWith(
@@ -143,7 +142,6 @@ class AuthController extends Notifier<AuthViewState> {
         return;
       }
       if (_disposed) return;
-      debugPrint('[DIAGNOSTIC] Auth state changed. UID=${user.uid} email=${user.email} (authenticated)');
       final workspaceOwnerId = await _resolveAndActivateWorkspaceOwner(
         user.uid,
       );
@@ -189,7 +187,6 @@ class AuthController extends Notifier<AuthViewState> {
         clearError: true,
       );
       if (workspaceOwnerId != null) {
-        debugPrint('[DIAGNOSTIC] Current workspace on startup: $workspaceOwnerId');
         await _triggerCloudRestore(workspaceOwnerId);
       }
     } catch (error) {
@@ -416,9 +413,6 @@ class AuthController extends Notifier<AuthViewState> {
   /// Triggers a cloud restore after successful login.
   /// Awaited — ensures Firestore data is merged into Hive before callers proceed.
   Future<void> _triggerCloudRestore(String ownerId) async {
-    debugPrint('[DIAGNOSTIC] About to call RestoreService.restoreAllFromCloud() from AuthController._triggerCloudRestore');
-    debugPrint('=== RESTORE STARTED ===');
-    debugPrint('UID: $ownerId');
     try {
       await ref
           .read(firestoreSyncServiceProvider)
@@ -426,7 +420,6 @@ class AuthController extends Notifier<AuthViewState> {
     } catch (e) {
       debugPrint('[AuthController] cloud restore error: $e');
     }
-    debugPrint('[DIAGNOSTIC] About to invalidate invoicesControllerProvider after restore');
     ref.invalidate(invoicesControllerProvider);
     ref.invalidate(clientsControllerProvider);
     ref.invalidate(dashboardControllerProvider);

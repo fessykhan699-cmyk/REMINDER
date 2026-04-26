@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/services/analytics_service.dart';
 
@@ -86,7 +85,6 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
 
   @override
   AsyncValue<List<Invoice>> build() {
-    debugPrint('[DIAGNOSTIC] InvoicesController.build() called');
     // When client data changes (rename, delete), clear invoice cache so
     // clientName resolves to the new value on next fetch.
     ref.listen(clientsControllerProvider, (previous, next) {
@@ -96,13 +94,11 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
       }
     });
 
-    debugPrint('[DIAGNOSTIC] InvoicesController.build: scheduling loadInitial via Future microtask');
     Future(() => loadInitial());
     return const AsyncValue.loading();
   }
 
   Future<void> loadInitial() async {
-    debugPrint('[DIAGNOSTIC] InvoicesController.loadInitial() called');
     _currentPage = 1;
     _hasMore = true;
 
@@ -116,7 +112,6 @@ class InvoicesController extends Notifier<AsyncValue<List<Invoice>>> {
             forceRefresh: true,
           ),
     );
-    debugPrint('[DIAGNOSTIC] InvoicesController.loadInitial DONE. state=${state.runtimeType} value count=${state.valueOrNull?.length ?? 'null'}');
   }
 
   Future<void> loadMore() async {

@@ -209,10 +209,10 @@ class _InvoicePdfPreviewScreenState
                         document.savedFilePath == null
                             ? subscription.isPro
                                   ? 'Preview the PDF here and share it from the top-right action.'
-                                  : 'Preview the PDF here. Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.'
+                                  : 'Preview the PDF here. Free plan PDFs include a faint Paydeck watermark behind the invoice content.'
                             : subscription.isPro
                             ? 'Saved locally for offline access. Share it from the top-right action.'
-                            : 'Saved locally for offline access. Free plan PDFs include a faint Invoice Flow watermark behind the invoice content.',
+                            : 'Saved locally for offline access. Free plan PDFs include a faint Paydeck watermark behind the invoice content.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                         ),

@@ -269,7 +269,7 @@ class _TeamMembersScreenState extends ConsumerState<TeamMembersScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'No user found with that email. They must sign up for Invoice Flow first.',
+            'No user found with that email. They must sign up for Paydeck first.',
           ),
         ),
       );

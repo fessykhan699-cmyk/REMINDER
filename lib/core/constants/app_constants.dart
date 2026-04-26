@@ -1,8 +1,8 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Invoice Reminder';
-  static const String aboutAppName = 'Invoice Flow';
+  static const String appName = 'Paydeck';
+  static const String aboutAppName = 'Paydeck';
   static const String appVersion = '1.0.0+1';
   static const String supportEmail = 'support@invoiceflow.app';
   static const String privacyPolicyUrl =

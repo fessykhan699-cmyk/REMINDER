@@ -811,12 +811,15 @@ pw.Widget _buildWatermark() {
   return pw.Center(
     child: pw.Transform.rotate(
       angle: -0.6,
-      child: pw.Text(
-        _pdfAppName.toUpperCase(),
-        style: pw.TextStyle(
-          color: PdfColor.fromInt(0x14000000),
-          fontSize: 100,
-          fontWeight: pw.FontWeight.bold,
+      child: pw.Opacity(
+        opacity: 0.06,
+        child: pw.Text(
+          'PAYDECK',
+          style: pw.TextStyle(
+            fontSize: 80,
+            fontWeight: pw.FontWeight.bold,
+            color: PdfColors.black,
+          ),
         ),
       ),
     ),
