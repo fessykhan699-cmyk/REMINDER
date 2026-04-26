@@ -38,6 +38,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _headerTapCount = 0;
   DateTime? _lastHeaderTapTime;
   bool _developerOptionsVisible = false;
+  bool _isDeletingAccount = false;
 
   void _onHeaderTap() {
     final now = DateTime.now();
@@ -158,11 +159,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _showDeleteConfirmation() async {
     final confirmed = await showDialog<bool>(
       context: context,
+      builder: (ctx) => const _DeleteConfirmDialog(),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _performDelete();
+  }
+
+  Future<void> _performDelete() async {
+    setState(() => _isDeletingAccount = true);
+    final user = FirebaseAuth.instance.currentUser!;
+    final userId = user.uid;
+    try {
+      await ref.read(authControllerProvider.notifier).deleteAccount(userId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeletingAccount = false);
+      if (e.toString().contains('requires-recent-login')) {
+        await _handleReauthAndRetry(userId);
+      } else {
+        AppFeedbackService.showSnackBar('Failed to delete account: $e');
+      }
+    }
+  }
+
+  Future<void> _handleReauthAndRetry(String userId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || !mounted) return;
+
+    final isGoogle = user.providerData.any((p) => p.providerId == 'google.com');
+    final isPassword = user.providerData.any((p) => p.providerId == 'password');
+
+    if (isGoogle) {
+      await _reauthWithGoogle(userId);
+    } else if (isPassword) {
+      await _reauthWithPassword(userId);
+    } else {
+      AppFeedbackService.showSnackBar(
+        'Reauthentication required. Please sign out and sign back in to complete deletion.',
+      );
+    }
+  }
+
+  Future<void> _reauthWithGoogle(String userId) async {
+    final proceed = await showDialog<bool>(
+      context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account'),
+        title: const Text('Confirm identity'),
         content: const Text(
-          'This will permanently delete your account and ALL data '
-          '(invoices, clients, expenses). This cannot be undone.',
+          'For security, please confirm by signing in with Google again.',
         ),
         actions: [
           TextButton(
@@ -171,55 +216,107 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete Forever'),
+            child: const Text('Continue'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true || !mounted) return;
-    await _performDelete();
+    if (proceed != true || !mounted) {
+      AppFeedbackService.showSnackBar('Account deletion cancelled.');
+      return;
+    }
+
+    try {
+      await ref.read(authControllerProvider.notifier).reauthenticateWithGoogle();
+    } catch (e) {
+      if (!mounted) return;
+      final cancelled = e.toString().contains('cancelled');
+      AppFeedbackService.showSnackBar(
+        cancelled ? 'Account deletion cancelled.' : 'Reauthentication failed. Please try again.',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await _retryDelete(userId);
   }
 
-  Future<void> _performDelete() async {
-    showDialog<void>(
+  Future<void> _reauthWithPassword(String userId) async {
+    final passwordController = TextEditingController();
+    String? dialogError;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Deleting account...'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Confirm identity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your password to confirm deletion.'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  errorText: dialogError,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final password = passwordController.text;
+                try {
+                  await ref
+                      .read(authControllerProvider.notifier)
+                      .reauthenticateWithPassword(password);
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  final isWrongPassword = e.toString().contains('wrong-password') ||
+                      e.toString().contains('invalid-credential');
+                  setDialogState(() {
+                    dialogError = isWrongPassword
+                        ? 'Incorrect password. Please try again.'
+                        : 'Reauthentication failed. Please try again.';
+                  });
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              child: const Text('Confirm'),
+            ),
           ],
         ),
       ),
     );
+    passwordController.dispose();
 
+    if (!mounted) return;
+    if (confirmed != true) {
+      AppFeedbackService.showSnackBar('Account deletion cancelled.');
+      return;
+    }
+
+    await _retryDelete(userId);
+  }
+
+  Future<void> _retryDelete(String userId) async {
+    if (!mounted) return;
+    setState(() => _isDeletingAccount = true);
     try {
-      final userId = FirebaseAuth.instance.currentUser!.uid;
-      await ref.read(firestoreSyncServiceProvider).deleteAccount(userId);
-
-      if (!mounted) return;
-      Navigator.of(context).pop(); // close loading dialog
-      ref.read(authControllerProvider.notifier).logout();
+      await ref.read(authControllerProvider.notifier).deleteAccount(userId);
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop(); // close loading dialog
-
-      final isReauthError = e.toString().contains('requires-recent-login');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isReauthError
-                ? 'For security, please sign out and sign back in, '
-                    'then try deleting again.'
-                : 'Failed to delete account: $e',
-          ),
-          duration: Duration(seconds: isReauthError ? 5 : 3),
-        ),
-      );
+      setState(() => _isDeletingAccount = false);
+      AppFeedbackService.showSnackBar('Failed to delete account: $e');
     }
   }
 
@@ -530,7 +627,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return AppScaffold(
       extendBody: true,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
@@ -850,6 +949,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         ),
+          ),
+          if (_isDeletingAccount)
+            const ColoredBox(
+              color: Color(0x99000000),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text(
+                      'Deleting account...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1704,6 +1822,61 @@ class _TextSettingSheetState extends State<_TextSettingSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DeleteConfirmDialog extends StatefulWidget {
+  const _DeleteConfirmDialog();
+
+  @override
+  State<_DeleteConfirmDialog> createState() => _DeleteConfirmDialogState();
+}
+
+class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canDelete = _controller.text == 'DELETE';
+    return AlertDialog(
+      title: const Text('Delete your account?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This will permanently delete your account and ALL data '
+            '(invoices, clients, expenses). This cannot be undone.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Type DELETE to confirm',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: canDelete ? () => Navigator.pop(context, true) : null,
+          style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+          child: const Text('Delete Account'),
+        ),
+      ],
     );
   }
 }

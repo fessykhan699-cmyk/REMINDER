@@ -6,6 +6,7 @@ import '../../../../shared/components/glass_card.dart';
 import '../../../../shared/components/primary_button.dart';
 import '../../domain/entities/app_preferences.dart';
 import '../controllers/app_preferences_controller.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 
 final appLockSessionProvider = StateProvider<bool>((ref) => false);
 
@@ -42,6 +43,7 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     if (state == AppLifecycleState.paused) {
       if (_lastKnownPreferences.appLockEnabled &&
           _lastKnownPreferences.hasPin) {
+        if (ref.read(authControllerProvider).reauthInProgress) return;
         ref.read(appLockSessionProvider.notifier).state = false;
       }
     }

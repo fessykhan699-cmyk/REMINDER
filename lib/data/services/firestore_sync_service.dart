@@ -9,6 +9,8 @@ import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/settings/data/models/profile_model.dart';
 import '../../features/expenses/data/models/expense_model.dart';
 import '../../core/storage/hive_storage.dart';
+import '../../features/settings/data/models/app_preferences_model.dart';
+import '../../features/invoices/data/models/invoice_template_model.dart';
 
 /// Firestore cloud backup/restore service.
 ///
@@ -309,20 +311,22 @@ class FirestoreSyncService {
     await _db.collection('users').doc(userId).delete();
 
     // Step 3 — Clear all local Hive boxes
-    Future<void> clearBox(String name) async {
+    // Use Hive.box<T>() (not openBox) — boxes are already open; each must be
+    // accessed with its registered type or Hive throws a type-mismatch error.
+    Future<void> clearBox<E>(String name) async {
       if (Hive.isBoxOpen(name)) {
-        await Hive.box<dynamic>(name).clear();
+        await Hive.box<E>(name).clear();
       }
     }
 
-    await clearBox(HiveStorage.invoicesBoxName);
-    await clearBox(HiveStorage.clientsBoxName);
-    await clearBox(HiveStorage.expensesBoxName);
-    await clearBox(HiveStorage.settingsBoxName);
-    await clearBox(HiveStorage.remindersBoxName);
-    await clearBox(HiveStorage.userProfileBoxName);
-    await clearBox(HiveStorage.appPreferencesBoxName);
-    await clearBox(HiveStorage.invoiceTemplatesBoxName);
+    await clearBox<InvoiceModel>(HiveStorage.invoicesBoxName);
+    await clearBox<ClientModel>(HiveStorage.clientsBoxName);
+    await clearBox<ExpenseModel>(HiveStorage.expensesBoxName);
+    await clearBox<dynamic>(HiveStorage.settingsBoxName);
+    await clearBox<ReminderModel>(HiveStorage.remindersBoxName);
+    await clearBox<ProfileModel>(HiveStorage.userProfileBoxName);
+    await clearBox<AppPreferencesModel>(HiveStorage.appPreferencesBoxName);
+    await clearBox<InvoiceTemplateModel>(HiveStorage.invoiceTemplatesBoxName);
 
     // Step 4 — Delete the Firebase Auth account
     try {

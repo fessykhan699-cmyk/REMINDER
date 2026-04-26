@@ -158,6 +158,38 @@ class AuthLocalDatasource {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
+
+  Future<void> reauthenticateWithGoogle() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('No user signed in to reauthenticate.');
+    }
+    // Force fresh Google sign-in to get a current credential.
+    await _googleSignIn.signOut();
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Reauthentication cancelled.');
+    }
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    await user.reauthenticateWithCredential(credential);
+  }
+
+  Future<void> reauthenticateWithPassword(String password) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('No user signed in to reauthenticate.');
+    }
+    final email = user.email;
+    if (email == null) {
+      throw Exception('No email associated with this account.');
+    }
+    final credential = EmailAuthProvider.credential(email: email, password: password);
+    await user.reauthenticateWithCredential(credential);
+  }
   
   Future<AuthSessionModel?> reloadUser() async {
     final user = _auth.currentUser;

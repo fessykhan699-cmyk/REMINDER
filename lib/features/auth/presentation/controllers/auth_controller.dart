@@ -24,6 +24,7 @@ class AuthViewState {
     required this.onboardingCompleted,
     required this.isSubmitting,
     required this.errorMessage,
+    required this.reauthInProgress,
   });
 
   factory AuthViewState.initial() {
@@ -33,6 +34,7 @@ class AuthViewState {
       onboardingCompleted: false,
       isSubmitting: false,
       errorMessage: null,
+      reauthInProgress: false,
     );
   }
 
@@ -41,6 +43,7 @@ class AuthViewState {
   final bool onboardingCompleted;
   final bool isSubmitting;
   final String? errorMessage;
+  final bool reauthInProgress;
 
   AuthViewState copyWith({
     AuthStatus? status,
@@ -50,6 +53,7 @@ class AuthViewState {
     bool? isSubmitting,
     String? errorMessage,
     bool clearError = false,
+    bool? reauthInProgress,
   }) {
     return AuthViewState(
       status: status ?? this.status,
@@ -57,6 +61,7 @@ class AuthViewState {
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      reauthInProgress: reauthInProgress ?? this.reauthInProgress,
     );
   }
 }
@@ -318,6 +323,26 @@ class AuthController extends Notifier<AuthViewState> {
     }
   }
 
+  Future<void> reauthenticateWithGoogle() async {
+    state = state.copyWith(reauthInProgress: true);
+    try {
+      final datasource = ref.read(authLocalDatasourceProvider);
+      await datasource.reauthenticateWithGoogle();
+    } finally {
+      state = state.copyWith(reauthInProgress: false);
+    }
+  }
+
+  Future<void> reauthenticateWithPassword(String password) async {
+    state = state.copyWith(reauthInProgress: true);
+    try {
+      final datasource = ref.read(authLocalDatasourceProvider);
+      await datasource.reauthenticateWithPassword(password);
+    } finally {
+      state = state.copyWith(reauthInProgress: false);
+    }
+  }
+
   Future<void> logout() async {
     ref.read(firestoreSyncServiceProvider).clearSession();
     state = state.copyWith(isSubmitting: true, clearError: true);
@@ -336,6 +361,22 @@ class AuthController extends Notifier<AuthViewState> {
         isSubmitting: false,
         errorMessage: error.toString(),
       );
+    }
+  }
+
+  Future<void> deleteAccount(String userId) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      await ref.read(firestoreSyncServiceProvider).deleteAccount(userId);
+      await _clearWorkspaceOwner();
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearSession: true,
+        isSubmitting: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false);
+      rethrow;
     }
   }
 
